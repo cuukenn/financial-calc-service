@@ -5,6 +5,8 @@ import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideInAPackage;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.resideOutsideOfPackages;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 class DependencyDirectionTest {
@@ -13,14 +15,20 @@ class DependencyDirectionTest {
 
     @Test
     void domain_must_not_depend_on_frameworks() {
-        // com.fincalc.domain is empty until the domain model lands; ArchUnit 1.x rejects
-        // rules whose `that()` clause matches nothing, so allow an empty match for now.
-        // The rule becomes effective as soon as the first domain class exists.
         ArchRule rule = noClasses().that().resideInAPackage("com.fincalc.domain..")
                 .should().dependOnClassesThat().resideInAnyPackage(
-                        "org.springframework..", "org.apache.poi..",
-                        "org.apache.ibatis..", "com.fasterxml.jackson..")
-                .allowEmptyShould(true);
+                        "lombok..", "org.springframework..", "org.apache.poi..",
+                        "org.apache.ibatis..", "com.fasterxml.jackson..");
+        rule.check(classes);
+    }
+
+    @Test
+    void domain_may_only_depend_on_domain_and_common() {
+        // 箭头只能指向 domain 与 common：domain 内的类不得依赖任何其他 com.fincalc 包
+        //（JDK 类型不受限）。其他模块尚未建立，建立后本规则自动覆盖它们。
+        ArchRule rule = noClasses().that().resideInAPackage("com.fincalc.domain..")
+                .should().dependOnClassesThat(resideInAPackage("com.fincalc..")
+                        .and(resideOutsideOfPackages("com.fincalc.domain..", "com.fincalc.common..")));
         rule.check(classes);
     }
 }
