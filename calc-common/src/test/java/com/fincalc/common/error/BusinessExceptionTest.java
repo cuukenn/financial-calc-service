@@ -1,7 +1,9 @@
 package com.fincalc.common.error;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.MissingFormatArgumentException;
 import org.junit.jupiter.api.Test;
 
 class BusinessExceptionTest {
@@ -35,6 +37,24 @@ class BusinessExceptionTest {
         args[1] = 99;
 
         assertThat(ex.args()).containsExactly("periods", 0);
+    }
+
+    @Test
+    void formatted_message_contains_no_placeholder() {
+        assertThat(new BusinessException(CommonErrorCode.INVALID_ARGUMENT, "periods", 0).getMessage())
+                .doesNotContain("%");
+        assertThat(new BusinessException(CommonErrorCode.NOT_FOUND, "PRODUCT").getMessage())
+                .doesNotContain("%");
+        assertThat(new BusinessException(CommonErrorCode.STATE_CONFLICT, "SETTLED", "DRAFT").getMessage())
+                .doesNotContain("%");
+    }
+
+    @Test
+    void wrong_arity_fails_at_construction() {
+        assertThatThrownBy(() -> new BusinessException(CommonErrorCode.INVALID_ARGUMENT, "periods"))
+                .isInstanceOf(MissingFormatArgumentException.class);
+        assertThatThrownBy(() -> new BusinessException(CommonErrorCode.NOT_FOUND))
+                .isInstanceOf(MissingFormatArgumentException.class);
     }
 
     @Test

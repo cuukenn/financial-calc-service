@@ -1,5 +1,6 @@
 package com.fincalc.common.error;
 
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -8,6 +9,10 @@ import java.util.Objects;
  * <p>The message is formatted once, at construction time, from the code's template and the given
  * arguments. Callers should treat this exception as part of the normal API contract rather than as a
  * programming error.
+ *
+ * <p>The template is always formatted, so a wrong number of arguments fails loudly at construction
+ * with {@link java.util.MissingFormatArgumentException} instead of leaking placeholders into a
+ * user-facing message.
  */
 public class BusinessException extends RuntimeException {
 
@@ -42,9 +47,7 @@ public class BusinessException extends RuntimeException {
     private static String format(ErrorCode errorCode, Object[] args) {
         Objects.requireNonNull(errorCode, "errorCode");
         String template = Objects.requireNonNull(errorCode.message(), "errorCode.message()");
-        if (args == null || args.length == 0) {
-            return template;
-        }
-        return String.format(template, args);
+        Object[] effectiveArgs = args == null ? new Object[0] : args;
+        return String.format(Locale.ROOT, template, effectiveArgs);
     }
 }
