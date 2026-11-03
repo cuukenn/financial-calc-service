@@ -47,10 +47,10 @@ class DateRollConventionsTest {
     }
 
     @Test
-    void end_of_month_never_returns_a_weekend() {
-        // 2024-06-30 是周日 → 同月最后一个工作日 2024-06-28
+    void end_of_month_does_not_adjust_for_weekends() {
+        // 2024-06-30 是周日，END_OF_MONTH 只对齐日，不避周末
         assertThat(DateRollConventions.all().require("END_OF_MONTH")
-                .roll(LocalDate.of(2024, 6, 10))).isEqualTo(LocalDate.of(2024, 6, 28));
+                .roll(LocalDate.of(2024, 6, 10))).isEqualTo(LocalDate.of(2024, 6, 30));
     }
 
     @Test

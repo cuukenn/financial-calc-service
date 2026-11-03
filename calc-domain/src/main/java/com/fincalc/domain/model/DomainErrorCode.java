@@ -23,7 +23,10 @@ public enum DomainErrorCode implements ErrorCode {
     IRREGULAR_PERIODS_INVALID("FCS-DOM-1006", "FCS-DOM-1006: 不规则频率必须提供显式期间且每项 start < end: %s"),
 
     BALLOON_RESIDUAL_OUT_OF_RANGE("FCS-DOM-1007",
-            "FCS-DOM-1007: BALLOON_IN_RENT 模式下残值必须满足 0 <= 残值 < 本金: %s");
+            "FCS-DOM-1007: BALLOON_IN_RENT 模式下残值必须满足 0 <= 残值 < 本金: %s"),
+
+    PERIOD_SEQUENCE_INVALID("FCS-DOM-2001",
+            "FCS-DOM-2001: 期次日期必须严格递增且 start < end: 第 %s 期 [%s, %s]");
 
     private final String code;
     private final String message;

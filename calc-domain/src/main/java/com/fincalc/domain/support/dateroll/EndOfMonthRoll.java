@@ -5,10 +5,10 @@ import com.fincalc.domain.port.DateRollConvention;
 import java.time.LocalDate;
 
 /**
- * Snaps to the last day of the date's month.
+ * Snaps to the last calendar day of the date's month.
  *
- * <p>When that last day is a weekend, the roll moves backward to the last weekday of the same month:
- * a payment date never leaves the month it belongs to, and never lands on a weekend.
+ * <p>This convention only aligns the day-of-month; it does not avoid weekends. Compose it with a
+ * business-day rule at the call site when a weekday is required.
  */
 public final class EndOfMonthRoll implements DateRollConvention {
 
@@ -19,10 +19,6 @@ public final class EndOfMonthRoll implements DateRollConvention {
 
     @Override
     public LocalDate roll(LocalDate date) {
-        LocalDate rolled = DateUtils.endOfMonth(date);
-        while (Following.isWeekend(rolled)) {
-            rolled = rolled.minusDays(1);
-        }
-        return rolled;
+        return DateUtils.endOfMonth(date);
     }
 }
