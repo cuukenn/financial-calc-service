@@ -77,6 +77,15 @@ class TailAdjustersTest {
     }
 
     @Test
+    void rejects_adjustment_that_would_make_principal_negative() {
+        Installment row = inst(1, "100.00");
+        assertThatThrownBy(() -> TailAdjusters.forPolicy(TailAdjustPolicy.LAST_PERIOD)
+                .adjust(row, new BigDecimal("-200.00"), RoundingPolicy.defaults()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("negative");
+    }
+
+    @Test
     void exposes_all_policies_by_code() {
         assertThat(TailAdjusters.forPolicy(TailAdjustPolicy.LAST_PERIOD).code()).isEqualTo("LAST_PERIOD");
         assertThat(TailAdjusters.forPolicy(TailAdjustPolicy.FIRST_PERIOD).code()).isEqualTo("FIRST_PERIOD");

@@ -25,6 +25,10 @@ public final class TailAdjustment {
 
         BigDecimal rent = source.rentDue().add(delta).setScale(policy.scale(), policy.mode());
         BigDecimal principal = source.principalDue().add(delta).setScale(policy.scale(), policy.mode());
+        if (principal.signum() < 0) {
+            throw new IllegalArgumentException("tail adjustment would make principal negative: period "
+                    + source.periodNo() + ", principal " + principal.toPlainString());
+        }
 
         return new Installment(source.periodNo(), source.startDate(), source.endDate(), source.days(),
                 source.openingBalance(), principal, source.interestAccrued(), source.interestPaid(),
