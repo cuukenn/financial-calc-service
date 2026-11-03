@@ -34,6 +34,19 @@ public final class ExtensionRegistry<T extends OrderedExtension> {
     }
 
     /**
+     * Creates an empty registry for explicit registration.
+     *
+     * <p>Use this when a component owns a fixed set of built-in extensions and must not pick up
+     * {@link ServiceLoader} providers from the classpath.
+     *
+     * @param <T> extension type
+     * @return a mutable, empty registry
+     */
+    public static <T extends OrderedExtension> ExtensionRegistry<T> empty() {
+        return new ExtensionRegistry<>();
+    }
+
+    /**
      * Creates a registry populated with every extension the {@link ServiceLoader} finds for
      * {@code type}.
      *
