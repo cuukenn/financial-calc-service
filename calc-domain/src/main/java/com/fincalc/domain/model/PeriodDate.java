@@ -26,7 +26,7 @@ public final class PeriodDate {
         return startDate;
     }
 
-    /** Last day of the period (inclusive). */
+    /** End of the period, exclusive: the first day of the next period. */
     public LocalDate endDate() {
         return endDate;
     }

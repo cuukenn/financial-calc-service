@@ -76,7 +76,7 @@ public final class PeriodBuilder {
 
     private static void requireOrdered(int periodNo, LocalDate start, LocalDate end, LocalDate previousEnd) {
         boolean reversed = start == null || end == null || !start.isBefore(end);
-        boolean overlaps = previousEnd != null && start.isBefore(previousEnd);
+        boolean overlaps = start != null && previousEnd != null && start.isBefore(previousEnd);
         if (reversed || overlaps) {
             throw new BusinessException(DomainErrorCode.PERIOD_SEQUENCE_INVALID, periodNo, start, end);
         }
