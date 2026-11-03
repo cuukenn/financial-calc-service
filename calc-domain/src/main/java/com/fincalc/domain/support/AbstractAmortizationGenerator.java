@@ -1,7 +1,6 @@
 package com.fincalc.domain.support;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -16,6 +15,7 @@ import com.fincalc.domain.model.LeaseElement;
 import com.fincalc.domain.model.PaymentTiming;
 import com.fincalc.domain.model.PeriodDate;
 import com.fincalc.domain.model.RoundingPolicy;
+import com.fincalc.domain.model.ResidualHandling;
 import com.fincalc.domain.model.RuleOutcome;
 import com.fincalc.domain.model.Schedule;
 import com.fincalc.domain.model.ScheduleHeader;
@@ -47,9 +47,11 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
     /**
      * Hook for one-off parameters that must be computed before the loop, typically the level
-     * payment. Default implementation does nothing.
+     * payment. The periods and the day-count convention are passed in because a periodic rate
+     * cannot be derived from the nominal rate alone.
      */
-    protected void prepare(LeaseElement element, AmortizationState state) {
+    protected void prepare(CalculationContext context, List<PeriodDate> periods,
+            AmortizationState state) {
     }
 
     /** Hook for element-level preconditions; default implementation does nothing. */
@@ -62,19 +64,32 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
     }
 
     /**
-     * Annual rate applied to one period. Defaults to the rate resolved by the rule set, or the
-     * element's nominal rate when no rule matches.
+     * Resolves the rule governing one period, or returns {@link RuleOutcome#none()} when the
+     * run has no rule set.
      */
-    protected BigDecimal annualRate(LeaseElement element, RuleSetView ruleSet, int periodNo,
-            BigDecimal openingBalance, int days) {
+    protected RuleOutcome resolveRule(RuleSetView ruleSet, int periodNo, BigDecimal openingBalance,
+            int days, BigDecimal defaultAnnualRate) {
         if (ruleSet == null) {
-            return element.nominalRate();
+            return RuleOutcome.none();
         }
-        RuleOutcome outcome = ruleSet.resolve(periodNo, openingBalance, days, element.nominalRate());
+        RuleOutcome outcome = ruleSet.resolve(periodNo, openingBalance, days, defaultAnnualRate);
+        return outcome == null ? RuleOutcome.none() : outcome;
+    }
+
+    /**
+     * Annual rate applied to one period. Uses the rate resolved by the rule set when present,
+     * otherwise the element's nominal rate.
+     */
+    protected BigDecimal annualRate(LeaseElement element, RuleOutcome outcome) {
         if (outcome == null || !outcome.matched() || outcome.annualRate() == null) {
             return element.nominalRate();
         }
         return outcome.annualRate();
+    }
+
+    /** Name recorded in the schedule header; solvers override it with their own strategy. */
+    protected String solverName() {
+        return DEFAULT_SOLVER;
     }
 
     /**
@@ -100,7 +115,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         RoundingPolicy rounding = element.rounding();
         DayCountConvention dayCount = context.dayCount();
         AmortizationState state = new AmortizationState();
-        prepare(element, state);
+        prepare(context, periods, state);
 
         List<Installment> installments = new ArrayList<>(periods.size());
         List<ValidationIssue> issues = new ArrayList<>();
@@ -114,14 +129,17 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
             int periodNo = index + 1;
             int days = dayCount.days(period.startDate(), period.endDate());
             BigDecimal openingBalance = balance;
-            BigDecimal rate = annualRate(element, context.ruleSet(), periodNo, openingBalance, days);
+            RuleOutcome outcome = resolveRule(context.ruleSet(), periodNo, openingBalance, days,
+                    element.nominalRate());
+            BigDecimal rate = annualRate(element, outcome);
             BigDecimal periodicRate = periodRate(element, period, rate, dayCount);
             BigDecimal accruedInterest = money(openingBalance.multiply(periodicRate), rounding);
             boolean lastPeriod = index == totalPeriods - 1;
 
             AllocationInput input = new AllocationInput(periodNo, totalPeriods, openingBalance,
                     periodicRate, accruedInterest,
-                    element.principal().subtract(cumulativePrincipal), lastPeriod, element.timing());
+                    element.principal().subtract(cumulativePrincipal), lastPeriod, element.timing(),
+                    days, element, outcome);
             Allocation allocation = allocate(input, state);
             if (allocation == null) {
                 throw new IllegalStateException("allocate returned null for period " + periodNo);
@@ -129,44 +147,62 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
             BigDecimal principalDue = money(allocation.principalDue(), rounding);
             BigDecimal interestPaid = money(allocation.interestPaid(), rounding);
-            BigDecimal fee = money(MoneyUtils.ZERO, rounding);
-            BigDecimal tax = money(MoneyUtils.ZERO, rounding);
-            BigDecimal rentDue = money(principalDue.add(interestPaid).add(fee).add(tax), rounding);
+            BigDecimal fee = allocation.fee() == null ? money(MoneyUtils.ZERO, rounding)
+                    : money(allocation.fee(), rounding);
+            BigDecimal tax = allocation.tax() == null ? null : money(allocation.tax(), rounding);
+            BigDecimal rentDue = money(principalDue.add(interestPaid).add(fee)
+                    .add(tax == null ? MoneyUtils.ZERO : tax), rounding);
             BigDecimal closingBalance = money(openingBalance.subtract(principalDue), rounding);
 
             cumulativePrincipal = money(cumulativePrincipal.add(principalDue), rounding);
             cumulativeInterest = money(cumulativeInterest.add(interestPaid), rounding);
+            state.cumulativePrincipal(cumulativePrincipal);
+            state.cumulativeInterest(cumulativeInterest);
 
             installments.add(new Installment(periodNo, period.startDate(), period.endDate(), days,
                     openingBalance, principalDue, accruedInterest, interestPaid, fee, tax, rentDue,
-                    closingBalance, cumulativePrincipal, cumulativeInterest, rate, null));
+                    closingBalance, cumulativePrincipal, cumulativeInterest, rate,
+                    allocation.memo()));
             balance = closingBalance;
         }
 
-        checkConservation(element, installments, balance, rounding, issues);
+        BigDecimal roundingDifference = checkConservation(element, installments, balance,
+                rounding, issues);
 
         ScheduleHeader header = new ScheduleHeader(FinancialMetrics.empty(), installments.size(),
                 periods.get(0).startDate(), periods.get(periods.size() - 1).endDate(),
-                DEFAULT_SOLVER, money(MoneyUtils.ZERO, rounding));
+                solverName(), roundingDifference);
         return new Schedule(header, installments, Collections.emptyList(), issues);
     }
 
-    private void checkConservation(LeaseElement element, List<Installment> installments,
+    /**
+     * Verifies that principal is conserved and that the schedule ends where the residual policy
+     * says it should. Returns the absorbed rounding difference.
+     */
+    private BigDecimal checkConservation(LeaseElement element, List<Installment> installments,
             BigDecimal closingBalance, RoundingPolicy rounding, List<ValidationIssue> issues) {
         BigDecimal principalSum = MoneyUtils.ZERO;
         for (Installment installment : installments) {
             principalSum = principalSum.add(installment.principalDue());
         }
-        if (principalSum.subtract(element.principal()).abs().compareTo(TOLERANCE) > 0) {
-            issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-DOM-2002",
-                    "FCS-DOM-2002: 本金合计 " + principalSum.toPlainString()
-                            + " 与合同本金 " + element.principal().toPlainString() + " 不一致",
+        BigDecimal contractPrincipal = money(element.principal(), rounding);
+        if (principalSum.subtract(contractPrincipal).abs().compareTo(TOLERANCE) > 0) {
+            issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3001",
+                    "FCS-CALC-3001: 本金合计 " + principalSum.toPlainString()
+                            + " 与合同本金 " + contractPrincipal.toPlainString() + " 不一致",
                     null));
         }
-        if (closingBalance.abs().compareTo(TOLERANCE) > 0) {
-            issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-DOM-2002",
-                    "FCS-DOM-2002: 末期余额 " + closingBalance.toPlainString() + " 未归零", null));
+        BigDecimal expectedClosing = element.residualHandling() == ResidualHandling.BALLOON_IN_RENT
+                ? money(element.residualValue() == null ? MoneyUtils.ZERO : element.residualValue(), rounding)
+                : money(MoneyUtils.ZERO, rounding);
+        BigDecimal difference = closingBalance.subtract(expectedClosing);
+        if (difference.abs().compareTo(TOLERANCE) > 0) {
+            issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3002",
+                    "FCS-CALC-3002: 末期余额 " + closingBalance.toPlainString()
+                            + " 与预期 " + expectedClosing.toPlainString() + " 不一致", null));
+            return money(MoneyUtils.ZERO, rounding);
         }
+        return money(difference.abs(), rounding);
     }
 
     private static BigDecimal money(BigDecimal value, RoundingPolicy rounding) {
@@ -178,10 +214,21 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
         private final BigDecimal principalDue;
         private final BigDecimal interestPaid;
+        private final BigDecimal fee;
+        private final BigDecimal tax;
+        private final String memo;
 
         public Allocation(BigDecimal principalDue, BigDecimal interestPaid) {
-            this.principalDue = principalDue;
-            this.interestPaid = interestPaid;
+            this(principalDue, interestPaid, null, null, null);
+        }
+
+        public Allocation(BigDecimal principalDue, BigDecimal interestPaid, BigDecimal fee,
+                BigDecimal tax, String memo) {
+            this.principalDue = Objects.requireNonNull(principalDue, "principalDue");
+            this.interestPaid = Objects.requireNonNull(interestPaid, "interestPaid");
+            this.fee = fee;
+            this.tax = tax;
+            this.memo = memo;
         }
 
         public BigDecimal principalDue() {
@@ -190,6 +237,21 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
         public BigDecimal interestPaid() {
             return interestPaid;
+        }
+
+        /** Fee charged in this period, or {@code null} for none. */
+        public BigDecimal fee() {
+            return fee;
+        }
+
+        /** VAT amount, or {@code null} when the schedule does not split tax. */
+        public BigDecimal tax() {
+            return tax;
+        }
+
+        /** Free-form note recorded on the installment, e.g. the matched rule id. */
+        public String memo() {
+            return memo;
         }
     }
 
@@ -204,10 +266,14 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         private final BigDecimal remainingPrincipal;
         private final boolean lastPeriod;
         private final PaymentTiming paymentTiming;
+        private final int days;
+        private final LeaseElement element;
+        private final RuleOutcome ruleOutcome;
 
         public AllocationInput(int periodNo, int totalPeriods, BigDecimal openingBalance,
                 BigDecimal periodRate, BigDecimal accruedInterest, BigDecimal remainingPrincipal,
-                boolean lastPeriod, PaymentTiming paymentTiming) {
+                boolean lastPeriod, PaymentTiming paymentTiming, int days, LeaseElement element,
+                RuleOutcome ruleOutcome) {
             this.periodNo = periodNo;
             this.totalPeriods = totalPeriods;
             this.openingBalance = openingBalance;
@@ -216,6 +282,9 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
             this.remainingPrincipal = remainingPrincipal;
             this.lastPeriod = lastPeriod;
             this.paymentTiming = paymentTiming;
+            this.days = days;
+            this.element = element;
+            this.ruleOutcome = ruleOutcome;
         }
 
         public int periodNo() {
@@ -249,6 +318,21 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
         public PaymentTiming paymentTiming() {
             return paymentTiming;
+        }
+
+        /** Accrual days of the period. */
+        public int days() {
+            return days;
+        }
+
+        /** The lease element being calculated. */
+        public LeaseElement element() {
+            return element;
+        }
+
+        /** Rule resolved for this period; never {@code null} (use {@code matched()}). */
+        public RuleOutcome ruleOutcome() {
+            return ruleOutcome;
         }
     }
 
