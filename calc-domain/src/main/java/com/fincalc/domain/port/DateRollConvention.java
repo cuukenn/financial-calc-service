@@ -11,8 +11,9 @@ import java.time.LocalDate;
  * calendar is a v2 extension: an implementation may consult its own calendar set, because the port
  * receives only the date to roll.
  *
- * <p>Rolling is not required to be idempotent for every convention, but every built-in returns a
- * date that is not a weekend.
+ * <p>Rolling is not required to be idempotent for every convention. Every rolling built-in returns
+ * a date that is not a weekend; {@code NONE} intentionally returns the nominal date unchanged, even
+ * when it is a weekend.
  */
 public interface DateRollConvention extends OrderedExtension {
 
