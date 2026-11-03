@@ -1,6 +1,7 @@
 package com.fincalc.domain.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import com.fincalc.domain.port.DayCountConvention;
 import java.math.BigDecimal;
@@ -45,5 +46,38 @@ class DayCountConventionsTest {
     void euro_thirty_clamps_both_endpoints() {
         DayCountConvention c = DayCountConventions.all().require("THIRTY_E_360");
         assertThat(c.days(LocalDate.of(2024, 1, 31), LocalDate.of(2024, 3, 31))).isEqualTo(60);
+    }
+
+    @Test
+    void every_convention_rejects_a_reversed_range() {
+        LocalDate later = LocalDate.of(2024, 3, 1);
+        LocalDate earlier = LocalDate.of(2024, 2, 1);
+        for (DayCountConvention c : DayCountConventions.all().all()) {
+            assertThatIllegalArgumentException()
+                    .as(c.code())
+                    .isThrownBy(() -> c.days(later, earlier));
+            assertThatIllegalArgumentException()
+                    .as(c.code())
+                    .isThrownBy(() -> c.yearFraction(later, earlier));
+        }
+    }
+
+    @Test
+    void zero_length_range_yields_zero() {
+        LocalDate day = LocalDate.of(2024, 2, 29);
+        for (DayCountConvention c : DayCountConventions.all().all()) {
+            assertThat(c.days(day, day)).as(c.code()).isZero();
+            assertThat(c.yearFraction(day, day)).as(c.code()).isEqualByComparingTo("0.000000000000");
+        }
+    }
+
+    @Test
+    void act_365_family_uses_its_own_basis() {
+        LocalDate start = LocalDate.of(2024, 1, 1);
+        LocalDate end = LocalDate.of(2025, 1, 1);
+        assertThat(DayCountConventions.all().require("ACT_365F").yearFraction(start, end))
+                .isEqualByComparingTo(new BigDecimal("1.002739726027"));
+        assertThat(DayCountConventions.all().require("ACT_365_25").yearFraction(start, end))
+                .isEqualByComparingTo(new BigDecimal("1.002053388090"));
     }
 }

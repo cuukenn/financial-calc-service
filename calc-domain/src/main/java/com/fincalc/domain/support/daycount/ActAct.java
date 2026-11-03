@@ -1,11 +1,11 @@
 package com.fincalc.domain.support.daycount;
 
+import com.fincalc.common.date.DateUtils;
 import com.fincalc.common.money.MoneyScale;
 import com.fincalc.domain.port.DayCountConvention;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 
 /**
  * Actual/Actual (ISDA): the range is split at every calendar-year boundary and each segment is
@@ -22,12 +22,14 @@ public final class ActAct implements DayCountConvention {
 
     @Override
     public int days(LocalDate start, LocalDate end) {
-        return Math.toIntExact(ChronoUnit.DAYS.between(start, end));
+        DayCountRanges.requireOrdered(start, end);
+        return DateUtils.daysBetween(start, end);
     }
 
     @Override
     public BigDecimal yearFraction(LocalDate start, LocalDate end) {
-        if (!end.isAfter(start)) {
+        DayCountRanges.requireOrdered(start, end);
+        if (end.equals(start)) {
             return BigDecimal.ZERO.setScale(MoneyScale.CALC);
         }
         BigDecimal total = BigDecimal.ZERO;
@@ -35,7 +37,7 @@ public final class ActAct implements DayCountConvention {
         while (cursor.isBefore(end)) {
             LocalDate nextYear = LocalDate.of(cursor.getYear() + 1, 1, 1);
             LocalDate segmentEnd = nextYear.isBefore(end) ? nextYear : end;
-            int segmentDays = (int) ChronoUnit.DAYS.between(cursor, segmentEnd);
+            int segmentDays = DateUtils.daysBetween(cursor, segmentEnd);
             int daysInYear = cursor.isLeapYear() ? 366 : 365;
             total = total.add(BigDecimal.valueOf(segmentDays)
                     .divide(BigDecimal.valueOf(daysInYear), INTERMEDIATE_SCALE, RoundingMode.HALF_UP));

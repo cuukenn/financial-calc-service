@@ -15,6 +15,7 @@ public final class ThirtyE360 implements DayCountConvention {
 
     @Override
     public int days(LocalDate start, LocalDate end) {
+        DayCountRanges.requireOrdered(start, end);
         int d1 = Math.min(start.getDayOfMonth(), 30);
         int d2 = Math.min(end.getDayOfMonth(), 30);
         return 360 * (end.getYear() - start.getYear())

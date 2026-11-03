@@ -91,6 +91,17 @@ class ExtensionRegistryTest {
         }
     }
 
+    @Test
+    void empty_registry_starts_with_no_extensions_and_accepts_registration() {
+        ExtensionRegistry<FakeExt> registry = ExtensionRegistry.empty();
+
+        assertThat(registry.all()).isEmpty();
+
+        registry.register(new FakeExt("a", 10));
+
+        assertThat(registry.all()).extracting(FakeExt::code).containsExactly("a");
+    }
+
     public static final class DefaultOrderExt implements OrderedExtension {
 
         @Override
