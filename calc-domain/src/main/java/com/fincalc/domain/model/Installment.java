@@ -59,7 +59,7 @@ public final class Installment {
         return startDate;
     }
 
-    /** Last day of the interest accrual window (inclusive). */
+    /** End of the interest accrual window (exclusive); the next period starts here. */
     public LocalDate endDate() {
         return endDate;
     }
