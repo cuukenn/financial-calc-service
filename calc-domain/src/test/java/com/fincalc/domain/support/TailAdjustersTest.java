@@ -77,6 +77,20 @@ class TailAdjustersTest {
     }
 
     @Test
+    void proportional_skips_interest_only_rows() {
+        List<Installment> rows = List.of(
+                instWithPrincipal(1, "5000.00", "0.00"),
+                instWithPrincipal(2, "5000.00", "5000.00"));
+
+        List<Installment> adjusted = TailAdjusters.applyProportional(rows, new BigDecimal("9999.99"));
+
+        assertThat(adjusted.get(0).principalDue()).isEqualByComparingTo("0.00");
+        assertThat(adjusted.get(0).rentDue()).isEqualByComparingTo("5000.00");
+        assertThat(adjusted.get(1).principalDue()).isEqualByComparingTo("4999.99");
+        assertThat(adjusted.get(1).rentDue()).isEqualByComparingTo("4999.99");
+    }
+
+    @Test
     void rejects_adjustment_that_would_make_principal_negative() {
         Installment row = inst(1, "100.00");
         assertThatThrownBy(() -> TailAdjusters.forPolicy(TailAdjustPolicy.LAST_PERIOD)
@@ -90,6 +104,17 @@ class TailAdjustersTest {
         assertThat(TailAdjusters.forPolicy(TailAdjustPolicy.LAST_PERIOD).code()).isEqualTo("LAST_PERIOD");
         assertThat(TailAdjusters.forPolicy(TailAdjustPolicy.FIRST_PERIOD).code()).isEqualTo("FIRST_PERIOD");
         assertThat(TailAdjusters.forPolicy(TailAdjustPolicy.PROPORTIONAL).code()).isEqualTo("PROPORTIONAL");
+    }
+
+    private static Installment instWithPrincipal(int periodNo, String rent, String principal) {
+        BigDecimal amount = new BigDecimal(rent);
+        BigDecimal principalDue = new BigDecimal(principal);
+        LocalDate start = LocalDate.of(2024, 1, 1).plusMonths(periodNo - 1L);
+        return new Installment(periodNo, start, start.plusMonths(1), 30,
+                new BigDecimal("1000000.00"), principalDue, amount.subtract(principalDue),
+                amount.subtract(principalDue), BigDecimal.ZERO, BigDecimal.ZERO, amount,
+                new BigDecimal("918933.57"), principalDue, amount.subtract(principalDue),
+                new BigDecimal("0.06"), null);
     }
 
     private static Installment inst(int periodNo, String rent) {

@@ -86,7 +86,7 @@ public final class TailAdjusters {
         int size = rows.size();
         BigDecimal[] deltas = new BigDecimal[size];
         BigDecimal totalWeight = MoneyUtils.sum(
-                rows.stream().map(row -> row.rentDue().abs()).collect(Collectors.toList()));
+                rows.stream().map(TailAdjusters::weightOf).collect(Collectors.toList()));
 
         if (totalWeight.signum() == 0) {
             Arrays.fill(deltas, BigDecimal.ZERO.setScale(MoneyScale.OUTPUT));
@@ -98,7 +98,7 @@ public final class TailAdjusters {
         BigDecimal[] fractions = new BigDecimal[size];
         BigDecimal allocated = BigDecimal.ZERO;
         for (int i = 0; i < size; i++) {
-            BigDecimal weight = rows.get(i).rentDue().abs();
+            BigDecimal weight = weightOf(rows.get(i));
             BigDecimal exact = magnitude.multiply(weight)
                     .divide(totalWeight, MoneyScale.INTERMEDIATE, RoundingMode.HALF_UP);
             BigDecimal base = exact.setScale(MoneyScale.OUTPUT, RoundingMode.DOWN);
@@ -127,5 +127,14 @@ public final class TailAdjusters {
             }
         }
         return deltas;
+    }
+
+    /**
+     * Rent-weighted, except for interest-only rows: they carry no principal, so any delta assigned to
+     * them would drive {@code principalDue} below zero. Their weight is zero and the difference goes
+     * to principal-bearing rows instead.
+     */
+    private static BigDecimal weightOf(Installment row) {
+        return row.principalDue().signum() > 0 ? row.rentDue().abs() : BigDecimal.ZERO;
     }
 }
