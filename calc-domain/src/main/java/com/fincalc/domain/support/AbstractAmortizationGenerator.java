@@ -186,15 +186,18 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
             principalSum = principalSum.add(installment.principalDue());
         }
         BigDecimal contractPrincipal = money(element.principal(), rounding);
-        if (principalSum.subtract(contractPrincipal).abs().compareTo(TOLERANCE) > 0) {
+        BigDecimal residual = element.residualValue() == null ? MoneyUtils.ZERO : element.residualValue();
+        boolean balloon = element.residualHandling() == ResidualHandling.BALLOON_IN_RENT;
+        BigDecimal expectedPrincipal = balloon
+                ? money(contractPrincipal.subtract(residual), rounding)
+                : contractPrincipal;
+        if (principalSum.subtract(expectedPrincipal).abs().compareTo(TOLERANCE) > 0) {
             issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3001",
                     "FCS-CALC-3001: 本金合计 " + principalSum.toPlainString()
-                            + " 与合同本金 " + contractPrincipal.toPlainString() + " 不一致",
+                            + " 与应还本金 " + expectedPrincipal.toPlainString() + " 不一致",
                     null));
         }
-        BigDecimal expectedClosing = element.residualHandling() == ResidualHandling.BALLOON_IN_RENT
-                ? money(element.residualValue() == null ? MoneyUtils.ZERO : element.residualValue(), rounding)
-                : money(MoneyUtils.ZERO, rounding);
+        BigDecimal expectedClosing = balloon ? money(residual, rounding) : money(MoneyUtils.ZERO, rounding);
         BigDecimal difference = closingBalance.subtract(expectedClosing);
         if (difference.abs().compareTo(TOLERANCE) > 0) {
             issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3002",

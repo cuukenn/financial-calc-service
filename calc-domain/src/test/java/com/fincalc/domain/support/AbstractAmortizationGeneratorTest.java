@@ -46,6 +46,19 @@ class AbstractAmortizationGeneratorTest {
         assertThat(s.installments().get(11).closingBalance()).isEqualByComparingTo("0.00");
     }
 
+    @Test
+    void balloon_residual_may_remain_at_maturity() {
+        LeaseElement element = baseElement().toBuilder()
+                .residualValue(new BigDecimal("100000"))
+                .residualHandling(ResidualHandling.BALLOON_IN_RENT)
+                .build();
+
+        Schedule s = new BalloonStub().generate(context(element));
+
+        assertThat(s.installments().get(11).closingBalance()).isEqualByComparingTo("100000.00");
+        assertThat(s.hasErrors()).isFalse();
+    }
+
     private static CalculationContext context(LeaseElement element) {
         return new CalculationContext(element, null, new Thirty360(), new NoRoll(),
                 SystemClockProvider.INSTANCE, CalculationOptions.defaults());
@@ -72,6 +85,28 @@ class AbstractAmortizationGeneratorTest {
                 .currency("CNY")
                 .rateChangePolicy(RateChangePolicy.RESOLVE)
                 .build();
+    }
+
+    /** Test double: amortizes principal minus the residual, leaving the balloon at maturity. */
+    private static final class BalloonStub extends AbstractAmortizationGenerator {
+
+        @Override
+        public String code() {
+            return "BALLOON_STUB";
+        }
+
+        @Override
+        public boolean supports(CalculationContext context) {
+            return true;
+        }
+
+        @Override
+        protected Allocation allocate(AllocationInput input, AmortizationState state) {
+            BigDecimal principal = input.lastPeriod()
+                    ? input.remainingPrincipal().subtract(input.element().residualValue())
+                    : new BigDecimal("75000");
+            return new Allocation(principal, input.accruedInterest());
+        }
     }
 
     /** Test double: fixed principal per period, remainder in the last period. */
