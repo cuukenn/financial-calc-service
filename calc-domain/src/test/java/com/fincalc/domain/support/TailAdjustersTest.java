@@ -94,7 +94,9 @@ class TailAdjustersTest {
 
     private static Installment inst(int periodNo, String rent) {
         BigDecimal amount = new BigDecimal(rent);
-        BigDecimal principal = amount.subtract(new BigDecimal("5000.00"));
+        BigDecimal principal = amount.compareTo(new BigDecimal("5000.00")) > 0
+                ? amount.subtract(new BigDecimal("5000.00"))
+                : amount;
         LocalDate start = LocalDate.of(2024, 1, 1).plusMonths(periodNo - 1L);
         return new Installment(periodNo, start, start.plusMonths(1), 30,
                 new BigDecimal("1000000.00"), principal, new BigDecimal("5000.00"), new BigDecimal("5000.00"),
