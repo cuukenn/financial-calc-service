@@ -197,9 +197,13 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         BigDecimal expectedClosing = money(residual, rounding);
         BigDecimal difference = closingBalance.subtract(expectedClosing);
         if (difference.abs().compareTo(TOLERANCE) >= 0) {
+            // Tagged with the last period number so the validator chain recognises this finding as
+            // the same one its own tail-balance check would raise, instead of reporting it twice.
+            Integer lastPeriodNo = installments.isEmpty() ? null
+                    : installments.get(installments.size() - 1).periodNo();
             issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3002",
                     "FCS-CALC-3002: 末期余额 " + closingBalance.toPlainString()
-                            + " 与预期 " + expectedClosing.toPlainString() + " 不一致", null));
+                            + " 与预期 " + expectedClosing.toPlainString() + " 不一致", lastPeriodNo));
             return money(MoneyUtils.ZERO, rounding);
         }
         return money(difference.abs(), rounding);

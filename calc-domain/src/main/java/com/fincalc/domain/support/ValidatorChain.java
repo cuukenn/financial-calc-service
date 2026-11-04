@@ -22,8 +22,9 @@ import java.util.Set;
  * new {@link Schedule} carrying the findings, so a schedule that a caller still holds stays intact.
  *
  * <p>A generator already reports the findings it can see while it builds the plan table. To keep the
- * audit trail readable, a finding the schedule already carries — same code and same period — is not
- * reported a second time.
+ * audit trail readable, the chain reports at most one finding per error code and period: a finding the
+ * schedule already carries is not reported a second time. A validator therefore expresses everything
+ * it found for one period in a single {@link ValidationIssue}, naming each rule that period broke.
  */
 public final class ValidatorChain {
 
@@ -78,7 +79,11 @@ public final class ValidatorChain {
         return Collections.unmodifiableList(findings);
     }
 
-    /** A new schedule carrying both the issues it already had and the newly found ones. */
+    /**
+     * A schedule carrying both the issues it already had and the newly found ones. When nothing new
+     * was found the given schedule is returned unchanged — {@link Schedule} is immutable, so an
+     * identical instance is a valid answer and callers must not rely on object identity changing.
+     */
     public Schedule validate(Schedule schedule, LeaseElement element) {
         List<ValidationIssue> findings = validateAll(schedule, element);
         if (findings.isEmpty()) {

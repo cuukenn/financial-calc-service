@@ -20,6 +20,7 @@ import com.fincalc.domain.model.ScheduleHeader;
 import com.fincalc.domain.model.ValidationIssue;
 import com.fincalc.domain.metric.FinancialMetrics;
 import com.fincalc.domain.support.algo.EqualInstallmentGenerator;
+import com.fincalc.domain.support.algo.EqualPrincipalGenerator;
 import com.fincalc.domain.support.daycount.Thirty360;
 import com.fincalc.domain.support.dateroll.NoRoll;
 import java.math.BigDecimal;
@@ -118,6 +119,77 @@ class ValidatorChainTest {
     void registers_the_three_default_validators() {
         assertThat(ValidatorChain.defaults().codes())
                 .contains("PRINCIPAL_CONSERVATION", "TAIL_BALANCE", "DATE_MONOTONIC");
+    }
+
+    @Test
+    void reports_the_tail_finding_a_generator_already_flagged_only_once() {
+        Schedule flagged = new ShortPayStub().generate(context(baseElement()));
+
+        // The generator sees the tail itself, and the finding belongs to the last period so that the
+        // chain can recognise it as the same finding its own tail check would raise.
+        assertThat(flagged.issues()).anySatisfy(issue -> {
+            assertThat(issue.code()).isEqualTo("FCS-CALC-3002");
+            assertThat(issue.periodNo()).isEqualTo(12);
+        });
+
+        Schedule merged = ValidatorChain.defaults().validate(flagged, baseElement());
+
+        assertThat(merged.issues()).filteredOn(issue -> issue.code().equals("FCS-CALC-3002"))
+                .hasSize(1);
+        assertThat(merged.issues()).filteredOn(issue -> issue.code().equals("FCS-CALC-3001"))
+                .hasSize(1);
+    }
+
+    @Test
+    void names_every_date_rule_a_period_breaks() {
+        List<Installment> rows = new ArrayList<>();
+        rows.add(installment(1, "2024-01-01", "2024-02-01", 31, "1000000.00", "83333.33", "916666.67"));
+        // 第 2 期同时违反两条规则：区间为空，且与上一期结束日不连续。
+        rows.add(installment(2, "2024-02-15", "2024-02-15", 0, "916666.67", "83333.33", "833333.34"));
+        rows.add(installment(3, "2024-02-15", "2024-03-15", 28, "833333.34", "833333.34", "0.00"));
+
+        List<ValidationIssue> issues = ValidatorChain.defaults()
+                .validateAll(schedule(rows), baseElement());
+
+        assertThat(issues).filteredOn(issue -> issue.code().equals("FCS-CALC-3004")).hasSize(1);
+        assertThat(issues).anySatisfy(issue -> {
+            assertThat(issue.message()).contains("不早于结束日");
+            assertThat(issue.message()).contains("不连续");
+        });
+    }
+
+    @Test
+    void accepts_a_schedule_built_at_a_coarser_rounding_scale() {
+        LeaseElement wholeYuan = baseElement().toBuilder()
+                .principal(new BigDecimal("1000000.40"))
+                .rounding(RoundingPolicy.builder().scale(0).build())
+                .build();
+        Schedule schedule = new EqualPrincipalGenerator().generate(context(wholeYuan));
+
+        assertThat(schedule.hasErrors()).isFalse();
+        assertThat(ValidatorChain.defaults().validateAll(schedule, wholeYuan)).isEmpty();
+    }
+
+    /** Test double: underpays 100.00 of principal in the final rent. */
+    private static final class ShortPayStub extends AbstractAmortizationGenerator {
+
+        @Override
+        public String code() {
+            return "SHORT_PAY_STUB";
+        }
+
+        @Override
+        public boolean supports(CalculationContext context) {
+            return true;
+        }
+
+        @Override
+        protected Allocation allocate(AllocationInput input, AmortizationState state) {
+            BigDecimal principal = input.lastPeriod()
+                    ? input.remainingPrincipal().subtract(new BigDecimal("100.00"))
+                    : new BigDecimal("83333.33");
+            return new Allocation(principal, input.accruedInterest());
+        }
     }
 
     private static Schedule scheduleWithPrincipalSum(String total) {

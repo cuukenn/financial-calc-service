@@ -45,8 +45,14 @@ public final class TailBalanceValidator implements Validator {
                         + " 与预期 " + expected.toPlainString() + " 不一致", last.periodNo()));
     }
 
-    /** Balance the schedule must end with, given the residual policy. */
+    /**
+     * Balance the schedule must end with under this element's residual policy, expressed at the
+     * element's output scale: the generator scales the balance it leaves behind, so comparing against
+     * the raw residual would report a valid schedule whenever the rounding policy is coarser than the
+     * input.
+     */
     private static BigDecimal expectedClosingBalance(LeaseElement element) {
-        return element.outstandingResidual();
+        return element.outstandingResidual()
+                .setScale(element.rounding().scale(), element.rounding().mode());
     }
 }

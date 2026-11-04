@@ -19,6 +19,13 @@ import java.util.List;
  */
 public final class DateMonotonicValidator implements Validator {
 
+    /**
+     * The design document assigns one code to the whole rule family ({@code FCS-CALC-3004} 期次日期
+     * 非单调), and the validator chain reports at most one finding per code and period, so every rule
+     * a period breaks is named in that single finding.
+     */
+    private static final String CODE = "FCS-CALC-3004";
+
     @Override
     public String code() {
         return "DATE_MONOTONIC";
@@ -35,26 +42,24 @@ public final class DateMonotonicValidator implements Validator {
         List<Installment> installments = schedule.installments();
         Installment previous = null;
         for (Installment current : installments) {
+            List<String> causes = new ArrayList<>(3);
             if (!current.startDate().isBefore(current.endDate())) {
-                issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3004",
-                        "FCS-CALC-3004: 第 " + current.periodNo() + " 期起始日 "
-                                + current.startDate() + " 不早于结束日 " + current.endDate(),
-                        current.periodNo()));
+                causes.add("起始日 " + current.startDate() + " 不早于结束日 " + current.endDate());
             }
             if (previous != null) {
                 if (current.periodNo() <= previous.periodNo()) {
-                    issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3004",
-                            "FCS-CALC-3004: 期次编号 " + current.periodNo()
-                                    + " 未在后一期 " + previous.periodNo() + " 之后递增",
-                            current.periodNo()));
+                    causes.add("期次编号 " + current.periodNo() + " 未在后一期 "
+                            + previous.periodNo() + " 之后递增");
                 }
                 if (!current.startDate().isEqual(previous.endDate())) {
-                    issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3004",
-                            "FCS-CALC-3004: 第 " + current.periodNo() + " 期起始日 "
-                                    + current.startDate() + " 与第 " + previous.periodNo()
-                                    + " 期结束日 " + previous.endDate() + " 不连续",
-                            current.periodNo()));
+                    causes.add("起始日 " + current.startDate() + " 与第 " + previous.periodNo()
+                            + " 期结束日 " + previous.endDate() + " 不连续");
                 }
+            }
+            if (!causes.isEmpty()) {
+                issues.add(new ValidationIssue(IssueLevel.ERROR, CODE,
+                        CODE + ": 第 " + current.periodNo() + " 期 " + String.join("；", causes),
+                        current.periodNo()));
             }
             previous = current;
         }

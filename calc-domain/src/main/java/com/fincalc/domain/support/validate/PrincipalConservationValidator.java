@@ -46,8 +46,14 @@ public final class PrincipalConservationValidator implements Validator {
                         + " 与应还本金 " + expected.toPlainString() + " 不一致", null));
     }
 
-    /** Principal the schedule must repay under this element's residual policy. */
+    /**
+     * Principal the schedule must repay under this element's residual policy, expressed at the
+     * element's output scale: a generator scales the balance it amortizes, so comparing against the
+     * raw contract principal would report a valid schedule whenever the rounding policy is coarser
+     * than the input.
+     */
     private static BigDecimal expectedRepayablePrincipal(LeaseElement element) {
-        return element.principal().subtract(element.outstandingResidual());
+        BigDecimal repayable = element.principal().subtract(element.outstandingResidual());
+        return repayable.setScale(element.rounding().scale(), element.rounding().mode());
     }
 }
