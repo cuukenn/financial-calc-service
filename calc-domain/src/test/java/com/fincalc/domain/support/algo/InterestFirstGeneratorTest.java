@@ -1,12 +1,14 @@
 package com.fincalc.domain.support.algo;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 
+import com.fincalc.common.error.BusinessException;
 import com.fincalc.common.time.SystemClockProvider;
 import com.fincalc.domain.calc.CalculationContext;
 import com.fincalc.domain.model.CalculationOptions;
@@ -30,6 +32,8 @@ class InterestFirstGeneratorTest {
         for (int i = 0; i < 11; i++) {
             assertThat(s.installments().get(i).principalDue()).isEqualByComparingTo("0.00");
             assertThat(s.installments().get(i).interestAccrued()).isEqualByComparingTo("5000.00");
+            assertThat(s.installments().get(i).interestPaid()).isEqualByComparingTo("5000.00");
+            assertThat(s.installments().get(i).rentDue()).isEqualByComparingTo("5000.00");
             assertThat(s.installments().get(i).closingBalance()).isEqualByComparingTo("1000000.00");
         }
         assertThat(s.installments().get(11).principalDue()).isEqualByComparingTo("1000000.00");
@@ -73,13 +77,40 @@ class InterestFirstGeneratorTest {
     }
 
     @Test
-    void supports_only_the_interest_first_method() {
+    void separate_residual_is_repaid_outside_the_schedule() {
+        LeaseElement element = baseElement("1000000", "0.06", 12).toBuilder()
+                .residualValue(new BigDecimal("100000"))
+                .build();
+        Schedule s = new InterestFirstGenerator().generate(context(element));
+        assertThat(s.installments().get(11).principalDue()).isEqualByComparingTo("1000000.00");
+        assertThat(s.installments().get(11).closingBalance()).isEqualByComparingTo("0.00");
+        assertThat(s.hasErrors()).isFalse();
+    }
+
+    @Test
+    void supports_only_interest_first_in_arrears() {
         InterestFirstGenerator generator = new InterestFirstGenerator();
         assertThat(generator.supports(context(baseElement("1000", "0.06", 3)))).isTrue();
-        LeaseElement other = baseElement("1000", "0.06", 3).toBuilder()
+
+        LeaseElement otherMethod = baseElement("1000", "0.06", 3).toBuilder()
                 .method(RepaymentMethodId.EQUAL_PRINCIPAL)
                 .build();
-        assertThat(generator.supports(context(other))).isFalse();
+        assertThat(generator.supports(context(otherMethod))).isFalse();
+
+        LeaseElement advance = baseElement("1000", "0.06", 3).toBuilder()
+                .timing(PaymentTiming.IN_ADVANCE)
+                .build();
+        assertThat(generator.supports(context(advance))).isFalse();
+    }
+
+    @Test
+    void does_not_support_advance_timing() {
+        LeaseElement advance = baseElement("1000000", "0.06", 12).toBuilder()
+                .timing(PaymentTiming.IN_ADVANCE)
+                .build();
+        assertThatThrownBy(() -> new InterestFirstGenerator().generate(context(advance)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-2004");
     }
 
     private static Schedule generate(String principal, String rate, int periods) {
