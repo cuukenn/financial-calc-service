@@ -26,7 +26,16 @@ public enum DomainErrorCode implements ErrorCode {
             "FCS-DOM-1007: BALLOON_IN_RENT 模式下残值必须满足 0 <= 残值 < 本金: %s"),
 
     PERIOD_SEQUENCE_INVALID("FCS-DOM-2001",
-            "FCS-DOM-2001: 期次日期必须严格递增且 start < end: 第 %s 期 [%s, %s]");
+            "FCS-DOM-2001: 期次日期必须严格递增且 start < end: 第 %s 期 [%s, %s]"),
+
+    NON_UNIFORM_PERIOD_RATE("FCS-DOM-2002",
+            "FCS-DOM-2002: 等额本息要求各期利率一致: 第 %s 期 %s 与首期 %s 不一致"),
+
+    NEGATIVE_PRINCIPAL_DUE("FCS-DOM-2003",
+            "FCS-DOM-2003: 第 %s 期本金为负: %s"),
+
+    UNSUPPORTED_PAYMENT_TIMING("FCS-DOM-2004",
+            "FCS-DOM-2004: 该算法暂不支持付款时点: %s");
 
     private final String code;
     private final String message;

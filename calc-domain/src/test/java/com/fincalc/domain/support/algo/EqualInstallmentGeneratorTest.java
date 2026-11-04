@@ -1,6 +1,7 @@
 package com.fincalc.domain.support.algo;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import static java.util.stream.Collectors.toList;
 
@@ -9,6 +10,7 @@ import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 
+import com.fincalc.common.error.BusinessException;
 import com.fincalc.common.money.MoneyUtils;
 import com.fincalc.common.time.SystemClockProvider;
 import com.fincalc.domain.calc.CalculationContext;
@@ -66,6 +68,47 @@ class EqualInstallmentGeneratorTest {
 
         assertThat(s.installments().get(0).rentDue()).isEqualByComparingTo("1005000.00");
         assertThat(s.installments().get(0).closingBalance()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void every_non_final_rent_is_equal() {
+        Schedule s = generate(new BigDecimal("1000000"), new BigDecimal("0.06"), 12);
+
+        for (int i = 0; i < 11; i++) {
+            assertThat(s.installments().get(i).rentDue()).isEqualByComparingTo("86066.43");
+        }
+    }
+
+    @Test
+    void rejects_non_uniform_period_rates_instead_of_emitting_negative_balances() {
+        LeaseElement element = baseElement(new BigDecimal("1000000"), new BigDecimal("0.06"), 12)
+                .toBuilder()
+                .firstRentDate(LocalDate.of(2024, 7, 1))
+                .build();
+
+        assertThatThrownBy(() -> new EqualInstallmentGenerator().generate(context(element)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-2002");
+    }
+
+    @Test
+    void does_not_support_advance_timing() {
+        LeaseElement element = baseElement(new BigDecimal("1000000"), new BigDecimal("0.06"), 12)
+                .toBuilder()
+                .timing(PaymentTiming.IN_ADVANCE)
+                .build();
+
+        assertThat(new EqualInstallmentGenerator().supports(context(element))).isFalse();
+        assertThatThrownBy(() -> new EqualInstallmentGenerator().generate(context(element)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-2004");
+    }
+
+    @Test
+    void exposes_code_and_order() {
+        EqualInstallmentGenerator generator = new EqualInstallmentGenerator();
+        assertThat(generator.code()).isEqualTo("EQUAL_INSTALLMENT");
+        assertThat(generator.order()).isEqualTo(10);
     }
 
     @Test
