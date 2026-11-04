@@ -10,7 +10,6 @@ import com.fincalc.domain.model.LeaseElement;
 import com.fincalc.domain.model.PaymentTiming;
 import com.fincalc.domain.model.PeriodDate;
 import com.fincalc.domain.model.RepaymentMethodId;
-import com.fincalc.domain.model.ResidualHandling;
 import com.fincalc.domain.support.AbstractAmortizationGenerator;
 
 /**
@@ -66,12 +65,5 @@ public final class EqualPrincipalGenerator extends AbstractAmortizationGenerator
                 .subtract(residualOf(element));
         state.pmt(principal.divide(BigDecimal.valueOf(periods.size()),
                 element.rounding().scale(), element.rounding().mode()));
-    }
-
-    private static BigDecimal residualOf(LeaseElement element) {
-        if (element.residualHandling() != ResidualHandling.BALLOON_IN_RENT) {
-            return BigDecimal.ZERO;
-        }
-        return element.residualValue() == null ? BigDecimal.ZERO : element.residualValue();
     }
 }

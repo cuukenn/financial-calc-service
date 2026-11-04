@@ -176,6 +176,17 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
     }
 
     /**
+     * Portion of the residual value that remains outstanding at maturity because it was ballooned
+     * into the rent. Zero when the residual is settled separately, or when there is none.
+     */
+    protected static BigDecimal residualOf(LeaseElement element) {
+        if (element.residualHandling() != ResidualHandling.BALLOON_IN_RENT) {
+            return BigDecimal.ZERO;
+        }
+        return element.residualValue() == null ? BigDecimal.ZERO : element.residualValue();
+    }
+
+    /**
      * Verifies that principal is conserved and that the schedule ends where the residual policy
      * says it should. Returns the absorbed rounding difference.
      */
@@ -186,7 +197,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
             principalSum = principalSum.add(installment.principalDue());
         }
         BigDecimal contractPrincipal = money(element.principal(), rounding);
-        BigDecimal residual = element.residualValue() == null ? MoneyUtils.ZERO : element.residualValue();
+        BigDecimal residual = residualOf(element);
         boolean balloon = element.residualHandling() == ResidualHandling.BALLOON_IN_RENT;
         BigDecimal expectedPrincipal = balloon
                 ? money(contractPrincipal.subtract(residual), rounding)
