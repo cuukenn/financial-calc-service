@@ -49,7 +49,7 @@ public final class EqualPrincipalGenerator extends AbstractAmortizationGenerator
     protected Allocation allocate(AllocationInput input, AmortizationState state) {
         BigDecimal principal;
         if (input.lastPeriod()) {
-            principal = input.remainingPrincipal().subtract(residualOf(input.element()));
+            principal = input.remainingPrincipal().subtract(input.element().outstandingResidual());
         } else {
             principal = state.pmt();
         }
@@ -62,7 +62,7 @@ public final class EqualPrincipalGenerator extends AbstractAmortizationGenerator
         LeaseElement element = context.element();
         BigDecimal principal = element.principal()
                 .setScale(element.rounding().scale(), element.rounding().mode())
-                .subtract(residualOf(element));
+                .subtract(element.outstandingResidual());
         state.pmt(principal.divide(BigDecimal.valueOf(periods.size()),
                 element.rounding().scale(), element.rounding().mode()));
     }

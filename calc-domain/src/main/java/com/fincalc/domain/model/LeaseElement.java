@@ -203,6 +203,21 @@ public final class LeaseElement {
         return residualHandling;
     }
 
+    /**
+     * Portion of the residual value that the schedule leaves outstanding at maturity: the residual
+     * itself under {@link ResidualHandling#BALLOON_IN_RENT}, zero when it is settled separately or
+     * when there is none.
+     *
+     * <p>The residual policy lives here so that generators and validators cannot disagree about
+     * where a schedule is supposed to end and how much principal it must repay.
+     */
+    public BigDecimal outstandingResidual() {
+        if (residualHandling != ResidualHandling.BALLOON_IN_RENT) {
+            return MoneyUtils.ZERO;
+        }
+        return residualValue == null ? MoneyUtils.ZERO : residualValue;
+    }
+
     /** Deposit amount; may be {@code null}. */
     public BigDecimal deposit() {
         return deposit;

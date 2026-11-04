@@ -15,7 +15,6 @@ import com.fincalc.domain.model.LeaseElement;
 import com.fincalc.domain.model.PaymentTiming;
 import com.fincalc.domain.model.PeriodDate;
 import com.fincalc.domain.model.RoundingPolicy;
-import com.fincalc.domain.model.ResidualHandling;
 import com.fincalc.domain.model.RuleOutcome;
 import com.fincalc.domain.model.Schedule;
 import com.fincalc.domain.model.ScheduleHeader;
@@ -34,6 +33,7 @@ import com.fincalc.domain.port.ScheduleGenerator;
  */
 public abstract class AbstractAmortizationGenerator implements ScheduleGenerator {
 
+    /** One cent or more of drift is a finding; anything smaller is absorbed rounding. */
     private static final BigDecimal TOLERANCE = new BigDecimal("0.01");
     private static final String DEFAULT_SOLVER = "CLOSED_FORM";
 
@@ -176,17 +176,6 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
     }
 
     /**
-     * Portion of the residual value that remains outstanding at maturity because it was ballooned
-     * into the rent. Zero when the residual is settled separately, or when there is none.
-     */
-    protected static BigDecimal residualOf(LeaseElement element) {
-        if (element.residualHandling() != ResidualHandling.BALLOON_IN_RENT) {
-            return BigDecimal.ZERO;
-        }
-        return element.residualValue() == null ? BigDecimal.ZERO : element.residualValue();
-    }
-
-    /**
      * Verifies that principal is conserved and that the schedule ends where the residual policy
      * says it should. Returns the absorbed rounding difference.
      */
@@ -197,20 +186,17 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
             principalSum = principalSum.add(installment.principalDue());
         }
         BigDecimal contractPrincipal = money(element.principal(), rounding);
-        BigDecimal residual = residualOf(element);
-        boolean balloon = element.residualHandling() == ResidualHandling.BALLOON_IN_RENT;
-        BigDecimal expectedPrincipal = balloon
-                ? money(contractPrincipal.subtract(residual), rounding)
-                : contractPrincipal;
-        if (principalSum.subtract(expectedPrincipal).abs().compareTo(TOLERANCE) > 0) {
+        BigDecimal residual = element.outstandingResidual();
+        BigDecimal expectedPrincipal = money(contractPrincipal.subtract(residual), rounding);
+        if (principalSum.subtract(expectedPrincipal).abs().compareTo(TOLERANCE) >= 0) {
             issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3001",
                     "FCS-CALC-3001: 本金合计 " + principalSum.toPlainString()
                             + " 与应还本金 " + expectedPrincipal.toPlainString() + " 不一致",
                     null));
         }
-        BigDecimal expectedClosing = balloon ? money(residual, rounding) : money(MoneyUtils.ZERO, rounding);
+        BigDecimal expectedClosing = money(residual, rounding);
         BigDecimal difference = closingBalance.subtract(expectedClosing);
-        if (difference.abs().compareTo(TOLERANCE) > 0) {
+        if (difference.abs().compareTo(TOLERANCE) >= 0) {
             issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3002",
                     "FCS-CALC-3002: 末期余额 " + closingBalance.toPlainString()
                             + " 与预期 " + expectedClosing.toPlainString() + " 不一致", null));

@@ -51,7 +51,7 @@ public final class InterestFirstGenerator extends AbstractAmortizationGenerator 
     @Override
     protected Allocation allocate(AllocationInput input, AmortizationState state) {
         BigDecimal principal = input.lastPeriod()
-                ? input.remainingPrincipal().subtract(residualOf(input.element()))
+                ? input.remainingPrincipal().subtract(input.element().outstandingResidual())
                 : BigDecimal.ZERO;
         return new Allocation(principal, input.accruedInterest());
     }

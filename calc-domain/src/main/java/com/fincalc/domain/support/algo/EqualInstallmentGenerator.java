@@ -61,22 +61,22 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
         requireUniformRate(context, periods, rate);
 
         if (rate.signum() == 0) {
-            state.pmt(principal.subtract(residualOf(element)).divide(BigDecimal.valueOf(n), MC));
+            state.pmt(principal.subtract(element.outstandingResidual()).divide(BigDecimal.valueOf(n), MC));
             return;
         }
 
         if (n == 1) {
-            state.pmt(principal.multiply(BigDecimal.ONE.add(rate)).subtract(residualOf(element)));
+            state.pmt(principal.multiply(BigDecimal.ONE.add(rate)).subtract(element.outstandingResidual()));
             return;
         }
 
         BigDecimal growth = BigDecimal.ONE.add(rate).pow(n, MC);
         BigDecimal denominator = growth.subtract(BigDecimal.ONE);
         if (denominator.signum() == 0) {
-            state.pmt(principal.subtract(residualOf(element)).divide(BigDecimal.valueOf(n), MC));
+            state.pmt(principal.subtract(element.outstandingResidual()).divide(BigDecimal.valueOf(n), MC));
             return;
         }
-        BigDecimal presentResidual = residualOf(element).divide(growth, MC);
+        BigDecimal presentResidual = element.outstandingResidual().divide(growth, MC);
         BigDecimal numerator = principal.subtract(presentResidual).multiply(rate).multiply(growth);
         state.pmt(numerator.divide(denominator, MC));
     }
@@ -103,7 +103,7 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
     protected Allocation allocate(AllocationInput input, AmortizationState state) {
         BigDecimal principal;
         if (input.lastPeriod()) {
-            principal = input.remainingPrincipal().subtract(residualOf(input.element()));
+            principal = input.remainingPrincipal().subtract(input.element().outstandingResidual());
         } else {
             principal = state.pmt().subtract(input.accruedInterest());
         }

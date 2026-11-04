@@ -54,7 +54,7 @@ public final class PrincipalFirstGenerator extends AbstractAmortizationGenerator
         LeaseElement element = context.element();
         BigDecimal repayable = element.principal()
                 .setScale(element.rounding().scale(), element.rounding().mode())
-                .subtract(residualOf(element));
+                .subtract(element.outstandingResidual());
         state.pmt(repayable.divide(BigDecimal.valueOf(periods.size()),
                 element.rounding().scale(), element.rounding().mode()));
         state.deferredInterest(BigDecimal.ZERO);
@@ -66,7 +66,7 @@ public final class PrincipalFirstGenerator extends AbstractAmortizationGenerator
             state.deferredInterest(state.deferredInterest().add(input.accruedInterest()));
             return new Allocation(state.pmt(), BigDecimal.ZERO);
         }
-        BigDecimal principal = input.remainingPrincipal().subtract(residualOf(input.element()));
+        BigDecimal principal = input.remainingPrincipal().subtract(input.element().outstandingResidual());
         BigDecimal interestPaid = state.deferredInterest().add(input.accruedInterest());
         state.deferredInterest(BigDecimal.ZERO);
         return new Allocation(principal, interestPaid);
