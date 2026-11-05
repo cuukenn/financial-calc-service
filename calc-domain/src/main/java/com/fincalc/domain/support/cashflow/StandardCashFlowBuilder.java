@@ -1,4 +1,4 @@
-package com.fincalc.domain.cashflow;
+package com.fincalc.domain.support.cashflow;
 
 import com.fincalc.common.error.BusinessException;
 import com.fincalc.common.money.MoneyUtils;
@@ -16,6 +16,7 @@ import com.fincalc.domain.model.LeaseElement;
 import com.fincalc.domain.model.ResidualHandling;
 import com.fincalc.domain.model.RoundingPolicy;
 import com.fincalc.domain.model.Schedule;
+import com.fincalc.domain.port.CashFlowBuilder;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -27,17 +28,25 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Turns a finished schedule into the ordered cash flow list every financial metric consumes
- * (design document §9.4), on the lessor books by default: principal out at t0, rents in at the
- * end of every period, then the closing events.
+ * The standard §9.4 event table: principal out at t0, upfront fees in at t0, the deposit cycle
+ * under the deposit basis, one rent leg per period on the schedule's own payment dates, and the
+ * closing settlement leg.
  *
- * <p>Deduplication rules the numbers depend on: {@code tax} already inside {@code rentDue} is
- * never listed again; a {@link ResidualHandling#BALLOON_IN_RENT} residual is already in the final
- * rent; zero-amount events are dropped. Flows are ordered by date, then by the fixed same-day
- * type order {@code PRINCIPAL → FEE → DEPOSIT → RENT → RESIDUAL}, and renumbered from 0 — the
- * order must be deterministic or the same input would price differently.
+ * <p>Residual money is listed exactly once, following how the schedule actually settles it
+ * (ledger ruling R28): under {@link ResidualHandling#SEPARATE} the option price is an extra
+ * maturity inflow while the rents amortize the full principal; under
+ * {@link ResidualHandling#BALLOON_IN_RENT} the schedule is required to end with the residual as
+ * its closing balance (design document §9.6, {@code TAIL_BALANCE}), so that outstanding amount —
+ * not the raw residual — is appended as the maturity settlement. Dropping it would erase money
+ * the lessor receives and silently misprice every yield metric.
+ *
+ * <p>Known v1 gaps: a {@link FeeChargeMode#DEDUCT_FROM_PRINCIPAL} fee or a deposit netted against
+ * the t0 principal would have no leg because v1 does not net anything — the {@code FeeAllocator}
+ * extension point arrives with the fee work (Plan 2); until then such contracts price the gross
+ * principal. Rent legs land on {@code installment.endDate()} because v1 schedules are
+ * {@code IN_ARREARS} only.
  */
-public final class CashFlowBuilder {
+public final class StandardCashFlowBuilder implements CashFlowBuilder {
 
     /** Fixed order of same-date events; stable IRR input requires a total order. */
     private static final Map<CashFlowType, Integer> SAME_DAY_ORDER;
@@ -49,27 +58,22 @@ public final class CashFlowBuilder {
         order.put(CashFlowType.DEPOSIT, 2);
         order.put(CashFlowType.RENT, 3);
         order.put(CashFlowType.RESIDUAL, 4);
-        SAME_DAY_ORDER = order;
+        SAME_DAY_ORDER = Collections.unmodifiableMap(order);
     }
 
-    private CashFlowBuilder() {
+    @Override
+    public String code() {
+        return "STANDARD_EVENT_TABLE";
     }
 
-    /** The lessor view (§9.4 default) with the run's cash flow basis. */
-    public static List<CashFlow> build(Schedule schedule, LeaseElement element,
-            CalculationOptions options) {
-        return build(schedule, element, options, CashFlowPerspective.LESSOR);
+    @Override
+    public int order() {
+        return 10;
     }
 
-    /**
-     * Cash flows of a finished schedule, seen from {@code perspective}. The lessee view mirrors
-     * every direction; dates, types, amounts and order are identical.
-     *
-     * @throws BusinessException when the basis is {@link CashFlowBasis#VAT_SPLIT}, which v1
-     *         rejects ({@code FCS-CALC-3005}) instead of silently degrading
-     */
-    public static List<CashFlow> build(Schedule schedule, LeaseElement element,
-            CalculationOptions options, CashFlowPerspective perspective) {
+    @Override
+    public List<CashFlow> build(Schedule schedule, LeaseElement element, CalculationOptions options,
+            CashFlowPerspective perspective) {
         Objects.requireNonNull(schedule, "schedule");
         Objects.requireNonNull(element, "element");
         Objects.requireNonNull(options, "options");
@@ -81,30 +85,25 @@ public final class CashFlowBuilder {
         RoundingPolicy rounding = element.rounding();
         LocalDate t0 = element.commenceDate();
         List<Installment> installments = schedule.installments();
-        LocalDate maturity = installments.isEmpty() ? null
-                : installments.get(installments.size() - 1).endDate();
+        boolean settled = !installments.isEmpty();
+        LocalDate maturity = settled ? installments.get(installments.size() - 1).endDate() : null;
 
         List<CashFlow> flows = new ArrayList<>();
         addFlow(flows, t0, money(element.principal(), rounding), CashFlowType.PRINCIPAL,
                 CashFlowDirection.OUTFLOW);
         addUpfrontFees(flows, element, rounding, t0);
-        if (depositIncluded(options, element)) {
+        if (settled && depositIncluded(options, element)) {
             BigDecimal deposit = money(element.deposit(), rounding);
             addFlow(flows, t0, deposit, CashFlowType.DEPOSIT, CashFlowDirection.INFLOW);
-            if (maturity != null) {
-                addFlow(flows, maturity, deposit, CashFlowType.DEPOSIT, CashFlowDirection.OUTFLOW);
-            }
+            addFlow(flows, maturity, deposit, CashFlowType.DEPOSIT, CashFlowDirection.OUTFLOW);
         }
         for (Installment installment : installments) {
-            // tax is already part of rentDue and fee events of AMORTIZED fees ride inside it;
+            // tax is already part of rentDue and AMORTIZED fee events ride inside it;
             // listing them again would count them twice.
             addFlow(flows, installment.endDate(), installment.rentDue(), CashFlowType.RENT,
                     CashFlowDirection.INFLOW);
         }
-        if (element.residualHandling() == ResidualHandling.SEPARATE && maturity != null) {
-            addFlow(flows, maturity, money(element.residualValue(), rounding),
-                    CashFlowType.RESIDUAL, CashFlowDirection.INFLOW);
-        }
+        addClosingResidual(flows, element, rounding, installments, maturity);
 
         return sorted(flows, perspective);
     }
@@ -113,13 +112,13 @@ public final class CashFlowBuilder {
      * A deposit participates only under the basis that asks for it; v1 deposits are refundable
      * only, so they never net against the t0 principal.
      */
-    private static boolean depositIncluded(CalculationOptions options, LeaseElement element) {
+    private boolean depositIncluded(CalculationOptions options, LeaseElement element) {
         return options.cashFlowBasis() == CashFlowBasis.INCLUDE_DEPOSIT
                 && element.deposit() != null
                 && element.deposit().signum() > 0;
     }
 
-    private static void addUpfrontFees(List<CashFlow> flows, LeaseElement element,
+    private void addUpfrontFees(List<CashFlow> flows, LeaseElement element,
             RoundingPolicy rounding, LocalDate t0) {
         BigDecimal total = MoneyUtils.ZERO;
         for (FeeItem fee : element.fees()) {
@@ -130,18 +129,42 @@ public final class CashFlowBuilder {
         addFlow(flows, t0, money(total, rounding), CashFlowType.FEE, CashFlowDirection.INFLOW);
     }
 
-    /** Zero-amount events are dropped: they would add noise and break the positive-amount rule. */
-    private static void addFlow(List<CashFlow> flows, LocalDate date, BigDecimal amount,
+    /** SEPARATE lists the option price; BALLOON lists whatever the schedule actually left outstanding. */
+    private void addClosingResidual(List<CashFlow> flows, LeaseElement element,
+            RoundingPolicy rounding, List<Installment> installments, LocalDate maturity) {
+        if (maturity == null) {
+            return;
+        }
+        if (element.residualHandling() == ResidualHandling.SEPARATE) {
+            addFlow(flows, maturity, money(element.residualValue(), rounding),
+                    CashFlowType.RESIDUAL, CashFlowDirection.INFLOW);
+            return;
+        }
+        if (element.residualHandling() == ResidualHandling.BALLOON_IN_RENT) {
+            BigDecimal outstanding = installments.get(installments.size() - 1).closingBalance();
+            addFlow(flows, maturity, outstanding, CashFlowType.RESIDUAL, CashFlowDirection.INFLOW);
+        }
+    }
+
+    /**
+     * Zero-amount events are dropped; a negative one means the schedule itself is broken —
+     * amounts are positive by invariant and the sign belongs to {@link CashFlowDirection}.
+     */
+    private void addFlow(List<CashFlow> flows, LocalDate date, BigDecimal amount,
             CashFlowType type, CashFlowDirection direction) {
         if (amount == null || amount.signum() == 0) {
             return;
         }
+        if (amount.signum() < 0) {
+            throw new IllegalStateException("negative cash flow amount for " + type
+                    + " on " + date + ": " + amount.toPlainString());
+        }
         flows.add(new CashFlow(flows.size(), date, amount, type, direction));
     }
 
-    private static List<CashFlow> sorted(List<CashFlow> flows, CashFlowPerspective perspective) {
+    private List<CashFlow> sorted(List<CashFlow> flows, CashFlowPerspective perspective) {
         Collections.sort(flows, Comparator.comparing(CashFlow::date)
-                .thenComparing(flow -> SAME_DAY_ORDER.get(flow.type()))
+                .thenComparing(flow -> SAME_DAY_ORDER.getOrDefault(flow.type(), Integer.MAX_VALUE))
                 .thenComparing(CashFlow::sequence));
 
         List<CashFlow> ordered = new ArrayList<>(flows.size());
@@ -153,8 +176,7 @@ public final class CashFlowBuilder {
         return Collections.unmodifiableList(ordered);
     }
 
-    private static CashFlowDirection flip(CashFlowDirection direction,
-            CashFlowPerspective perspective) {
+    private CashFlowDirection flip(CashFlowDirection direction, CashFlowPerspective perspective) {
         if (perspective == CashFlowPerspective.LESSOR) {
             return direction;
         }
@@ -162,7 +184,7 @@ public final class CashFlowBuilder {
                 ? CashFlowDirection.OUTFLOW : CashFlowDirection.INFLOW;
     }
 
-    private static BigDecimal money(BigDecimal value, RoundingPolicy rounding) {
+    private BigDecimal money(BigDecimal value, RoundingPolicy rounding) {
         return MoneyUtils.zeroIfNull(value).setScale(rounding.scale(), rounding.mode());
     }
 }
