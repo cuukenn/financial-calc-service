@@ -87,7 +87,11 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         return outcome.annualRate();
     }
 
-    /** Name recorded in the schedule header; solvers override it with their own strategy. */
+    /**
+     * Name recorded in the schedule header when {@link #prepare} did not set
+     * {@link AmortizationState#solver}. Generators whose strategy is fixed override it; generators
+     * that pick a strategy per run record it in the state.
+     */
     protected String solverName() {
         return DEFAULT_SOLVER;
     }
@@ -169,9 +173,12 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         BigDecimal roundingDifference = checkConservation(element, installments, balance,
                 rounding, issues);
 
+        // prepare() may pick a strategy per run and record it in the state; a generator with a fixed
+        // strategy keeps the solverName() hook.
+        String solver = state.solver() != null ? state.solver() : solverName();
         ScheduleHeader header = new ScheduleHeader(FinancialMetrics.empty(), installments.size(),
                 periods.get(0).startDate(), periods.get(periods.size() - 1).endDate(),
-                solverName(), roundingDifference);
+                solver, roundingDifference);
         return new Schedule(header, installments, Collections.emptyList(), issues);
     }
 
@@ -347,6 +354,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         private BigDecimal cumulativePrincipal = MoneyUtils.ZERO;
         private BigDecimal cumulativeInterest = MoneyUtils.ZERO;
         private BigDecimal pmt;
+        private String solver;
 
         public BigDecimal deferredInterest() {
             return deferredInterest;
@@ -379,6 +387,19 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
         public void pmt(BigDecimal pmt) {
             this.pmt = pmt;
+        }
+
+        /**
+         * Solver name to record in the schedule header, chosen by {@link #prepare} when the strategy
+         * depends on the run (e.g. a closed form or an iterative solve); {@code null} leaves the
+         * generator's fixed {@code solverName()} in charge.
+         */
+        public String solver() {
+            return solver;
+        }
+
+        public void solver(String solver) {
+            this.solver = solver;
         }
     }
 }

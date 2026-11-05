@@ -26,6 +26,7 @@ import com.fincalc.domain.model.ResidualHandling;
 import com.fincalc.domain.model.RoundingPolicy;
 import com.fincalc.domain.model.Schedule;
 import com.fincalc.domain.support.dateroll.NoRoll;
+import com.fincalc.domain.support.daycount.Act365F;
 import com.fincalc.domain.support.daycount.Thirty360;
 
 class EqualInstallmentGeneratorTest {
@@ -77,6 +78,31 @@ class EqualInstallmentGeneratorTest {
         for (int i = 0; i < 11; i++) {
             assertThat(s.installments().get(i).rentDue()).isEqualByComparingTo("86066.43");
         }
+    }
+
+    @Test
+    void golden_schedule_records_the_closed_form_solver() {
+        Schedule s = generate(new BigDecimal("1000000"), new BigDecimal("0.06"), 12);
+
+        assertThat(s.header().solver()).isEqualTo("CLOSED_FORM");
+    }
+
+    @Test
+    void solves_act_windows_iteratively_and_closes_to_zero() {
+        LeaseElement element = baseElement(new BigDecimal("1000000"), new BigDecimal("0.06"), 12)
+                .toBuilder()
+                .dayCountCode("ACT_365F")
+                .build();
+        CalculationContext actContext = new CalculationContext(element, null, new Act365F(),
+                new NoRoll(), SystemClockProvider.INSTANCE, CalculationOptions.defaults());
+
+        Schedule s = new EqualInstallmentGenerator().generate(actContext);
+
+        assertThat(s.header().solver()).isEqualTo("ITERATIVE");
+        assertThat(s.installments().get(11).closingBalance()).isEqualByComparingTo("0.00");
+        assertThat(MoneyUtils.sum(s.installments().stream().map(Installment::principalDue)
+                .collect(toList()))).isEqualByComparingTo("1000000.00");
+        assertThat(s.hasErrors()).isFalse();
     }
 
     @Test

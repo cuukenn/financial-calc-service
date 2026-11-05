@@ -44,7 +44,7 @@ public final class ScheduleHeader {
         return lastDate;
     }
 
-    /** How the periodic payment was obtained, e.g. {@code CLOSED_FORM} or {@code BISECTION}. */
+    /** How the periodic payment was obtained, e.g. {@code CLOSED_FORM} or {@code ITERATIVE}. */
     public String solver() {
         return solver;
     }

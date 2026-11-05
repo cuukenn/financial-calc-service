@@ -1,7 +1,6 @@
 package com.fincalc.domain.support.algo;
 
 import java.math.BigDecimal;
-import java.math.MathContext;
 import java.util.List;
 
 import com.fincalc.common.error.BusinessException;
@@ -11,19 +10,21 @@ import com.fincalc.domain.model.LeaseElement;
 import com.fincalc.domain.model.PaymentTiming;
 import com.fincalc.domain.model.PeriodDate;
 import com.fincalc.domain.model.RepaymentMethodId;
+import com.fincalc.domain.port.DayCountConvention;
 import com.fincalc.domain.support.AbstractAmortizationGenerator;
+import com.fincalc.domain.support.PmtSolver;
 
 /**
  * Equal installment (annuity) schedule: every period carries the same rent, with interest on
  * the opening balance and principal as the remainder.
  *
- * <p>The level payment is solved once in {@link #prepare} from the first period's rate, then
- * every period allocates {@code pmt - accruedInterest} to principal. The final period absorbs
- * whatever principal is left so the schedule closes exactly.
+ * <p>The level rent is solved once in {@link #prepare} by {@link PmtSolver}: closed form when the
+ * day-count convention gives every period the same rate, bisection over the schedule's own windows
+ * when it does not. Every period then allocates {@code pmt - accruedInterest} to principal; the
+ * final period absorbs whatever principal is left so the schedule closes exactly.
  */
 public final class EqualInstallmentGenerator extends AbstractAmortizationGenerator {
 
-    private static final MathContext MC = MathContext.DECIMAL128;
     private static final BigDecimal RATE_EPSILON = new BigDecimal("0.000000000001");
 
     @Override
@@ -54,37 +55,26 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
     protected void prepare(CalculationContext context, List<PeriodDate> periods,
             AmortizationState state) {
         LeaseElement element = context.element();
-        int n = periods.size();
+        DayCountConvention dayCount = context.dayCount();
         BigDecimal principal = money(element.principal(), element);
-        BigDecimal rate = periodRate(element, periods.get(0), element.nominalRate(),
-                context.dayCount());
-        requireUniformRate(context, periods, rate);
+        BigDecimal residual = element.outstandingResidual();
 
-        if (rate.signum() == 0) {
-            state.pmt(principal.subtract(element.outstandingResidual()).divide(BigDecimal.valueOf(n), MC));
+        if (PmtSolver.isConstantPeriodRate(dayCount)) {
+            BigDecimal rate = periodRate(element, periods.get(0), element.nominalRate(), dayCount);
+            requireUniformRate(context, periods, rate);
+            state.pmt(PmtSolver.closedForm(principal, rate, periods.size(), residual));
+            state.solver("CLOSED_FORM");
             return;
         }
-
-        if (n == 1) {
-            state.pmt(principal.multiply(BigDecimal.ONE.add(rate)).subtract(element.outstandingResidual()));
-            return;
-        }
-
-        BigDecimal growth = BigDecimal.ONE.add(rate).pow(n, MC);
-        BigDecimal denominator = growth.subtract(BigDecimal.ONE);
-        if (denominator.signum() == 0) {
-            state.pmt(principal.subtract(element.outstandingResidual()).divide(BigDecimal.valueOf(n), MC));
-            return;
-        }
-        BigDecimal presentResidual = element.outstandingResidual().divide(growth, MC);
-        BigDecimal numerator = principal.subtract(presentResidual).multiply(rate).multiply(growth);
-        state.pmt(numerator.divide(denominator, MC));
+        state.pmt(PmtSolver.iterative(principal, periods, dayCount, element.nominalRate(), residual));
+        state.solver("ITERATIVE");
     }
 
     /**
-     * The annuity formula assumes one periodic rate. A stub first period, an ACT convention or a
-     * mid-term rate change breaks that assumption; failing fast is better than emitting a
-     * schedule with negative balances that still passes the conservation check.
+     * Guards the closed-form path: the annuity formula assumes one periodic rate. A stub period
+     * that breaks rate uniformity fails fast, which is better than emitting a schedule with
+     * negative balances that still passes the conservation check. Conventions that make every
+     * period's rate differ by design are priced iteratively instead.
      */
     private static void requireUniformRate(CalculationContext context, List<PeriodDate> periods,
             BigDecimal firstRate) {
