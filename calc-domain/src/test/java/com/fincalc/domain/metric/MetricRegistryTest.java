@@ -7,6 +7,7 @@ import com.fincalc.domain.calc.CalculationContext;
 import com.fincalc.domain.model.CalculationOptions;
 import com.fincalc.domain.model.CashFlow;
 import com.fincalc.domain.model.CashFlowDirection;
+import com.fincalc.domain.model.CashFlowType;
 import com.fincalc.domain.model.GracePeriod;
 import com.fincalc.domain.model.LeaseElement;
 import com.fincalc.domain.model.PaymentFrequency;
@@ -252,8 +253,9 @@ class MetricRegistryTest {
         // 86 066.42 = 11.6189320992 periods, / 12 = 0.9682443416 years.
         assertThat(metrics.find(MetricCodes.PAYBACK_PERIOD)).isEqualByComparingTo("0.9682443416");
         // At the yield the discounted sum closes at the last flow, so the dynamic payback is the
-        // horizon; the 3e-10 excess is the scale-10 rounding of IRR_PERIOD, not a defect.
-        assertThat(metrics.find(MetricCodes.DISCOUNTED_PAYBACK)).isEqualByComparingTo("1.0000000003");
+        // horizon itself: the leg of the final flow is capped at one period, which absorbs the
+        // -2.5e-4 residual that discounting at the scale-10 IRR_PERIOD leaves behind.
+        assertThat(metrics.find(MetricCodes.DISCOUNTED_PAYBACK)).isEqualByComparingTo("1.0000000000");
         assertThat(metrics.find(MetricCodes.NPV)).isEqualByComparingTo("0.00");
         assertThat(metrics.find(MetricCodes.XNPV)).isEqualByComparingTo("0.00");
         assertThat(metrics.find(MetricCodes.DURATION_MACAULAY)).isEqualByComparingTo("0.2683570275");
@@ -320,6 +322,85 @@ class MetricRegistryTest {
                 new BigDecimal("4.03"));
     }
 
+    /**
+     * §9.5's authority table names 残值 as the option price {@code residualValue}, which is an input
+     * of the lease and not a property of the schedule. Under the default
+     * {@link ResidualHandling#SEPARATE} the option price never enters the rents at all — it is the
+     * maturity cash flow of §9.4 — so reporting the schedule's outstanding balance instead would
+     * publish {@code 0.00} for a 100 000 留购价, the「silently 0」§9.5 forbids.
+     */
+    @Test
+    void residual_value_reports_the_purchase_option_price_under_separate_handling() {
+        LeaseElement element = element().toBuilder()
+                .residualValue(new BigDecimal("100000"))
+                .residualHandling(ResidualHandling.SEPARATE)
+                .build();
+        Schedule schedule = new EqualInstallmentGenerator().generate(new CalculationContext(element,
+                null, new Thirty360(), new NoRoll(), SystemClockProvider.INSTANCE,
+                CalculationOptions.defaults()));
+        FinancialMetrics metrics = MetricRegistry.defaults().computeAll(
+                new MetricContext(flowsOf(schedule, element), schedule, element, 12, null, null,
+                        null));
+
+        assertThat(metrics.find(MetricCodes.RESIDUAL_VALUE)).isEqualByComparingTo("100000.00");
+        assertThat(metrics.find(MetricCodes.RESIDUAL_VALUE).scale()).isEqualTo(2);
+        // The two views coexist without contradicting each other: SEPARATE amortizes the whole
+        // principal, so the schedule still closes at zero and the option price is the last flow.
+        assertThat(schedule.installments().get(schedule.installments().size() - 1).closingBalance())
+                .isEqualByComparingTo("0.00");
+        assertThat(metrics.find(MetricCodes.TOTAL_PRINCIPAL)).isEqualByComparingTo("1000000.00");
+    }
+
+    /**
+     * The static walk is exact to the cent, so §9.5's「期末未回收 → null」is applied to it strictly:
+     * a schedule that ends one cent short of recovery has <em>not</em> recovered, and no tolerance may
+     * turn it into a number.
+     */
+    @Test
+    void a_static_walk_that_ends_one_cent_short_of_recovery_is_not_recovered() {
+        List<CashFlow> flows = new ArrayList<>();
+        flows.add(new CashFlow(0, T0, new BigDecimal("100.00"), CashFlowType.PRINCIPAL,
+                CashFlowDirection.OUTFLOW));
+        flows.add(new CashFlow(1, T0.plusMonths(1), new BigDecimal("50.00"), CashFlowType.RENT,
+                CashFlowDirection.INFLOW));
+        flows.add(new CashFlow(2, T0.plusMonths(2), new BigDecimal("49.99"), CashFlowType.RENT,
+                CashFlowDirection.INFLOW));
+        // Running totals: -50.00, then -0.01 at the last flow — strictly short.
+        MetricContext context = new MetricContext(flows, null, null, 12, new BigDecimal("0.005"),
+                null, null);
+
+        FinancialMetrics metrics = MetricRegistry.defaults().computeAll(context);
+
+        assertThat(metrics.find(MetricCodes.PAYBACK_PERIOD)).isNull();
+        // Discounted at 0.5 % per period the shortfall is far wider than a cent, so it is absent too.
+        assertThat(metrics.find(MetricCodes.DISCOUNTED_PAYBACK)).isNull();
+    }
+
+    /**
+     * A tolerance-approved crossing at the final flow means recovery exactly at the horizon: the leg
+     * the last flow takes is capped at one period, so the dynamic payback of a lease that repays at
+     * maturity is its term, never a value past the schedule it was measured from.
+     */
+    @Test
+    void discounted_payback_closes_at_the_horizon_and_never_past_it() {
+        FinancialMetrics twelve = MetricRegistry.defaults().computeAll(context(flatLoanSchedule()));
+        assertThat(twelve.find(MetricCodes.DISCOUNTED_PAYBACK)).isEqualByComparingTo("1.0000000000");
+        assertThat(twelve.find(MetricCodes.DISCOUNTED_PAYBACK).scale()).isEqualTo(10);
+        assertThat(twelve.find(MetricCodes.PAYBACK_PERIOD)).isLessThan(BigDecimal.ONE);
+
+        LeaseElement element = element().toBuilder().periods(60).build();
+        Schedule schedule = new EqualInstallmentGenerator().generate(new CalculationContext(element,
+                null, new Thirty360(), new NoRoll(), SystemClockProvider.INSTANCE,
+                CalculationOptions.defaults()));
+        FinancialMetrics sixty = MetricRegistry.defaults().computeAll(
+                new MetricContext(flowsOf(schedule, element), schedule, element, 12, null, null,
+                        null));
+
+        assertThat(sixty.find(MetricCodes.DISCOUNTED_PAYBACK)).isEqualByComparingTo("5.0000000000");
+        assertThat(sixty.find(MetricCodes.DISCOUNTED_PAYBACK)).isLessThan(new BigDecimal("5.01"));
+        assertThat(sixty.find(MetricCodes.PAYBACK_PERIOD)).isLessThan(new BigDecimal("5"));
+    }
+
     private static Schedule flatLoanSchedule() {
         return new EqualInstallmentGenerator().generate(new CalculationContext(element(), null,
                 new Thirty360(), new NoRoll(), SystemClockProvider.INSTANCE,
@@ -352,8 +433,12 @@ class MetricRegistryTest {
     }
 
     private static List<CashFlow> flowsOf(Schedule schedule) {
-        return new StandardCashFlowBuilder().build(schedule, element(),
-                CalculationOptions.defaults());
+        return flowsOf(schedule, element());
+    }
+
+    /** The §9.4 event table of {@code schedule} as the element describes it, residual included. */
+    private static List<CashFlow> flowsOf(Schedule schedule, LeaseElement element) {
+        return new StandardCashFlowBuilder().build(schedule, element, CalculationOptions.defaults());
     }
 
     private static LeaseElement element() {

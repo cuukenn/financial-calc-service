@@ -20,12 +20,17 @@ import java.util.List;
  * {@code schedule.installments()} — and keeping them together is what stops the column names from
  * drifting apart. {@link #instances()} hands the registry one metric per code.
  *
- * <p>{@code RESIDUAL_VALUE} reports {@link com.fincalc.domain.model.LeaseElement#outstandingResidual()}
- * rather than §9.5's literal {@code residualValue}: what a schedule actually leaves outstanding at
- * maturity. Under {@link com.fincalc.domain.model.ResidualHandling#BALLOON_IN_RENT} the two are the
- * same, and under {@link com.fincalc.domain.model.ResidualHandling#SEPARATE} the option price is
- * already listed as the maturity cash flow of §9.4, so reporting the raw option price here would
- * contradict a schedule that ends at zero.
+ * <p>{@code RESIDUAL_VALUE} reports {@link com.fincalc.domain.model.LeaseElement#residualValue()},
+ * the 残值 / 留购价 the parties agreed to, exactly as §9.5's authority table names it. It is an input
+ * of the lease, not a property of the schedule: under
+ * {@link com.fincalc.domain.model.ResidualHandling#SEPARATE} it is listed as the maturity cash flow
+ * of §9.4 and never enters the rents, under
+ * {@link com.fincalc.domain.model.ResidualHandling#BALLOON_IN_RENT} it is absorbed into them, and in
+ * both cases the metric publishes the agreed price. Reading the schedule's outstanding balance there
+ * would report {@code 0.00} for a separate residual — the「silently 0」§9.5 forbids.
+ * {@link com.fincalc.domain.model.LeaseElement#outstandingResidual()} answers a different question
+ * (how much principal the schedule still leaves open at maturity) and belongs to the generators, the
+ * balance validators and the cash-flow builder.
  */
 public final class TotalMetrics implements FinancialMetric {
 
@@ -72,9 +77,10 @@ public final class TotalMetrics implements FinancialMetric {
     @Override
     public BigDecimal compute(MetricContext context) {
         if (column == Column.RESIDUAL) {
+            // §9.5: the option price itself, null-safe (§9.5 forbids a fabricated zero).
             return context.element() == null
                     ? null
-                    : MoneyUtils.out(context.element().outstandingResidual());
+                    : MoneyUtils.out(context.element().residualValue());
         }
         if (context.schedule() == null) {
             return null;

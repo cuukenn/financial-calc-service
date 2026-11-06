@@ -27,13 +27,22 @@ import java.util.List;
  * flow must be negative. A flow set that starts with money coming in (a pure inflow schedule) has no
  * payback and answers {@code null} — not 0, which §9.5 forbids, and not the first index, which would
  * read as "recovered instantly". A walk still negative at the last flow has not recovered within the
- * horizon and is likewise {@code null}.
+ * horizon and is likewise {@code null} — but the two walks approach the last flow differently, on
+ * purpose.
  *
- * <p>Zero is approached, not required exactly: a schedule is quoted in cents, and at the yield the
- * discounted sum is zero by construction while the {@code IRR_PERIOD} the run published is rounded at
- * ten scales, which leaves a sub-cent residual on either side of the last flow. A running total
- * inside one cent of zero has therefore recovered; a stricter test would report "never recovered" for
- * a schedule that repays exactly.
+ * <p><b>Static walk, strict.</b> Its amounts are cent-exact, so a crossing means the running total
+ * has reached zero exactly. A schedule that ends one cent short of recovery is「期末未回收」per §9.5
+ * and answers {@code null}: no tolerance belongs there.
+ *
+ * <p><b>Discounted walk, one-cent tolerance.</b> At the yield the discounted sum is zero by
+ * construction, but the run publishes {@code IRR_PERIOD} at scale 10 and this walk discounts at that
+ * rounded rate, which leaves a residual of about {@code -2.5e-4} on the last flow of a schedule that
+ * repays exactly. A strict test would report "never recovered" for such a schedule, so
+ * {@link #RECOVERY_TOLERANCE} is what counts as zero there — and only there.
+ *
+ * <p>Because that tolerance can approve a crossing a hair below zero, the interpolated leg of the
+ * <b>final</b> flow is capped at one period: a sub-cent shortfall at maturity means recovery at the
+ * horizon ({@code n / periodsPerYear}), never a payback past the schedule it was measured from.
  *
  * <p>Both walks read the flows in list order, which is the
  * {@link com.fincalc.domain.port.CashFlowBuilder} contract: ordered by date and renumbered
@@ -43,8 +52,13 @@ import java.util.List;
  */
 public final class PaybackMetric implements FinancialMetric {
 
-    /** One cent: the money precision a schedule is quoted at, and how close to zero counts as zero. */
-    private static final BigDecimal CENT = new BigDecimal("0.01");
+    /**
+     * One cent, the money precision a schedule is quoted at. It is the recovery line of the
+     * {@link #DISCOUNTED_ORDER discounted} walk only: the run publishes {@code IRR_PERIOD} at scale
+     * 10, so discounting the flows at that rounded rate leaves a residual of about {@code -2.5e-4}
+     * where the exact yield would leave zero. The static walk recovers on the exact line instead.
+     */
+    private static final BigDecimal RECOVERY_TOLERANCE = new BigDecimal("0.01");
 
     private static final int STATIC_ORDER = 20;
     private static final int DISCOUNTED_ORDER = 30;
@@ -97,11 +111,15 @@ public final class PaybackMetric implements FinancialMetric {
         if (previous.signum() >= 0) {
             return null;
         }
+        // The static walk reaches zero exactly; only the discounted one is allowed a cent of slack.
+        BigDecimal recoveryLine = discounted ? RECOVERY_TOLERANCE.negate() : BigDecimal.ZERO;
         for (int index = 1; index < flows.size(); index++) {
             BigDecimal value = MetricSupport.discounted(flows.get(index), rate);
             BigDecimal cumulative = previous.add(value, MetricSupport.MC);
-            if (cumulative.compareTo(CENT.negate()) >= 0) {
-                BigDecimal periods = BigDecimal.valueOf(index - 1L).add(leg(previous, value));
+            if (cumulative.compareTo(recoveryLine) >= 0) {
+                boolean finalFlow = index == flows.size() - 1;
+                BigDecimal periods = BigDecimal.valueOf(index - 1L)
+                        .add(leg(previous, value, finalFlow));
                 return MoneyUtils.mid(MetricSupport.quotient(periods,
                         MetricSupport.periodsPerYear(context)));
             }
@@ -113,10 +131,17 @@ public final class PaybackMetric implements FinancialMetric {
     /**
      * The fractional period the crossing flow takes to cover the outstanding {@code previous}. A
      * zero-sized crossing flow recovers nothing, so the recovery sits at the previous boundary
-     * instead of dividing by zero.
+     * instead of dividing by zero. When the crossing is the last flow of the walk the leg is capped
+     * at one period: a sub-cent shortfall approved by {@link #RECOVERY_TOLERANCE} at maturity means
+     * the money comes back <em>at</em> the horizon, and a payback past the schedule's own term would
+     * be a number no lease could produce.
      */
-    private static BigDecimal leg(BigDecimal previous, BigDecimal crossingFlow) {
+    private static BigDecimal leg(BigDecimal previous, BigDecimal crossingFlow, boolean finalFlow) {
         BigDecimal size = crossingFlow.abs();
-        return size.signum() == 0 ? BigDecimal.ZERO : previous.abs().divide(size, MetricSupport.MC);
+        if (size.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal covered = previous.abs().divide(size, MetricSupport.MC);
+        return finalFlow && covered.compareTo(BigDecimal.ONE) > 0 ? BigDecimal.ONE : covered;
     }
 }
