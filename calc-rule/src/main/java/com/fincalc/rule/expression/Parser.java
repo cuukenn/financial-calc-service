@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Recursive-descent parser turning a {@link Lexer} token list into an {@link AstNode} tree,
@@ -26,6 +27,13 @@ import java.util.Set;
  * {@code [minArity, maxArity]}, raises {@link RuleErrorCode#UNKNOWN_FUNCTION}. There is no
  * assignment, member access or {@code new} in the grammar, and the lexer rejects the dot, which
  * structurally rules out reflection-style escapes.
+ *
+ * <p><b>Depth cap (design §8.6 单表达式深度 ≤ 64).</b> Every nesting construct — a parenthesized
+ * group, a unary operator, a binary operator, a function call — is counted; the 65th level raises
+ * the {@code FCS-RULE-3004} syntax error naming the nesting overflow, instead of an uncatchable
+ * {@code StackOverflowError}. Every AST level is counted, so the cap also bounds the recursive
+ * {@link AstNode#eval(EvalContext)} interpreter (eval depth ≤ parse depth); parenthesized groups
+ * and unary {@code +} cost parse depth only, which keeps the parser's own recursion bounded too.
  */
 final class Parser {
 
@@ -34,9 +42,13 @@ final class Parser {
             "PERIOD", "BALANCE", "DAYS", "RATE", "INDEX",
             "IS_LAST", "PRINCIPAL", "TOTAL_PERIODS", "RESIDUAL");
 
+    /** §8.6's 单表达式深度 ≤ 64; the same cap bounds eval recursion. */
+    private static final int MAX_DEPTH = 64;
+
     private final List<Token> tokens;
     private final FunctionRegistry functions;
     private int pos;
+    private int depth;
 
     Parser(List<Token> tokens, FunctionRegistry functions) {
         this.tokens = tokens;
@@ -56,8 +68,7 @@ final class Parser {
     private AstNode parseOr() {
         AstNode node = parseAnd();
         while (peek().type() == Type.OR) {
-            advance();
-            node = new AstNode.BinaryNode(AstNode.Op.OR, node, parseAnd());
+            node = fold(AstNode.Op.OR, node, advance(), this::parseAnd);
         }
         return node;
     }
@@ -66,8 +77,7 @@ final class Parser {
     private AstNode parseAnd() {
         AstNode node = parseComparison();
         while (peek().type() == Type.AND) {
-            advance();
-            node = new AstNode.BinaryNode(AstNode.Op.AND, node, parseComparison());
+            node = fold(AstNode.Op.AND, node, advance(), this::parseComparison);
         }
         return node;
     }
@@ -78,22 +88,22 @@ final class Parser {
         while (true) {
             switch (peek().type()) {
                 case EQ:
-                    node = binary(AstNode.Op.EQ, node);
+                    node = fold(AstNode.Op.EQ, node, advance(), this::parseAdditive);
                     break;
                 case NE:
-                    node = binary(AstNode.Op.NE, node);
+                    node = fold(AstNode.Op.NE, node, advance(), this::parseAdditive);
                     break;
                 case LT:
-                    node = binary(AstNode.Op.LT, node);
+                    node = fold(AstNode.Op.LT, node, advance(), this::parseAdditive);
                     break;
                 case LE:
-                    node = binary(AstNode.Op.LE, node);
+                    node = fold(AstNode.Op.LE, node, advance(), this::parseAdditive);
                     break;
                 case GT:
-                    node = binary(AstNode.Op.GT, node);
+                    node = fold(AstNode.Op.GT, node, advance(), this::parseAdditive);
                     break;
                 case GE:
-                    node = binary(AstNode.Op.GE, node);
+                    node = fold(AstNode.Op.GE, node, advance(), this::parseAdditive);
                     break;
                 default:
                     return node;
@@ -105,9 +115,9 @@ final class Parser {
     private AstNode parseAdditive() {
         AstNode node = parseTerm();
         while (peek().type() == Type.PLUS || peek().type() == Type.MINUS) {
-            AstNode.Op op = peek().type() == Type.PLUS ? AstNode.Op.ADD : AstNode.Op.SUB;
-            advance();
-            node = new AstNode.BinaryNode(op, node, parseTerm());
+            Token operator = advance();
+            AstNode.Op op = operator.type() == Type.PLUS ? AstNode.Op.ADD : AstNode.Op.SUB;
+            node = fold(op, node, operator, this::parseTerm);
         }
         return node;
     }
@@ -116,9 +126,9 @@ final class Parser {
     private AstNode parseTerm() {
         AstNode node = parsePower();
         while (peek().type() == Type.STAR || peek().type() == Type.SLASH) {
-            AstNode.Op op = peek().type() == Type.STAR ? AstNode.Op.MUL : AstNode.Op.DIV;
-            advance();
-            node = new AstNode.BinaryNode(op, node, parsePower());
+            Token operator = advance();
+            AstNode.Op op = operator.type() == Type.STAR ? AstNode.Op.MUL : AstNode.Op.DIV;
+            node = fold(op, node, operator, this::parsePower);
         }
         return node;
     }
@@ -127,24 +137,36 @@ final class Parser {
     private AstNode parsePower() {
         AstNode node = parseUnary();
         while (peek().type() == Type.CARET) {
-            advance();
-            node = new AstNode.BinaryNode(AstNode.Op.POW, node, parseUnary());
+            node = fold(AstNode.Op.POW, node, advance(), this::parseUnary);
         }
         return node;
     }
 
     /** {@code unary → (! | - | +) unary | primary}; a leading {@code +} is a no-op */
     private AstNode parseUnary() {
-        switch (peek().type()) {
-            case MINUS:
+        Token token = peek();
+        switch (token.type()) {
+            case MINUS: {
                 advance();
-                return new AstNode.UnaryNode(AstNode.Op.NEG, parseUnary());
-            case NOT:
+                push(token);
+                AstNode node = new AstNode.UnaryNode(AstNode.Op.NEG, parseUnary());
+                depth--;
+                return node;
+            }
+            case NOT: {
                 advance();
-                return new AstNode.UnaryNode(AstNode.Op.NOT, parseUnary());
-            case PLUS:
+                push(token);
+                AstNode node = new AstNode.UnaryNode(AstNode.Op.NOT, parseUnary());
+                depth--;
+                return node;
+            }
+            case PLUS: {
                 advance();
-                return parseUnary();
+                push(token);
+                AstNode node = parseUnary();
+                depth--;
+                return node;
+            }
             default:
                 return parsePrimary();
         }
@@ -171,14 +193,17 @@ final class Parser {
                 return new AstNode.LiteralNode(Value.blank());
             case IDENT:
                 return parseIdentifier();
-            case LPAREN:
+            case LPAREN: {
                 advance();
+                push(token);
                 AstNode grouped = parseOr();
                 if (peek().type() != Type.RPAREN) {
                     throw unexpected(peek());
                 }
                 advance();
+                depth--;
                 return grouped;
+            }
             default:
                 throw unexpected(token);
         }
@@ -200,6 +225,7 @@ final class Parser {
     private AstNode parseCall(Token nameToken) {
         String code = nameToken.text();
         advance(); // LPAREN
+        push(nameToken);
         List<AstNode> args = new ArrayList<>();
         if (peek().type() != Type.RPAREN) {
             args.add(parseOr());
@@ -212,6 +238,7 @@ final class Parser {
             throw unexpected(peek());
         }
         advance(); // RPAREN
+        depth--;
 
         FormulaFunction function = functions.find(code);
         if (function == null) {
@@ -226,6 +253,31 @@ final class Parser {
         return new AstNode.CallNode(code, args);
     }
 
+    /**
+     * Folds one binary operator into {@code left}, counting the nesting level (each operator
+     * application deepens the AST's left spine).
+     */
+    private AstNode fold(AstNode.Op op, AstNode left, Token operator, Supplier<AstNode> operand) {
+        push(operator);
+        AstNode node = new AstNode.BinaryNode(op, left, operand.get());
+        depth--;
+        return node;
+    }
+
+    /**
+     * Enters one nesting level, raising the {@code FCS-RULE-3004} syntax error past
+     * {@code MAX_DEPTH} levels (§8.6). The parser is discarded on any parse error, so the counter
+     * needs no unwinding on the throw path.
+     */
+    private void push(Token token) {
+        depth++;
+        if (depth > MAX_DEPTH) {
+            throw new BusinessException(RuleErrorCode.EXPRESSION_SYNTAX_ERROR,
+                    "表达式嵌套过深: 深度 " + depth + " > " + MAX_DEPTH
+                            + " (第 " + token.line() + " 行第 " + token.col() + " 列)");
+        }
+    }
+
     private static String arityText(FormulaFunction function) {
         int min = function.minArity();
         int max = function.maxArity();
@@ -236,11 +288,6 @@ final class Parser {
             return "恰好需要 " + min + " 个参数";
         }
         return "需要 " + min + " 到 " + max + " 个参数";
-    }
-
-    private AstNode binary(AstNode.Op op, AstNode left) {
-        advance();
-        return new AstNode.BinaryNode(op, left, parseAdditive());
     }
 
     private Token peek() {

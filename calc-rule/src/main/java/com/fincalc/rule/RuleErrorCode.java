@@ -31,7 +31,10 @@ public enum RuleErrorCode implements ErrorCode {
     /** Parse-time whitelist check: the identifier is not one of the nine period variables. */
     UNKNOWN_VARIABLE("FCS-RULE-3001", "FCS-RULE-3001: 未知变量: %s"),
 
-    /** Lexer/parser check: the expression does not satisfy the §8.4 grammar. */
+    /**
+     * Lexer/parser check: the expression does not satisfy the §8.4 grammar, or its nesting
+     * exceeds the §8.6 depth cap of 64 levels.
+     */
     EXPRESSION_SYNTAX_ERROR("FCS-RULE-3004", "FCS-RULE-3004: 表达式语法错误: %s"),
 
     /**

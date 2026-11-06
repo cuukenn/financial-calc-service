@@ -26,6 +26,12 @@ import java.util.Objects;
  *   <li>{@link CallNode} passes {@code ERROR} arguments to the function verbatim, so the
  *       function — {@code IFERROR} in particular — decides what an error means.</li>
  * </ul>
+ *
+ * <p><b>Recursion bound.</b> The parser caps nesting at 64 levels (design §8.6, see
+ * {@link Parser}), counting every AST level, so this recursive interpreter never recurses deeper
+ * than the parse did — an oversized rule string fails with the coded
+ * {@code FCS-RULE-3004} nesting error at parse time, never as a
+ * {@code StackOverflowError} at evaluation time.
  */
 public interface AstNode {
 
@@ -132,12 +138,23 @@ public interface AstNode {
      * MathContext)} (negative bases allowed); fractional exponents use the shared
      * {@link DecimalMath#pow} for positive bases; Excel's edge readings — {@code 0^0 → #NUM!},
      * {@code 0^(-n) → #DIV/0!}, negative base with fractional exponent → {@code #NUM!} — produce
-     * {@code ERROR} values.
+     * {@code ERROR} values, as does any result beyond Excel's ~1e308 range
+     * ({@code 2^2000 → #NUM!}, both paths, checked before computation).
      *
      * <p>Comparisons compare numbers, or strings when both operands are text; mixed text/number
      * coerces the text to a number like Excel.
      */
     final class BinaryNode implements AstNode {
+
+        /**
+         * Result-magnitude ceiling of {@code ^}: Excel maps results beyond ~1e308 (the double
+         * range) to {@code #NUM!}, so a power whose |result| would exceed 10^308 — or fall below
+         * 10^-308, the same |ln| test — is rejected before it is computed. ln(10^308) =
+         * 308·ln(10), computed once from the shared helper.
+         */
+        private static final BigDecimal POWER_RESULT_CEILING =
+                DecimalMath.ln(BigDecimal.TEN)
+                        .multiply(BigDecimal.valueOf(308), MathContext.DECIMAL128);
 
         private final Op op;
         private final AstNode left;
@@ -264,12 +281,35 @@ public interface AstNode {
                 if (base.signum() == 0 && integral.signum() < 0) {
                     return Value.error(FormulaError.DIV_ZERO);
                 }
+                // The BigDecimal.pow computation itself is unchanged; the ceiling check only
+                // rejects magnitudes Excel would render as #NUM! before they are computed.
+                if (base.signum() != 0 && powerBeyondCeiling(base.abs(), integral)) {
+                    return Value.error(FormulaError.NUM_ERROR);
+                }
                 return Value.number(base.pow(integral.intValueExact(), Value.mathContext()));
             }
             if (base.signum() <= 0) {
                 return Value.error(FormulaError.NUM_ERROR);
             }
+            // The fractional path delegates to DecimalMath.exp(exponent·ln(base)), which computes
+            // the result exactly — a huge exponent would materialize a huge BigDecimal (e.g.
+            // 2^2e9 ≈ 250 MB of digits on the per-period hot path). Bound the expected magnitude
+            // first: |ln(base)·exponent| against ln(10^308), Excel's #NUM! threshold. base > 0
+            // here, so ln is defined.
+            if (powerBeyondCeiling(base, exponent)) {
+                return Value.error(FormulaError.NUM_ERROR);
+            }
             return Value.number(DecimalMath.pow(base, exponent));
+        }
+
+        /**
+         * Estimates the power's decimal magnitude as |ln(base)·exponent| and reports whether it
+         * exceeds {@link #POWER_RESULT_CEILING} (10^308, Excel's #NUM! range); covers overflow
+         * and, through the same |ln| test, underflow below 10^-308. {@code base} must be positive.
+         */
+        private static boolean powerBeyondCeiling(BigDecimal base, BigDecimal exponent) {
+            return DecimalMath.ln(base).multiply(exponent).abs()
+                    .compareTo(POWER_RESULT_CEILING) > 0;
         }
     }
 

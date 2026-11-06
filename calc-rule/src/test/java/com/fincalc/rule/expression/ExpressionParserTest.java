@@ -67,6 +67,40 @@ class ExpressionParserTest {
                 .isInstanceOf(BusinessException.class);
     }
 
+    @Test
+    void rejects_nesting_beyond_the_depth_cap() {
+        assertThatThrownBy(() -> parse(nestedParens(65)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-RULE-3004")
+                .hasMessageContaining("表达式嵌套过深")
+                .hasMessageContaining("深度 65 > 64");
+        assertThatThrownBy(() -> parse(nestedUnary(65)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-RULE-3004");
+    }
+
+    @Test
+    void evaluates_nesting_at_the_depth_cap() {
+        assertThat(eval(nestedParens(64)).asNumber()).isEqualByComparingTo("1");
+        assertThat(eval(nestedUnary(64)).asNumber()).isEqualByComparingTo("1");
+    }
+
+    @Test
+    void power_beyond_the_range_ceiling_is_num_error() {
+        Value v = eval("2 ^ 2000");
+        assertThat(v.type()).isEqualTo(ValueType.ERROR);
+        assertThat(((FormulaError) v.raw()).code()).isEqualTo("FCS-RULE-3007");
+        assertThat(eval("2 ^ 2000.5").type()).isEqualTo(ValueType.ERROR);
+        assertThat(eval("2 ^ -2000").type()).isEqualTo(ValueType.ERROR);
+    }
+
+    @Test
+    void power_within_the_range_ceiling_stays_numeric() {
+        assertThat(eval("2 ^ 10").asNumber()).isEqualByComparingTo("1024");
+        assertThat(eval("2 ^ 1000.5").type()).isEqualTo(ValueType.NUMBER);
+        assertThat(eval("-2 ^ 3").asNumber()).isEqualByComparingTo("-8");
+    }
+
     private static Value eval(String expr) {
         return eval(expr, FunctionRegistry.empty());
     }
@@ -88,5 +122,26 @@ class ExpressionParserTest {
         variables.put("PERIOD", Value.number(BigDecimal.valueOf(period)));
         variables.put("RATE", Value.number(new BigDecimal("0.08")));
         return new EvalContext(variables, FunctionRegistry.empty());
+    }
+
+    private static String nestedParens(int depth) {
+        StringBuilder expression = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            expression.append('(');
+        }
+        expression.append('1');
+        for (int i = 0; i < depth; i++) {
+            expression.append(')');
+        }
+        return expression.toString();
+    }
+
+    private static String nestedUnary(int depth) {
+        StringBuilder expression = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            expression.append('-');
+        }
+        expression.append('1');
+        return expression.toString();
     }
 }
