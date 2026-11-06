@@ -92,6 +92,10 @@ class IrrCalculatorTest {
         BigDecimal mirr = IrrCalculator.mirr(flatLoanFlows(),
                 new BigDecimal("0.04"), new BigDecimal("0.08"), 12);
 
+        // FV = Σ 86 066.43 × (1 + 0.04/12)^(12−k) at the §8 periodic-rate scale of 12
+        //    = 1 051 943.745537485…, PV = 1 000 000, horizon 12 periods = 1 year
+        // ⇒ (FV/PV)^1 − 1 = 0.05194374553748511…, half-up at 12 scales.
+        assertThat(mirr).isEqualByComparingTo("0.051943745537");
         assertThat(mirr).isBetween(new BigDecimal("0.03"), new BigDecimal("0.09"));
     }
 

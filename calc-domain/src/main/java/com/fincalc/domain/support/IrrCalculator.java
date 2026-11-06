@@ -35,10 +35,10 @@ import java.util.Objects;
  *
  * <p><b>Multiple roots.</b> A flow set with several sign changes — fees plus balloon residual plus
  * a mid-term deposit refund is enough — has several rates that zero its NPV. These methods ask the
- * solver for a root of the whole bracket and may return any of them. §9.5's tie-break rule (取最
- * 接近名义利率的最小正根) needs the element's nominal rate, which this class does not receive, so it
- * belongs to the metric assembly task; {@link #hasSingleSignChange(List)} is exposed so that caller
- * can tell when the answer is ambiguous.
+ * solver for a root of the whole bracket and may return any of them. §9.5's tie-break rule
+ * 「取最接近名义利率的最小正根」 needs the element's nominal rate, which this class does not
+ * receive, so it belongs to the metric assembly task; {@link #hasSingleSignChange(List)} is exposed
+ * so that caller can tell when the answer is ambiguous.
  */
 public final class IrrCalculator {
 
@@ -137,11 +137,12 @@ public final class IrrCalculator {
     }
 
     /**
-     * Modified IRR: positive flows compound to the horizon at the reinvestment rate, negative
-     * flows discount from t0 at the finance rate, and the bridge between the two is annualized
-     * over {@code periodsPerYear} periods per year — the §9.5 MIRR expressed as an annual rate, so
-     * a caller must not annualize it a second time. {@code null} when either side of the flow set
-     * is missing.
+     * Modified IRR: positive flows compound to the horizon at the reinvestment rate, negative flows
+     * discount from t0 at the finance rate, and the bridge between the two is annualized over
+     * {@code periodsPerYear} periods per year. Note the deliberate deviation from §9.5's literal
+     * {@code (FV / −PV)^(1/n) − 1}: the exponent here is {@code periodsPerYear / horizon}, so the
+     * result is the annual rate and a caller must not annualize it a second time. {@code null} when
+     * either side of the flow set is missing.
      */
     public static BigDecimal mirr(List<CashFlow> flows, BigDecimal reinvestRate,
             BigDecimal financeRate, int periodsPerYear) {
@@ -218,7 +219,11 @@ public final class IrrCalculator {
         return false;
     }
 
-    /** INFLOW positive, OUTFLOW negative. {@code CashFlow} carries the sign in its direction, never in the amount. */
+    /**
+     * INFLOW positive, OUTFLOW negative: {@code CashFlow} carries the sign in its direction and its
+     * amount stays positive, so a signed amount here would be negated twice and silently invert the
+     * whole IRR (design document §9.4 review focus 6).
+     */
     private static BigDecimal signed(CashFlow flow) {
         if (flow.amount().signum() < 0) {
             throw new IllegalStateException("cash flow amount must be positive: " + flow.amount()

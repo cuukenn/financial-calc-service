@@ -47,9 +47,10 @@ class RootSolverTest {
 
     @Test
     void solver_returns_null_when_the_iteration_budget_is_exhausted() {
-        // |f| can never fall below the tolerance: 1e-20 on both sides of zero. The bracket halves
-        // every iteration, so 100 iterations leave it about 1.6e-30 wide — still far wider than
-        // 1e-40 — and design document §9.5 requires null rather than a fabricated rate.
+        // |f| can never fall below the tolerance: it is 1e-20 on both sides of the discontinuity,
+        // so neither endpoint, nor any midpoint, is within 1e-40. The Newton steps keep landing on
+        // the wrong side of the jump and the bracket stalls a few 1e-8 wide, so the 100-iteration
+        // budget runs out — and design document §9.5 requires null rather than a fabricated rate.
         BigDecimal flat = new BigDecimal("1e-20");
         Function<BigDecimal, BigDecimal> f = x -> x.signum() >= 0 ? flat : flat.negate();
 
