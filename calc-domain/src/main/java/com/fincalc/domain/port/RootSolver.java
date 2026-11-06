@@ -13,6 +13,12 @@ import java.util.function.Function;
  * {@code |f|} is within {@code tolerance}, or {@code null} when the bracket holds no sign change
  * or the iteration budget is exhausted — a metric that does not converge is reported as
  * {@code null}, never as a fabricated number.
+ *
+ * <p>When the function changes sign more than once the bracket contains several roots and the
+ * solver returns whichever one its steps land on; it does not enumerate them. Design document §9.5
+ * picks among several roots by preferring the smallest positive one nearest the element's nominal
+ * rate, and a solver knows nothing about nominal rates — so that choice belongs to the caller that
+ * assembles the metrics, not to this port.
  */
 public interface RootSolver extends OrderedExtension {
 

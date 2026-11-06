@@ -46,6 +46,18 @@ class RootSolverTest {
     }
 
     @Test
+    void solver_returns_null_when_the_iteration_budget_is_exhausted() {
+        // |f| can never fall below the tolerance: 1e-20 on both sides of zero. The bracket halves
+        // every iteration, so 100 iterations leave it about 1.6e-30 wide — still far wider than
+        // 1e-40 — and design document §9.5 requires null rather than a fabricated rate.
+        BigDecimal flat = new BigDecimal("1e-20");
+        Function<BigDecimal, BigDecimal> f = x -> x.signum() >= 0 ? flat : flat.negate();
+
+        assertThat(solver.solve(f, BigDecimal.ONE.negate(), BigDecimal.ONE, new BigDecimal("1e-40")))
+                .isNull();
+    }
+
+    @Test
     void solver_exposes_extension_identity() {
         assertThat(solver.code()).isEqualTo("BISECTION_NEWTON");
         assertThat(solver.order()).isEqualTo(10);

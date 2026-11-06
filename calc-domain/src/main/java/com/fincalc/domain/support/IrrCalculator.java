@@ -1,11 +1,12 @@
 package com.fincalc.domain.support;
 
+import com.fincalc.common.money.MoneyScale;
+import com.fincalc.common.money.MoneyUtils;
 import com.fincalc.domain.model.CashFlow;
 import com.fincalc.domain.model.CashFlowDirection;
 import com.fincalc.domain.port.RootSolver;
 import java.math.BigDecimal;
 import java.math.MathContext;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -22,6 +23,22 @@ import java.util.Objects;
  * the bracket follows the design convention {@code [-0.9999, 10]}. A yield that cannot be found
  * (no sign change, no root in the bracket, budget exhausted) is {@code null}, and the caller
  * records the {@code FCS-CALC-3003} warning — a metric is never fabricated.
+ *
+ * <p><b>Precision.</b> These formulas keep guard digits: sums and quotients run at
+ * {@link MathContext#DECIMAL128} and the power steps at 40 significant digits (see
+ * {@link DecimalMath}), which is wider than the §8 scales of 10 / 12. Rounding an intermediate
+ * money amount to 10 scales would quantise the {@code |f| < 1e-10} target that Newton is trying to
+ * hit. Nothing here is rounded except the rate results of {@link #annualize}, {@link
+ * #simpleAnnualize} and {@link #mirr}, at {@link MoneyScale#CALC}; the §9.5 metric scales
+ * (XNPV at 2, IRR_PERIOD at 10) are pinned by the metric assembly task when it writes
+ * {@link com.fincalc.domain.metric.FinancialMetrics}.
+ *
+ * <p><b>Multiple roots.</b> A flow set with several sign changes — fees plus balloon residual plus
+ * a mid-term deposit refund is enough — has several rates that zero its NPV. These methods ask the
+ * solver for a root of the whole bracket and may return any of them. §9.5's tie-break rule (取最
+ * 接近名义利率的最小正根) needs the element's nominal rate, which this class does not receive, so it
+ * belongs to the metric assembly task; {@link #hasSingleSignChange(List)} is exposed so that caller
+ * can tell when the answer is ambiguous.
  */
 public final class IrrCalculator {
 
@@ -30,15 +47,7 @@ public final class IrrCalculator {
     public static final BigDecimal RATE_UPPER = new BigDecimal("10");
 
     private static final MathContext MC = MathContext.DECIMAL128;
-    /** Internal precision for the transcendental steps of a decimal power. */
-    private static final MathContext CALC = new MathContext(40, RoundingMode.HALF_EVEN);
     private static final BigDecimal DAYS_PER_YEAR = new BigDecimal("365");
-    private static final BigDecimal TWO = BigDecimal.valueOf(2);
-    private static final BigDecimal SERIES_STOP = new BigDecimal("1e-36");
-    /** ln(2) straight from its own atanh series, used to range-reduce ln and exp. */
-    private static final BigDecimal LN2 =
-            atanhSeries(BigDecimal.ONE.divide(BigDecimal.valueOf(3), CALC)).multiply(TWO, CALC);
-    private static final int RATE_SCALE = 12;
     private static final RootSolver DEFAULT_SOLVER = new BisectionNewtonSolver();
 
     private IrrCalculator() {
@@ -49,6 +58,7 @@ public final class IrrCalculator {
         requireFlows(flows);
         Objects.requireNonNull(periodRate, "periodRate");
         BigDecimal growth = BigDecimal.ONE.add(periodRate);
+        requirePositiveBase(growth, periodRate);
         BigDecimal total = BigDecimal.ZERO;
         for (CashFlow flow : flows) {
             BigDecimal factor = growth.pow(flow.sequence(), MC);
@@ -73,8 +83,8 @@ public final class IrrCalculator {
         for (CashFlow flow : flows) {
             BigDecimal years = BigDecimal.valueOf(ChronoUnit.DAYS.between(origin, flow.date()))
                     .divide(DAYS_PER_YEAR, MC);
-            // BigDecimal has no decimal-exponent pow on JDK 11: split integer and fractional parts.
-            BigDecimal factor = decimalPow(growth, years);
+            // BigDecimal has no decimal-exponent pow on JDK 11: see DecimalMath.
+            BigDecimal factor = DecimalMath.pow(growth, years);
             total = total.add(signed(flow).divide(factor, MC), MC);
         }
         return total;
@@ -114,22 +124,24 @@ public final class IrrCalculator {
     public static BigDecimal annualize(BigDecimal periodIrr, int periodsPerYear) {
         Objects.requireNonNull(periodIrr, "periodIrr");
         requirePositive(periodsPerYear);
-        return BigDecimal.ONE.add(periodIrr).pow(periodsPerYear, MC).subtract(BigDecimal.ONE)
-                .setScale(RATE_SCALE, RoundingMode.HALF_UP);
+        return MoneyUtils.scale(BigDecimal.ONE.add(periodIrr).pow(periodsPerYear, MC)
+                .subtract(BigDecimal.ONE), MoneyScale.CALC);
     }
 
     /** Simple annualization: {@code periodIrr × periodsPerYear}, at {@code 12} scales. */
     public static BigDecimal simpleAnnualize(BigDecimal periodIrr, int periodsPerYear) {
         Objects.requireNonNull(periodIrr, "periodIrr");
         requirePositive(periodsPerYear);
-        return periodIrr.multiply(BigDecimal.valueOf(periodsPerYear))
-                .setScale(RATE_SCALE, RoundingMode.HALF_UP);
+        return MoneyUtils.scale(periodIrr.multiply(BigDecimal.valueOf(periodsPerYear)),
+                MoneyScale.CALC);
     }
 
     /**
      * Modified IRR: positive flows compound to the horizon at the reinvestment rate, negative
-     * flows discount from t0 at the finance rate, and the annualized bridge between the two is
-     * the result. {@code null} when the flow set has both sides missing.
+     * flows discount from t0 at the finance rate, and the bridge between the two is annualized
+     * over {@code periodsPerYear} periods per year — the §9.5 MIRR expressed as an annual rate, so
+     * a caller must not annualize it a second time. {@code null} when either side of the flow set
+     * is missing.
      */
     public static BigDecimal mirr(List<CashFlow> flows, BigDecimal reinvestRate,
             BigDecimal financeRate, int periodsPerYear) {
@@ -145,8 +157,10 @@ public final class IrrCalculator {
         if (horizon == 0) {
             return null;
         }
-        BigDecimal reinvestPeriodic = reinvestRate.divide(BigDecimal.valueOf(periodsPerYear), MC);
-        BigDecimal financePeriodic = financeRate.divide(BigDecimal.valueOf(periodsPerYear), MC);
+        BigDecimal reinvestPeriodic = MoneyUtils.scale(
+                reinvestRate.divide(BigDecimal.valueOf(periodsPerYear), MC), MoneyScale.CALC);
+        BigDecimal financePeriodic = MoneyUtils.scale(
+                financeRate.divide(BigDecimal.valueOf(periodsPerYear), MC), MoneyScale.CALC);
 
         BigDecimal futureInflows = BigDecimal.ZERO;
         BigDecimal presentOutflows = BigDecimal.ZERO;
@@ -167,9 +181,8 @@ public final class IrrCalculator {
         BigDecimal ratio = futureInflows.divide(presentOutflows.negate(), MC);
         BigDecimal exponent = BigDecimal.valueOf(periodsPerYear)
                 .divide(BigDecimal.valueOf(horizon), MC);
-        return decimalPow(ratio, exponent)
-                .subtract(BigDecimal.ONE)
-                .setScale(RATE_SCALE, RoundingMode.HALF_UP);
+        return MoneyUtils.scale(DecimalMath.pow(ratio, exponent).subtract(BigDecimal.ONE),
+                MoneyScale.CALC);
     }
 
     /** Whether the signed flow sequence changes sign exactly once. */
@@ -205,72 +218,13 @@ public final class IrrCalculator {
         return false;
     }
 
-    /** INFLOW positive, OUTFLOW negative. */
+    /** INFLOW positive, OUTFLOW negative. {@code CashFlow} carries the sign in its direction, never in the amount. */
     private static BigDecimal signed(CashFlow flow) {
+        if (flow.amount().signum() < 0) {
+            throw new IllegalStateException("cash flow amount must be positive: " + flow.amount()
+                    + " (" + flow.type() + " " + flow.direction() + ")");
+        }
         return flow.direction() == CashFlowDirection.INFLOW ? flow.amount() : flow.amount().negate();
-    }
-
-    /**
-     * {@code base^exponent} for a non-negative exponent on a positive base: JDK 11 has no
-     * BigDecimal decimal power, so it is computed as {@code exp(exponent · ln(base))} with series
-     * at 40 significant digits — comfortably finer than the 34-digit solve precision.
-     */
-    private static BigDecimal decimalPow(BigDecimal base, BigDecimal exponent) {
-        return exp(exponent.multiply(ln(base), CALC));
-    }
-
-    /** Σ z^(2n+1)/(2n+1); converges quickly for |z| ≤ 1/3. */
-    private static BigDecimal atanhSeries(BigDecimal z) {
-        BigDecimal sum = z;
-        BigDecimal zSquared = z.multiply(z, CALC);
-        BigDecimal term = z;
-        for (int n = 1; n < 500; n++) {
-            term = term.multiply(zSquared, CALC);
-            BigDecimal part = term.divide(BigDecimal.valueOf(2L * n + 1), CALC);
-            sum = sum.add(part, CALC);
-            if (part.abs().compareTo(SERIES_STOP) < 0) {
-                break;
-            }
-        }
-        return sum;
-    }
-
-    /** ln(base) = 2·atanh((m−1)/(m+1)) + k·ln2 after reducing base to m·2^k, m ∈ [1, 2). */
-    private static BigDecimal ln(BigDecimal base) {
-        if (base.signum() <= 0) {
-            throw new ArithmeticException("ln requires a positive argument: " + base.toPlainString());
-        }
-        BigDecimal m = base;
-        int k = 0;
-        while (m.compareTo(TWO) >= 0) {
-            m = m.divide(TWO, CALC);
-            k++;
-        }
-        while (m.compareTo(BigDecimal.ONE) < 0) {
-            m = m.multiply(TWO, CALC);
-            k--;
-        }
-        BigDecimal z = m.subtract(BigDecimal.ONE).divide(m.add(BigDecimal.ONE), CALC);
-        BigDecimal logM = atanhSeries(z).multiply(TWO, CALC);
-        return k == 0 ? logM
-                : logM.add(LN2.multiply(BigDecimal.valueOf(k), CALC), CALC);
-    }
-
-    /** exp(y) = 2^k · Σ r^n/n! with y = k·ln2 + r, r kept near zero by the ln2 reduction. */
-    private static BigDecimal exp(BigDecimal y) {
-        int k = y.divide(LN2, 0, RoundingMode.HALF_EVEN).intValueExact();
-        BigDecimal r = y.subtract(LN2.multiply(BigDecimal.valueOf(k), CALC), CALC);
-        BigDecimal sum = BigDecimal.ONE;
-        BigDecimal term = BigDecimal.ONE;
-        for (int n = 1; n < 200; n++) {
-            term = term.multiply(r, CALC).divide(BigDecimal.valueOf(n), CALC);
-            sum = sum.add(term, CALC);
-            if (term.abs().compareTo(SERIES_STOP) < 0) {
-                break;
-            }
-        }
-        return k >= 0 ? sum.multiply(TWO.pow(k), CALC)
-                : sum.divide(TWO.pow(-k), CALC);
     }
 
     private static void requireFlows(List<CashFlow> flows) {
@@ -280,7 +234,7 @@ public final class IrrCalculator {
         }
     }
 
-    /** ln() needs a positive argument: a discount rate of -1 or lower has no present value. */
+    /** A discount rate of -1 or lower has no present value, and no positive base to take a power of. */
     private static void requirePositiveBase(BigDecimal growth, BigDecimal rate) {
         if (growth.signum() <= 0) {
             throw new IllegalArgumentException("rate must be greater than -1: " + rate);

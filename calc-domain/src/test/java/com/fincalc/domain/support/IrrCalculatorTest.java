@@ -1,6 +1,7 @@
 package com.fincalc.domain.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import static com.fincalc.domain.model.CashFlowDirection.INFLOW;
 import static com.fincalc.domain.model.CashFlowDirection.OUTFLOW;
@@ -92,6 +93,78 @@ class IrrCalculatorTest {
                 new BigDecimal("0.04"), new BigDecimal("0.08"), 12);
 
         assertThat(mirr).isBetween(new BigDecimal("0.03"), new BigDecimal("0.09"));
+    }
+
+    @Test
+    void npv_and_xnpv_reject_a_discount_rate_at_or_below_minus_one() {
+        List<CashFlow> flows = flatLoanFlows();
+
+        assertThatThrownBy(() -> IrrCalculator.npv(flows, new BigDecimal("-1")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> IrrCalculator.npv(flows, new BigDecimal("-1.5")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> IrrCalculator.xnpv(flows, new BigDecimal("-1")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void empty_flow_list_is_rejected() {
+        List<CashFlow> empty = new ArrayList<>();
+
+        assertThatThrownBy(() -> IrrCalculator.npv(empty, BigDecimal.ZERO))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> IrrCalculator.periodIrr(empty))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void annualize_and_mirr_reject_a_non_positive_periods_per_year() {
+        assertThatThrownBy(() -> IrrCalculator.annualize(new BigDecimal("0.005"), 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> IrrCalculator.simpleAnnualize(new BigDecimal("0.005"), -1))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> IrrCalculator.mirr(flatLoanFlows(),
+                new BigDecimal("0.04"), new BigDecimal("0.08"), 0))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void mirr_returns_null_when_one_side_of_the_flow_set_is_missing() {
+        List<CashFlow> onlyInflows = new ArrayList<>();
+        onlyInflows.add(flow(0, T0, "100", CashFlowType.RENT, INFLOW));
+        onlyInflows.add(flow(1, T0.plusMonths(1), "100", CashFlowType.RENT, INFLOW));
+        assertThat(IrrCalculator.mirr(onlyInflows,
+                new BigDecimal("0.04"), new BigDecimal("0.08"), 12)).isNull();
+
+        List<CashFlow> onlyOutflows = new ArrayList<>();
+        onlyOutflows.add(flow(0, T0, "100", CashFlowType.PRINCIPAL, OUTFLOW));
+        onlyOutflows.add(flow(1, T0.plusMonths(1), "10", CashFlowType.FEE, OUTFLOW));
+        assertThat(IrrCalculator.mirr(onlyOutflows,
+                new BigDecimal("0.04"), new BigDecimal("0.08"), 12)).isNull();
+    }
+
+    @Test
+    void xnpv_uses_the_earliest_flow_date_whatever_the_insertion_order() {
+        List<CashFlow> ordered = new ArrayList<>();
+        ordered.add(flow(0, LocalDate.of(2024, 1, 1), "1000000", CashFlowType.PRINCIPAL, OUTFLOW));
+        ordered.add(flow(1, LocalDate.of(2024, 7, 1), "1050000", CashFlowType.RENT, INFLOW));
+
+        List<CashFlow> reversed = new ArrayList<>();
+        reversed.add(flow(1, LocalDate.of(2024, 7, 1), "1050000", CashFlowType.RENT, INFLOW));
+        reversed.add(flow(0, LocalDate.of(2024, 1, 1), "1000000", CashFlowType.PRINCIPAL, OUTFLOW));
+
+        BigDecimal rate = new BigDecimal("0.10");
+        assertThat(IrrCalculator.xnpv(reversed, rate))
+                .isEqualByComparingTo(IrrCalculator.xnpv(ordered, rate));
+    }
+
+    @Test
+    void a_negative_flow_amount_is_rejected_rather_than_double_negated() {
+        List<CashFlow> flows = new ArrayList<>();
+        flows.add(flow(0, T0, "-1000000", CashFlowType.PRINCIPAL, OUTFLOW));
+
+        assertThatThrownBy(() -> IrrCalculator.npv(flows, BigDecimal.ZERO))
+                .isInstanceOf(IllegalStateException.class);
     }
 
     /** Golden annuity flows: 1 000 000 out at t0, twelve level rents of 86 066.43 in. */
