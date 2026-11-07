@@ -35,6 +35,15 @@ public enum DomainErrorCode implements ErrorCode {
     EXPLICIT_RENTS_MUST_BE_POSITIVE("FCS-DOM-1009",
             "FCS-DOM-1009: 显式租金必须为正: %s"),
 
+    PERIODS_OUT_OF_RANGE("FCS-DOM-1010",
+            "FCS-DOM-1010: 租期期数不得超过硬上限 1200（月频 100 年）: %s"),
+
+    FEE_AMOUNT_INVALID("FCS-DOM-1011",
+            "FCS-DOM-1011: 费用金额不得为空且必须不小于 0: %s"),
+
+    DEPOSIT_MUST_BE_NON_NEGATIVE("FCS-DOM-1012",
+            "FCS-DOM-1012: 保证金必须不小于 0: %s"),
+
     PERIOD_SEQUENCE_INVALID("FCS-DOM-2001",
             "FCS-DOM-2001: 期次日期必须严格递增且 start < end: 第 %s 期 [%s, %s]"),
 

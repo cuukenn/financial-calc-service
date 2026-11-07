@@ -21,6 +21,9 @@ import io.github.cuukenn.fincalc.common.money.MoneyUtils;
  */
 public final class LeaseElement {
 
+    /** Hard cap on the effective period count: 1200 monthly periods, i.e. 100 years. */
+    public static final int MAX_PERIODS = 1200;
+
     private final BigDecimal principal;
     private final BigDecimal nominalRate;
     private final LocalDate commenceDate;
@@ -88,6 +91,7 @@ public final class LeaseElement {
         if (periods < 1) {
             throw new BusinessException(DomainErrorCode.PERIODS_MUST_BE_POSITIVE, periods);
         }
+        validatePeriodCount();
         if (commenceDate == null) {
             throw new BusinessException(DomainErrorCode.COMMENCE_DATE_REQUIRED);
         }
@@ -101,6 +105,8 @@ public final class LeaseElement {
             validateBalloonResidual();
         }
         validateExplicitRents();
+        validateFees();
+        validateDeposit();
         requireField(frequency, "frequency");
         requireField(timing, "timing");
         requireField(dayCountCode, "dayCountCode");
@@ -111,6 +117,18 @@ public final class LeaseElement {
         requireField(gracePeriod, "gracePeriod");
         requireField(currency, "currency");
         requireField(rateChangePolicy, "rateChangePolicy");
+    }
+
+    /**
+     * Caps the effective period count at {@link #MAX_PERIODS}: the {@code periods} of a regular
+     * schedule, or the number of explicit windows when the frequency is
+     * {@link PaymentFrequency#IRREGULAR}.
+     */
+    private void validatePeriodCount() {
+        int effective = frequency == PaymentFrequency.IRREGULAR ? explicitPeriods.size() : periods;
+        if (effective > MAX_PERIODS) {
+            throw new BusinessException(DomainErrorCode.PERIODS_OUT_OF_RANGE, effective);
+        }
     }
 
     private void validateExplicitPeriods() {
@@ -156,6 +174,21 @@ public final class LeaseElement {
             // Same stable code FCS-DOM-1008 as the empty/length failure, but with its own
             // message so the cross-method rejection does not read self-contradictory.
             throw new BusinessException(DomainErrorCode.EXPLICIT_RENTS_CROSS_METHOD, method);
+        }
+    }
+
+    private void validateFees() {
+        for (FeeItem fee : fees) {
+            if (fee == null || fee.amount() == null || fee.amount().compareTo(MoneyUtils.ZERO) < 0) {
+                throw new BusinessException(DomainErrorCode.FEE_AMOUNT_INVALID,
+                        fee == null ? null : fee.amount());
+            }
+        }
+    }
+
+    private void validateDeposit() {
+        if (deposit != null && deposit.compareTo(MoneyUtils.ZERO) < 0) {
+            throw new BusinessException(DomainErrorCode.DEPOSIT_MUST_BE_NON_NEGATIVE, deposit);
         }
     }
 
