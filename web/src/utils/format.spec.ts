@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { formatMoney, formatNumber, formatPercent } from './format'
 
 describe('format (R90a/R90b numeric display formatters)', () => {
-  it('formats money with thousands separators and fixed 4 decimals', () => {
-    expect(formatMoney('1032797.15')).toBe('1,032,797.1500')
-    expect(formatMoney('5000.00')).toBe('5,000.0000')
-    expect(formatMoney('0')).toBe('0.0000')
-    expect(formatMoney('-1234567.891')).toBe('-1,234,567.8910')
+  it('formats money with thousands separators and fixed 2 decimals (R93-2)', () => {
+    expect(formatMoney('1032797.15')).toBe('1,032,797.15')
+    expect(formatMoney('1032797.1500')).toBe('1,032,797.15')
+    expect(formatMoney('5000.00')).toBe('5,000.00')
+    expect(formatMoney('0')).toBe('0.00')
+    expect(formatMoney('-1234567.891')).toBe('-1,234,567.89')
     // 原样直显（占位/兜底约定），不发明数字。
     expect(formatMoney(null)).toBe('—')
     expect(formatMoney('')).toBe('—')

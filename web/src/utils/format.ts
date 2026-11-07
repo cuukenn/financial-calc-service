@@ -5,10 +5,11 @@
  * 对账不丢精度）。非数值/null 的兜底约定与既有占位一致（'—' / 原样透出）。
  */
 
-/** 金额格式：千分位 + 固定 4 位小数（#,##0.0000），locale 固定 en-US 保证千分位为 ','。 */
+/** R93-2：金额格式贴合现实记账精度——千分位 + 固定 2 位小数（#,##0.00，分），
+ * locale 固定 en-US 保证千分位为 ','。百分比/一般数值仍为 4 位小数不变。 */
 const MONEY_FORMAT = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 4,
-  maximumFractionDigits: 4,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 })
 
 function toNumber(value: string | null | undefined): number | null {
@@ -17,7 +18,7 @@ function toNumber(value: string | null | undefined): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-/** 金额：千分位 + 固定 4 位小数（1032797.15 → 1,032,797.1500）。 */
+/** 金额：千分位 + 固定 2 位小数（1032797.1500 → 1,032,797.15）；原值随 tooltip 透出。 */
 export function formatMoney(value: string | null | undefined): string {
   const n = toNumber(value)
   if (n === null) return value === null || value === undefined || value === '' ? '—' : value

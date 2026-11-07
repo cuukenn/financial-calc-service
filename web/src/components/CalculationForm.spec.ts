@@ -260,8 +260,37 @@ describe('CalculationForm', () => {
     expect(wrapper.text()).toContain('格式无效：请输入如 6% 或 600bp 的名义年利率')
   })
 
-  it('fills the VAT rate from the China bracket presets and submits decimals (R92-5)', async () => {
+  it('gives the day-count select its own full-width row, pairing date-roll with rate policy (R93-1)', () => {
     const wrapper = mountWithI18n(CalculationForm)
+
+    // 字段所在的外层栅格 Col：从 FormItem 的 control col 再向上一层的 ant-col
+    // （FormItem 内部的 label/control 也是 ant-col，外层工作台布局 Col 在 Card 之外）。
+    const colClasses = (sel: string): string[] => {
+      const el = wrapper.find(sel).element as HTMLElement
+      const control = el.closest('.ant-col')
+      const gridCol = control?.parentElement?.closest('.ant-col')
+      return gridCol ? gridCol.className.split(/\s+/) : []
+    }
+
+    // 计息基准独占一行（span 24）。
+    expect(colClasses('[data-test="day-count-code"]')).toContain('ant-col-24')
+    // 日期调整与分段利率策略共占一行（各 span 12）。
+    expect(colClasses('[data-test="date-roll-code"]')).toContain('ant-col-12')
+    expect(colClasses('[data-test="rate-change-policy"]')).toContain('ant-col-12')
+  })
+
+  it('fills the VAT rate from the China bracket presets and submits decimals (R92-5 / R93-4)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+
+    // R93-4：档次快选位于增值税率 Form.Item 的 extra 插槽（输入框正下方内联一行），
+    // 不再有独立「增值税档次」标签（竖排一字一行的旧实现彻底移除）。
+    const presets = wrapper.find('[data-test="vat-rate-presets"]')
+    expect(presets.exists()).toBe(true)
+    expect(presets.element.closest('.ant-form-item-extra')).not.toBeNull()
+    expect(wrapper.text()).not.toContain('增值税档次')
+    for (const preset of ['13%', '9%', '6%', '0%']) {
+      expect(presets.text()).toContain(preset)
+    }
 
     // 快选按钮以百分数口径回填展示值。
     await wrapper.find('[data-test="vat-rate-preset-13"]').trigger('click')
@@ -327,17 +356,17 @@ describe('CalculationForm', () => {
     const wrapper = mountWithI18n(CalculationForm)
     await submit(wrapper)
 
-    // Task 3：指标升级为 Statistic 卡（R90a：#,##0.0000 显示，原值随 tooltip 透出）。
+    // Task 3：指标升级为 Statistic 卡（R90a + R93-2：#,##0.00 显示，原值随 tooltip 透出）。
     const cards = wrapper.findAll('[data-test="metric-card"]')
     expect(cards.length).toBeGreaterThanOrEqual(1)
-    expect(wrapper.find('[data-test="metric-TOTAL_RENT"]').text()).toContain('1,032,797.1500')
+    expect(wrapper.find('[data-test="metric-TOTAL_RENT"]').text()).toContain('1,032,797.15')
 
     // Plan 4 Task 1：摊销计划移入同名 Tab（懒渲染，须先激活）。
     await activateTab(wrapper, '摊销计划')
     const rows = wrapper.find('[data-test="installments-table"]').findAll('.ant-table-row')
     expect(rows.length).toBeGreaterThanOrEqual(1)
-    // R90a：金额列千分位 + 固定 4 位小数。
-    expect(rows[0].text()).toContain('84,271.2400')
+    // R90a + R93-2：金额列千分位 + 固定 2 位小数。
+    expect(rows[0].text()).toContain('84,271.24')
     expect(wrapper.find('[data-test="has-errors-alert"]').exists()).toBe(false)
   })
 

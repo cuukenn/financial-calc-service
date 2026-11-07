@@ -458,7 +458,8 @@ async function onFinish(): Promise<void> {
                   />
                 </FormItem>
               </Col>
-              <Col :span="12">
+              <!-- R93-1：计息基准独占一行（下拉项名称 + 原码两栏展示需要足够宽度）。 -->
+              <Col :span="24">
                 <FormItem :label="t('form.basic.dayCountCode')" name="dayCountCode">
                   <!-- R89：触发器只显示斜杠记法主文本；code 以次要小字留在下拉项内（对账用）。 -->
                   <Select
@@ -484,6 +485,7 @@ async function onFinish(): Promise<void> {
                   </Select>
                 </FormItem>
               </Col>
+              <!-- R93-1：日期调整与分段利率策略共占一行。 -->
               <Col :span="12">
                 <FormItem :label="t('form.basic.dateRollCode')" name="dateRollCode">
                   <Select
@@ -495,7 +497,7 @@ async function onFinish(): Promise<void> {
                   />
                 </FormItem>
               </Col>
-              <Col :span="24">
+              <Col :span="12">
                 <FormItem :label="t('form.basic.rateChangePolicy')" name="rateChangePolicy">
                   <Select
                     v-model:value="form.rateChangePolicy"
@@ -602,27 +604,28 @@ async function onFinish(): Promise<void> {
               </Col>
               <Col :span="12">
                 <FormItem :label="t('form.feesOther.vatRate')" name="vatRate">
-                  <!-- R92-5：百分数口径输入（6 或 6% → 0.06）+ 中国增值税档次快选。 -->
+                  <!-- R92-5：百分数口径输入（6 或 6% → 0.06）。 -->
                   <Input
                     v-model:value="form.vatRate"
                     data-test="vat-rate"
                     :placeholder="t('form.feesOther.vatRatePh')"
                   />
-                  <div class="vat-rate-presets" data-test="vat-rate-presets">
-                    <Typography.Text type="secondary">
-                      {{ t('form.feesOther.vatRatePreset') }}
-                    </Typography.Text>
-                    <Button
-                      v-for="preset in VAT_RATE_PRESETS"
-                      :key="preset"
-                      size="small"
-                      class="vat-rate-preset-btn"
-                      :data-test="`vat-rate-preset-${preset}`"
-                      @click="form.vatRate = preset"
-                    >
-                      {{ preset }}%
-                    </Button>
-                  </div>
+                  <!-- R93-4：档次快选移入 extra 插槽——输入框正下方一行内联小按钮，
+                       不再有任何独立标签（彻底消除竖排一字一行的可能）。 -->
+                  <template #extra>
+                    <div class="vat-rate-presets" data-test="vat-rate-presets">
+                      <Button
+                        v-for="preset in VAT_RATE_PRESETS"
+                        :key="preset"
+                        size="small"
+                        class="vat-rate-preset-btn"
+                        :data-test="`vat-rate-preset-${preset}`"
+                        @click="form.vatRate = preset"
+                      >
+                        {{ preset }}%
+                      </Button>
+                    </div>
+                  </template>
                 </FormItem>
               </Col>
             </Row>

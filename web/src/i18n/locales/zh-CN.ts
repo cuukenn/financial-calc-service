@@ -90,7 +90,6 @@ const zhCN = {
       // R92-5：百分数口径输入（6 或 6% → 0.06），附中国增值税档次快选。
       vatRatePh: '如 6 或 6%',
       vatRateFormat: '格式无效：请输入如 6 或 6% 的增值税率',
-      vatRatePreset: '增值税档次：',
     },
     submit: '开始测算',
     submitting: '测算中…',

@@ -93,8 +93,9 @@ describe('ResultPanel', () => {
     // 自定义 code 指标：主文本为目录中文名，原码以次要小字随卡（对账用）。
     expect(rent.text()).toContain('租金合计')
     expect(rent.find('[data-test="metric-card-code"]').text()).toBe('TOTAL_RENT')
-    // R90a：金额显示千分位 + 固定 4 位小数（原值随 tooltip 透出）。
-    expect(rent.text()).toContain('1,032,797.1500')
+    // R90a + R93-2：金额显示千分位 + 固定 2 位小数（原值随 tooltip 透出）。
+    expect(rent.text()).toContain('1,032,797.15')
+    expect(rent.text()).not.toContain('1,032,797.1500')
 
     const xirr = wrapper.find('[data-test="metric-XIRR"]')
     // R92-4：标准缩写原样展示，不再强行译作「实际日期 IRR」，也不重复次要原码。
@@ -125,6 +126,33 @@ describe('ResultPanel', () => {
     expect(headers).toContain('NPV')
     // hover 仍透出目录中文名（不得出现强行翻译的主标签，但悬浮解释保留中文）。
     expect(titles.join('\n')).toContain('净现值')
+  })
+
+  it('renders the metrics table as a 3-column grid with three metrics per row (R93-3)', () => {
+    // 精选卡片之外的指标凑够 4 个：3 + 1 两行，验证网格声明固定 3 等分列。
+    const many = result()
+    many.schedule.header.metrics = {
+      ...many.schedule.header.metrics,
+      MIRR: '0.058',
+      PAYBACK_PERIOD: '0.26841',
+      TRUE_ANNUAL_RATE: '0.0622',
+    }
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: many } })
+
+    const grid = wrapper.find('[data-test="metrics-list"]')
+    expect(grid.exists()).toBe(true)
+    // 3 等分列的网格：宽度不足不再靠 min-width 撑出横向滚动（R93-3）。
+    expect((grid.element as HTMLElement).style.gridTemplateColumns).toContain('repeat(3')
+
+    // 每个网格单元恰含一个行头（即每行 3 个指标），行头/数值 hook 保持不变。
+    const items = grid.findAll('[data-test="metrics-grid-item"]')
+    expect(items.length).toBe(4)
+    for (const item of items) {
+      expect(item.findAll('[data-test="metric-header"]').length).toBe(1)
+      expect(item.findAll('[data-test="metric-value"]').length).toBe(1)
+    }
+    // 旧 Descriptions 实现彻底移除。
+    expect(wrapper.find('.ant-descriptions').exists()).toBe(false)
   })
 
   it('renders standard abbreviations raw as row-header primary text with no duplicated code (R92-4)', () => {
@@ -232,13 +260,13 @@ describe('ResultPanel', () => {
 
     await activateTab(wrapper, '现金流')
 
-    // 现金流表渲染全部事件行；R90a：金额列千分位 + 固定 4 位小数。
+    // 现金流表渲染全部事件行；R90a + R93-2：金额列千分位 + 固定 2 位小数。
     const table = wrapper.find('[data-test="cashflow-table"]')
     expect(table.exists()).toBe(true)
     const rows = table.findAll('.ant-table-row')
     expect(rows.length).toBe(5)
-    expect(rows[0].text()).toContain('1,000,000.0000')
-    expect(rows[2].text()).toContain('84,271.2400')
+    expect(rows[0].text()).toContain('1,000,000.00')
+    expect(rows[2].text()).toContain('84,271.24')
 
     // 类型标签走 i18n（zh-CN：本金/费用/租金/残值/保证金）。
     const rowText = rows.map((r) => r.text())
@@ -280,9 +308,9 @@ describe('ResultPanel', () => {
     await activateTab(wrapper, '实际利率法')
     const table = wrapper.find('[data-test="effective-interest-table"]')
     expect(table.exists()).toBe(true)
-    // EIR 摘要行与摊销表同 Tab 展示（R90a/R90b：EIR 百分比、金额 #,##0.0000）。
+    // EIR 摘要行与摊销表同 Tab 展示（R90a/R90b：EIR 百分比、金额 #,##0.00）。
     expect(wrapper.find('[data-test="result-tabs"]').text()).toContain('实际利率（EIR）：0.5100%')
-    expect(table.find('.ant-table-row').text()).toContain('920,828.7600')
+    expect(table.find('.ant-table-row').text()).toContain('920,828.76')
 
     // 无数据（IRR 未收敛等）时占位而非空表。
     const nullWrapper = mountWithI18n(ResultPanel, { props: { result: result() } })

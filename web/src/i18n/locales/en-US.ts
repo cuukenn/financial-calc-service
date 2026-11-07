@@ -89,7 +89,6 @@ const enUS: typeof zhCN = {
       // R92-5: percent-style input (6 or 6% → 0.06), with China VAT bracket quick picks.
       vatRatePh: 'e.g. 6 or 6%',
       vatRateFormat: 'Invalid format: enter a VAT rate like 6 or 6%',
-      vatRatePreset: 'VAT brackets: ',
     },
     submit: 'Calculate',
     submitting: 'Calculating…',

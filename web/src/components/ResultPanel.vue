@@ -2,7 +2,6 @@
 import {
   Alert,
   Card,
-  Descriptions,
   Empty,
   Statistic,
   Table,
@@ -58,7 +57,7 @@ const metrics = computed(() => props.result.schedule.header.metrics)
  * R90b：指标数值显示格式分类（money 为缺省）。
  * - percent：利率类指标，×100 固定 4 位小数 + '%'；
  * - number：年数类（回收期/久期/凸性）与租费率比值，固定 4 位小数；
- * - money：金额类，千分位 + 固定 4 位小数。
+ * - money：金额类，千分位 + 固定 2 位小数（R93-2：贴合现实记账精度）。
  * 原始后端字符串不丢：随 tooltip 透出（对账不丢精度）。
  */
 const PERCENT_METRICS = new Set([
@@ -302,7 +301,7 @@ function issueKey(issue: Issue, index: number): string {
           <!-- R86：指标卡 hover 显示指标目录（中文名/公式/说明）。 -->
           <Tooltip v-for="card in metricCards" :key="card.code" :title="card.tooltip">
             <Card size="small" data-test="metric-card">
-              <!-- 自定义 formatter：绕开 Statistic 内置重排版；R90a/R90b 按 #,##0.0000 / 百分比 / 4 位小数显示，原值随 tooltip 透出。 -->
+              <!-- 自定义 formatter：绕开 Statistic 内置重排版；R90a/R90b + R93-2 按 #,##0.00 / 百分比 / 4 位小数显示，原值随 tooltip 透出。 -->
               <Statistic
                 :value="card.value ?? '—'"
                 :data-test="`metric-${card.code}`"
@@ -324,35 +323,40 @@ function issueKey(issue: Issue, index: number): string {
             </Card>
           </Tooltip>
         </div>
-        <Descriptions
+        <!-- R93-3：指标表改为 3 列网格（每格 = 行头 + 数值），每行恰 3 个指标。
+             Descriptions 的列宽随内容计算，在结果列宽度下会不规则挤压/换行；
+             网格固定 3 等分列，格子内 nowrap + 省略号，tooltip 仍透出原值。 -->
+        <div
           v-if="otherMetrics.length > 0"
-          bordered
-          size="small"
-          :column="3"
-          class="metrics-descriptions"
+          class="metrics-grid"
           data-test="metrics-list"
-          style="margin-top: 12px"
+          style="margin-top: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))"
         >
-          <Descriptions.Item v-for="[code, value] in otherMetrics" :key="code">
-            <template #label>
-              <!-- R92-4：行头主文本为标准缩写（原样）/目录本地化名，R86 hover 不变。 -->
-              <Tooltip :title="otherMetricTooltip(code, value)">
-                <span data-test="metric-header">
-                  <span data-test="metric-header-name">{{ otherMetricLabel(code) }}</span>
-                  <span
-                    v-if="showsSecondaryCode(code)"
-                    data-test="metric-header-code"
-                    class="metric-header-code"
-                  >{{ code }}</span>
-                </span>
-              </Tooltip>
-            </template>
+          <div
+            v-for="[code, value] in otherMetrics"
+            :key="code"
+            class="metrics-grid-item"
+            data-test="metrics-grid-item"
+          >
+            <!-- R92-4：行头主文本为标准缩写（原样）/目录本地化名，R86 hover 不变。 -->
+            <Tooltip :title="otherMetricTooltip(code, value)">
+              <span data-test="metric-header" class="metrics-grid-label">
+                <span data-test="metric-header-name">{{ otherMetricLabel(code) }}</span>
+                <span
+                  v-if="showsSecondaryCode(code)"
+                  data-test="metric-header-code"
+                  class="metric-header-code"
+                >{{ code }}</span>
+              </span>
+            </Tooltip>
             <!-- R90a/R90b：数值按类别格式化，原值随 tooltip 透出。 -->
             <Tooltip :title="t('result.raw', { value: value ?? '—' })">
-              <span data-test="metric-value">{{ formatMetricValue(code, value) }}</span>
+              <span data-test="metric-value" class="metrics-grid-value">
+                {{ formatMetricValue(code, value) }}
+              </span>
             </Tooltip>
-          </Descriptions.Item>
-        </Descriptions>
+          </div>
+        </div>
 
         <template v-if="result.schedule.issues.length > 0">
           <Typography.Title :level="5" style="margin-top: 12px">
@@ -395,7 +399,7 @@ function issueKey(issue: Issue, index: number): string {
           :scroll="{ x: 1870 }"
           data-test="installments-table"
         >
-          <!-- R90a/R90b：金额列 #,##0.0000、利率列百分比，hover 透出原值（对账不丢精度）。 -->
+          <!-- R90a/R90b：金额列 #,##0.00（R93-2）、利率列百分比，hover 透出原值（对账不丢精度）。 -->
           <template #bodyCell="{ column, record }">
             <template v-if="INSTALLMENT_MONEY_COLUMNS.has(column.dataIndex as string)">
               <Tooltip :title="t('result.raw', { value: record[column.dataIndex as keyof Installment] })">
@@ -438,7 +442,7 @@ function issueKey(issue: Issue, index: number): string {
                   {{ cashflowDirectionLabel(record.direction) }}
                 </Tag>
               </template>
-              <!-- R90a：金额列 #,##0.0000，hover 透出原值。 -->
+              <!-- R90a：金额列 #,##0.00（R93-2），hover 透出原值。 -->
               <template v-else-if="column.dataIndex === 'amount'">
                 <Tooltip :title="t('result.raw', { value: record.amount })">
                   <span>{{ formatMoney(record.amount) }}</span>
@@ -479,7 +483,7 @@ function issueKey(issue: Issue, index: number): string {
             :scroll="{ x: 650 }"
             data-test="effective-interest-table"
           >
-            <!-- R90a：五列金额均 #,##0.0000，hover 透出原值。 -->
+            <!-- R90a：五列金额均 #,##0.00（R93-2），hover 透出原值。 -->
             <template #bodyCell="{ column, record }">
               <template v-if="EIR_MONEY_COLUMNS.has(column.dataIndex as string)">
                 <Tooltip :title="t('result.raw', { value: record[column.dataIndex as keyof EffectiveInterestRow] })">
@@ -506,15 +510,39 @@ function issueKey(issue: Issue, index: number): string {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
 }
-/* R90：金额/率值禁止折行断数字——宽度不足时由容器横向滚动。 */
-.metrics-descriptions {
+/* R93-3：3 列指标网格的仿 bordered 描边与单元格排版。
+   数值 nowrap + 省略号（完整原值在 tooltip），行头不折行。 */
+.metrics-grid {
   overflow-x: auto;
 }
-.metrics-descriptions :deep(.ant-descriptions-view) {
-  min-width: 640px;
+.metrics-grid-item {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
 }
-.metrics-descriptions :deep(.ant-descriptions-item-label),
-.metrics-descriptions :deep(.ant-descriptions-item-content) {
+.metrics-grid-item:nth-child(3n + 1) {
+  border-left: 1px solid #f0f0f0;
+}
+.metrics-grid {
+  border-top: 1px solid #f0f0f0;
+}
+.metrics-grid-label {
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 6px 10px;
+  background: #fafafa;
+  color: rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+}
+.metrics-grid-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 </style>
