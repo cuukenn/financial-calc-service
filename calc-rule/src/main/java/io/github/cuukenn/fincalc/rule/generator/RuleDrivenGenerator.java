@@ -24,9 +24,9 @@ import io.github.cuukenn.fincalc.domain.port.RuleSetView;
 import io.github.cuukenn.fincalc.domain.support.AbstractAmortizationGenerator;
 import io.github.cuukenn.fincalc.rule.RuleErrorCode;
 import io.github.cuukenn.fincalc.rule.expression.EvalContext;
-import io.github.cuukenn.fincalc.rule.expression.Value;
 import io.github.cuukenn.fincalc.rule.model.CompiledRule;
 import io.github.cuukenn.fincalc.rule.model.CompiledRuleSet;
+import io.github.cuukenn.fincalc.rule.model.PeriodVariables;
 import io.github.cuukenn.fincalc.rule.model.RuleRow;
 
 /**
@@ -274,28 +274,15 @@ public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
         }
 
         /**
-         * The nine whitelisted condition variables (design §8.2 column D, parser whitelist)
-         * built from the loop state: {@code PERIOD}, {@code BALANCE}, {@code DAYS},
-         * {@code RATE} (the fallback annual rate — see {@link #resolve}), {@code INDEX} (zero
-         * based), {@code IS_LAST}, {@code PRINCIPAL}, {@code TOTAL_PERIODS} and {@code RESIDUAL}
-         * ({@link Value#blank()} when the element carries no residual — a {@code null} cannot
-         * enter a {@code Map.copyOf} variable map). Functions resolve against the registry the
-         * rules were compiled with.
+         * The condition context for one period, built by the shared
+         * {@link PeriodVariables#evalContext} factory (R70) from this run's loop state;
+         * functions resolve against the registry the rules were compiled with.
          */
         private EvalContext evalContext(CompiledRuleSet compiled, int periodNo,
                 BigDecimal openingBalance, int days, BigDecimal defaultAnnualRate) {
-            Map<String, Value> variables = new HashMap<>();
-            variables.put("PERIOD", Value.number(BigDecimal.valueOf(periodNo)));
-            variables.put("BALANCE", Value.number(openingBalance));
-            variables.put("DAYS", Value.number(BigDecimal.valueOf(days)));
-            variables.put("RATE", Value.number(defaultAnnualRate));
-            variables.put("INDEX", Value.number(BigDecimal.valueOf(periodNo - 1)));
-            variables.put("IS_LAST", Value.bool(periodNo == totalPeriods));
-            variables.put("PRINCIPAL", Value.number(element.principal()));
-            variables.put("TOTAL_PERIODS", Value.number(BigDecimal.valueOf(totalPeriods)));
-            variables.put("RESIDUAL", element.residualValue() == null
-                    ? Value.blank() : Value.number(element.residualValue()));
-            return new EvalContext(variables, compiled.functionRegistry());
+            return PeriodVariables.evalContext(periodNo, openingBalance, days, defaultAnnualRate,
+                    totalPeriods, element.principal(), element.residualValue(),
+                    periodNo == totalPeriods, compiled.functionRegistry());
         }
 
         /**

@@ -59,9 +59,9 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
         BigDecimal principal = money(element.principal(), element);
         BigDecimal residual = element.outstandingResidual();
 
-        if (PmtSolver.isConstantPeriodRate(dayCount)) {
+        if (PmtSolver.isConstantPeriodRate(dayCount)
+                && closedFormPricing(context, periods)) {
             BigDecimal rate = periodRate(element, periods.get(0), element.nominalRate(), dayCount);
-            requireUniformRate(context, periods, rate);
             state.pmt(PmtSolver.closedForm(principal, rate, periods.size(), residual));
             state.solver("CLOSED_FORM");
             return;
@@ -71,22 +71,35 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
     }
 
     /**
-     * Guards the closed-form path: the annuity formula assumes one periodic rate. A stub period
-     * that breaks rate uniformity fails fast, which is better than emitting a schedule with
-     * negative balances that still passes the conservation check. Conventions that make every
-     * period's rate differ by design are priced iteratively instead.
+     * Whether the level rent may be priced by the closed form. The annuity formula assumes one
+     * periodic rate, so the nominal-derived periodic rates must be uniform across the schedule.
+     *
+     * <p>R70: without a rule set a stub period that breaks uniformity fails fast
+     * ({@code FCS-DOM-2002}) — better than emitting a schedule with negative balances that still
+     * passes the conservation check. With a rule set the per-period rates are rule-resolved and
+     * may legitimately vary, so the guard stands down; non-uniform nominal windows then fall to
+     * the iterative solver, which prices the level rent over the schedule's own windows from the
+     * element's nominal rate (R27 interim posture — Task 3 replaces this with the segmented
+     * solve, and until then a rule rate that diverges from the nominal pricing is kept loud by
+     * the R17 negative-principal backstop in the walk).
      */
-    private static void requireUniformRate(CalculationContext context, List<PeriodDate> periods,
-            BigDecimal firstRate) {
+    private static boolean closedFormPricing(CalculationContext context, List<PeriodDate> periods) {
+        BigDecimal firstRate = context.element().nominalRate()
+                .multiply(context.dayCount().yearFraction(periods.get(0).startDate(),
+                        periods.get(0).endDate()));
         for (int index = 1; index < periods.size(); index++) {
             PeriodDate period = periods.get(index);
             BigDecimal rate = context.element().nominalRate()
                     .multiply(context.dayCount().yearFraction(period.startDate(), period.endDate()));
             if (rate.subtract(firstRate).abs().compareTo(RATE_EPSILON) > 0) {
-                throw new BusinessException(DomainErrorCode.NON_UNIFORM_PERIOD_RATE,
-                        index + 1, rate.toPlainString(), firstRate.toPlainString());
+                if (context.ruleSet() == null) {
+                    throw new BusinessException(DomainErrorCode.NON_UNIFORM_PERIOD_RATE,
+                            index + 1, rate.toPlainString(), firstRate.toPlainString());
+                }
+                return false;
             }
         }
+        return true;
     }
 
     @Override

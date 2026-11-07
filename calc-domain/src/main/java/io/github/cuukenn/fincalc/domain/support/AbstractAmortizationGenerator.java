@@ -64,8 +64,19 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
     }
 
     /**
-     * Resolves the rule governing one period, or returns {@link RuleOutcome#none()} when the
-     * run has no rule set.
+     * Resolves the rule governing one period through the {@link RuleSetView} port's 4-arg
+     * resolve, or returns {@link RuleOutcome#none()} when the run has no rule set. This is the
+     * R70 period-rate resolution order for the built-in generators: a rule hit carries the
+     * period's annual rate (read back in {@link #annualRate}); an unmatched period falls back to
+     * the element's nominal rate there.
+     *
+     * <p>Honest-no-match posture (Task 26 semantics, unchanged here): the 4-arg port resolve
+     * skips conditioned rows — evaluating a condition needs the per-period
+     * {@code EvalContext}, which only calc-rule can build. For the built-in generators a period
+     * whose only covering rows are conditioned is therefore an unmatched period (nominal-rate
+     * fallback); conditioned rates need the {@code RULE_DRIVEN} generator, which resolves through
+     * the context-accepting resolve, until a later ruling extends condition evaluation to the
+     * built-ins.
      */
     protected RuleOutcome resolveRule(RuleSetView ruleSet, int periodNo, BigDecimal openingBalance,
             int days, BigDecimal defaultAnnualRate) {
