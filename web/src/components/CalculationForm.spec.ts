@@ -463,6 +463,34 @@ describe('CalculationForm', () => {
     ])
   })
 
+  it('blocks submission when a rule-row rate is unparseable and shows a per-row error (R95)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="rule-add"]').trigger('click')
+    await wrapper.findAll('[data-test="rule-annual-rate"]')[0].setValue('6bp%')
+    await submit(wrapper)
+
+    // 垃圾值不达后端：提交被阻断并逐行报错。
+    expect(calculate).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="local-error-alert"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="local-error-alert"]').text()).toContain('分段利率第 1 行格式无效')
+
+    // 行内即时错误：红字提示 + 输入框 error 状态。
+    expect(wrapper.find('[data-test="rule-rate-error"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="rule-rate-error"]').text()).toContain('利率格式无效')
+  })
+
+  it('keeps an empty rule-row rate as inherit (annualRate omitted) on submit (R95)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="rule-add"]').trigger('click')
+    await submit(wrapper)
+
+    // 空值合法 = 继承后端缺省利率（RuleRow.annualRate 可空），不再提交空串。
+    expect(calculate).toHaveBeenCalledTimes(1)
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.ruleRows).toHaveLength(1)
+    expect(req.ruleRows![0].annualRate).toBeUndefined()
+  })
+
   it('keeps the optional rule-rows editor available for built-in methods', () => {
     const wrapper = mountWithI18n(CalculationForm)
 

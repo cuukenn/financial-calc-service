@@ -53,6 +53,9 @@ const enUS: typeof zhCN = {
         toPeriodPh: 'To period',
         // R92-6: rule-row annual rates use the same percent-style input (3 / 3% / 300bp → 0.03).
         annualRatePh: 'Annual rate (e.g. 3% or 300bp)',
+        // R95 (review): inline format error + per-row submit-blocking message.
+        rateFormat: 'Invalid rate format (e.g. 3 / 3% / 300bp)',
+        rateFormatRow: 'Invalid rate format in rule row {n} (e.g. 3 / 3% / 300bp)',
         remove: 'Remove',
         add: '+ Add rule row',
         preset: "Segmented preset ({from}-{to} {'@'}3%, {from2}-{to2} {'@'}6%)",

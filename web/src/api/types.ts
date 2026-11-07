@@ -7,20 +7,6 @@
  * - Business failures answer HTTP 400/500 with the unified body {code, message}.
  */
 
-/** Entry of GET /api/v1/algorithms (AlgorithmDto). */
-export interface AlgorithmInfo {
-  /** RepaymentMethodId 枚举名，可直接用作 CalculationRequest.method。 */
-  code: string
-  /** 该算法的中文说明。 */
-  description: string
-}
-
-/** GET /api/v1/ping 的响应体。 */
-export interface PingResponse {
-  status: string
-  engine: string
-}
-
 export type PaymentFrequency = 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL' | 'IRREGULAR'
 
 export type PaymentTiming = 'IN_ADVANCE' | 'IN_ARREARS'

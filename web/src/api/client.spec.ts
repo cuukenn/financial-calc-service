@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, calculate, getAlgorithms, ping } from './client'
+import { ApiError, calculate } from './client'
 import type { CalculationRequest } from './types'
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -19,26 +19,6 @@ describe('api client', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
-  })
-
-  it('ping() fetches GET /api/v1/ping and parses the JSON body', async () => {
-    const fetchMock = vi.mocked(fetch)
-    fetchMock.mockResolvedValue(jsonResponse({ status: 'UP', engine: 'ready' }))
-
-    await expect(ping()).resolves.toEqual({ status: 'UP', engine: 'ready' })
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/ping', undefined)
-  })
-
-  it('getAlgorithms() returns the algorithm list on 200', async () => {
-    const items = [
-      { code: 'EQUAL_INSTALLMENT', description: '等额租金（年金）' },
-      { code: 'EXPLICIT_RENT', description: '显式租金' },
-    ]
-    const fetchMock = vi.mocked(fetch)
-    fetchMock.mockResolvedValue(jsonResponse(items))
-
-    await expect(getAlgorithms()).resolves.toEqual(items)
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/algorithms', undefined)
   })
 
   it('calculate() posts the request body as JSON', async () => {
@@ -61,7 +41,7 @@ describe('api client', () => {
       jsonResponse({ code: 'FCS-DOM-1001', message: '本金必须为正数' }, 400),
     )
 
-    const promise = getAlgorithms()
+    const promise = calculate({ principal: '1' } as unknown as CalculationRequest)
     await expect(promise).rejects.toBeInstanceOf(ApiError)
     const err = (await promise.catch((e) => e)) as ApiError
     expect(err.code).toBe('FCS-DOM-1001')
@@ -72,7 +52,9 @@ describe('api client', () => {
   it('throws ApiError with NETWORK_ERROR when fetch itself fails', async () => {
     vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'))
 
-    const err = (await getAlgorithms().catch((e) => e)) as ApiError
+    const err = (await calculate({ principal: '1' } as unknown as CalculationRequest).catch(
+      (e) => e,
+    )) as ApiError
     expect(err).toBeInstanceOf(ApiError)
     expect(err.code).toBe('NETWORK_ERROR')
   })

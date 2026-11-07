@@ -1,10 +1,4 @@
-import type {
-  AlgorithmInfo,
-  ApiErrorBody,
-  CalculationRequest,
-  CalculationResult,
-  PingResponse,
-} from './types'
+import type { ApiErrorBody, CalculationRequest, CalculationResult } from './types'
 
 /**
  * Error carrying the backend's unified {code, message} body (R77). Business
@@ -42,16 +36,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(body.code ?? 'UNKNOWN_ERROR', body.message ?? response.statusText, response.status)
   }
   return (await response.json()) as T
-}
-
-/** GET /api/v1/ping → {status: "UP", engine: "ready"}。 */
-export function ping(): Promise<PingResponse> {
-  return request<PingResponse>('/ping')
-}
-
-/** GET /api/v1/algorithms → 内置还款算法清单（code + 中文说明）。 */
-export function getAlgorithms(): Promise<AlgorithmInfo[]> {
-  return request<AlgorithmInfo[]>('/algorithms')
 }
 
 /** POST /api/v1/calculations → 运行一次测算，返回租金表/现金流/金融指标。 */

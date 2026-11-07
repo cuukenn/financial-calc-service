@@ -234,6 +234,18 @@ const submitError = ref<ApiError | null>(null)
 /** 提交前的本地校验提示（如显式租金未填满）。 */
 const localError = ref<string | null>(null)
 
+/**
+ * R95（评审 Important）：规则行利率换算收紧 —— 空值合法（后端 RuleRow.annualRate
+ * 可空，缺省继承名义利率，§8.5 `rule.annualRate ?: element.nominalRate`），
+ * 非空必须可解析，否则抛错拒绝装配（onFinish 已逐行阻断，此处为防御性兜底）。
+ */
+function toRuleRowRate(raw: string): string | undefined {
+  if (raw.trim() === '') return undefined
+  const parsed = parseRateInput(raw)
+  if (parsed === null) throw new Error(`unparseable rule-row rate: ${raw}`)
+  return parsed
+}
+
 function mapRuleRows(): RuleRow[] {
   return ruleRows.value.map((row, index) => ({
     // 留空时同样派生不重复的 ID（排除自身后取最大序号后继）。
@@ -244,7 +256,7 @@ function mapRuleRows(): RuleRow[] {
     fromPeriod: row.fromPeriod ?? undefined,
     toPeriod: row.toPeriod ?? undefined,
     // R92-6：规则行年利率同为百分数口径（3 / 3% / 300bp），提交前换算为小数字符串。
-    annualRate: parseRateInput(row.annualRate) ?? row.annualRate.trim(),
+    annualRate: toRuleRowRate(row.annualRate),
     // 与后端 segmented 用例同款缺省列：继承本金计划、付息即付、期末付、无特殊动作。
     principalPlan: 'INHERIT',
     interestTreatment: 'PAY_AS_INCURRED',
@@ -312,6 +324,16 @@ async function onFinish(): Promise<void> {
     localError.value = t('form.rentStructure.explicitRents.incomplete', {
       periods: form.periods ?? 0,
     })
+    return
+  }
+
+  // R95（评审 Important）：规则行利率非空必须可解析 —— 逐行报错阻断提交，
+  // 不再静默回退原串（垃圾值不达后端）；空值合法（继承后端缺省利率）。
+  const badRateIdx = ruleRows.value.findIndex(
+    (row) => row.annualRate.trim() !== '' && parseRateInput(row.annualRate) === null,
+  )
+  if (badRateIdx !== -1) {
+    localError.value = t('form.rentStructure.ruleRows.rateFormatRow', { n: badRateIdx + 1 })
     return
   }
 

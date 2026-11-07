@@ -18,8 +18,6 @@ vi.mock('@/api/client', () => ({
       this.status = status
     }
   },
-  ping: vi.fn().mockResolvedValue({ status: 'UP', engine: 'ready' }),
-  getAlgorithms: vi.fn().mockResolvedValue([]),
   calculate: vi.fn(),
 }))
 
