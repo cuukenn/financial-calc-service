@@ -6,3 +6,5 @@ target/
 *.iml
 .DS_Store
 .jqwik-database
+web/node_modules/
+web/dist/
