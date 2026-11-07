@@ -124,6 +124,19 @@ class ExcelSemanticsTest {
     }
 
     @Test
+    void invalid_date_inputs_surface_as_error_values_never_crashes() {
+        // A plausible but impossible date: LocalDate.of throws a plain DateTimeException,
+        // which evaluation must convert into an ERROR value (#VALUE!), never rethrow.
+        assertError(eval("DATEVALUE(\"2024/2/30\")"), "FCS-RULE-3006");
+        assertError(eval("DATEVALUE(\"2024/13/1\")"), "FCS-RULE-3006");
+        // Month-shift overflow: for 2e9 months plusMonths still lands on a representable
+        // calendar year, so the failure is the serial range check — Excel's #NUM! for an
+        // out-of-range result, not a crash. (An even larger shift misses the calendar itself
+        // and is #VALUE! through the DateTimeException guard.)
+        assertError(eval("EDATE(DATE(2024,1,1), 2000000000)"), "FCS-RULE-3007");
+    }
+
+    @Test
     void days360_uses_the_us_method_by_default_and_european_when_asked() {
         assertThat(eval("DAYS360(DATE(2024,1,31), DATE(2024,3,31))").asNumber())
                 .isEqualByComparingTo("60");

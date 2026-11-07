@@ -81,6 +81,15 @@ public final class DateFunctions {
             return maxArity;
         }
 
+        /**
+         * Runs the function, converting every failure into an {@code ERROR} value. Besides
+         * coercion ({@code BusinessException}) and arithmetic failures, this catches
+         * {@link java.time.DateTimeException}: date inputs a caller can plausibly write —
+         * {@code DATEVALUE("2024/2/30")}, {@code DATEVALUE("2024/13/1")}, a month shift that
+         * overflows the calendar — throw it from {@code LocalDate.of}/{@code plusMonths}, and the
+         * error-as-value model (design §8.5) requires them to surface as {@code #VALUE!} rather
+         * than crash evaluation. Future date functions inherit this guard through the template.
+         */
         @Override
         public final Value invoke(List<Value> args, EvalContext context) {
             try {
@@ -89,6 +98,8 @@ public final class DateFunctions {
                 return AstNode.errorFrom(ex);
             } catch (ArithmeticException ex) {
                 return Value.error(FormulaError.NUM_ERROR);
+            } catch (java.time.DateTimeException ex) {
+                return Value.error(FormulaError.VALUE_ERROR);
             }
         }
 
