@@ -7,7 +7,7 @@ import type zhCN from './zh-CN'
 const enUS: typeof zhCN = {
   app: {
     title: 'Lease Calculation Workbench',
-    footer: 'financial-calc-service · visualization frontend (Plan 3)',
+    footer: 'financial-calc-service · visualization frontend (Plan 3/4)',
   },
   engine: {
     cardTitle: 'Engine Status',

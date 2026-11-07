@@ -1,12 +1,12 @@
 # financial-calc-web（可视化测算前端）
 
-Vue 3 + TypeScript + Ant Design Vue 4 单页应用（Plan 3 / R80–R82），经 `calc-server` REST API
+Vue 3 + TypeScript + Ant Design Vue 4 单页应用（Plan 3/4，R80–R87），经 `calc-server` REST API
 消费核心计算引擎。后端与核心模块零改动。
 
 ## 技术栈
 
 - Vue 3（`<script setup>` + TS）、Vite 6
-- Ant Design Vue 4.x（ConfigProvider 中文 locale）
+- Ant Design Vue 4.x（ConfigProvider locale 随语言切换 zh_CN/en_US）
 - ECharts（直接引入，无包装库；option 构造为纯函数 `src/components/charts/options.ts`）
 - vitest + @vue/test-utils 组件测试；原生 fetch 封装 API client（无 Router / Pinia，最小 v1）
 
@@ -55,11 +55,15 @@ npm run lint       # ESLint（脚手架默认规则）
 ```
 web/src/
 ├── api/            # fetch client + DTO 类型镜像（对齐 calc-server dto）
+├── api/            # fetch client + DTO 类型镜像（对齐 calc-server dto）
 ├── components/
-│   ├── CalculationForm.vue   # 测算表单
-│   ├── ResultPanel.vue       # 结果区块（指标卡/问题/表格/图表）
+│   ├── CalculationForm.vue   # 测算表单（三卡片分组）
+│   ├── editors/              # 规则行/显式租金/费用编辑器子组件
+│   ├── ResultPanel.vue       # 结果区块（Tabs：指标/摊销/现金流/实际利率法）
 │   ├── EngineStatus.vue      # 引擎连通状态
+│   ├── LanguageSwitcher.vue  # 语言切换（zh-CN/en-US）
 │   ├── charts/               # EChart 薄封装 + 纯函数 option 构造
 │   └── ruleIds.ts            # 规则行 ID 派生
-└── App.vue         # 布局（无路由）
+├── i18n/            # vue-i18n（zh-CN/en-US 目录 + 指标目录）
+└── App.vue          # 布局（无路由）
 ```

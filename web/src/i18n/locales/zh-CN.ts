@@ -10,7 +10,7 @@
 const zhCN = {
   app: {
     title: '租赁测算工作台',
-    footer: 'financial-calc-service · 可视化测算前端（Plan 3）',
+    footer: 'financial-calc-service · 可视化测算前端（Plan 3/4）',
   },
   engine: {
     cardTitle: '引擎状态',
