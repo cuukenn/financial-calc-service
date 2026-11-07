@@ -6,6 +6,7 @@ import io.github.cuukenn.fincalc.domain.port.ScheduleGenerator;
 import io.github.cuukenn.fincalc.domain.port.RuleSetView;
 import io.github.cuukenn.fincalc.domain.support.algo.EqualInstallmentGenerator;
 import io.github.cuukenn.fincalc.domain.support.algo.EqualPrincipalGenerator;
+import io.github.cuukenn.fincalc.domain.support.algo.ExplicitRentGenerator;
 import io.github.cuukenn.fincalc.domain.support.algo.InterestFirstGenerator;
 import io.github.cuukenn.fincalc.domain.support.algo.PrincipalFirstGenerator;
 import io.github.cuukenn.fincalc.rule.generator.RuleDrivenGenerator;
@@ -41,9 +42,9 @@ public final class GeneratorRegistry {
     }
 
     /**
-     * The four built-in amortization algorithms: equal installment, equal principal, interest
-     * first and principal first. The rule-driven generator is not among them — see the class
-     * javadoc.
+     * The five built-in amortization algorithms: equal installment, equal principal, interest
+     * first, principal first and explicit rent. The rule-driven generator is not among them —
+     * see the class javadoc.
      *
      * @return a fresh registry with the built-ins registered
      */
@@ -53,6 +54,7 @@ public final class GeneratorRegistry {
         registry.extensions.register(new EqualPrincipalGenerator());
         registry.extensions.register(new InterestFirstGenerator());
         registry.extensions.register(new PrincipalFirstGenerator());
+        registry.extensions.register(new ExplicitRentGenerator());
         return registry;
     }
 

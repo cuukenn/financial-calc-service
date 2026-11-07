@@ -103,6 +103,63 @@ class BuiltinSegmentedRateTest {
                 .isEqualByComparingTo("0.00");
     }
 
+    @Test
+    void interest_first_applies_rule_resolved_segmented_rates() {
+        // The principal plan (interest only, balloon at maturity) is rate-independent, so the
+        // segmented rule rates flow straight through the Task-2 period-rate resolution with no
+        // generator change — this run is the proof (no guard to relax, R70).
+        LeaseElement element = baseElement(RepaymentMethodId.INTEREST_FIRST);
+        CompiledRuleSet set = compiler().compile(List.of(
+                rateRow("R1", 10, 1, 6, "0.03"),
+                rateRow("R2", 20, 7, 12, "0.06")), element, false);
+
+        CalculationResult r = CalculationFacade.defaults().calculate(
+                new CalculationRequest(element, set, CalculationOptions.defaults()));
+
+        assertThat(r.schedule().hasErrors()).isFalse();
+        assertThat(r.schedule().installments().get(5).appliedRate())
+                .isEqualByComparingTo("0.03");
+        assertThat(r.schedule().installments().get(6).appliedRate())
+                .isEqualByComparingTo("0.06");
+        // 1 000 000 x 0.03 / 12 = 2 500.00 in the 3% segment against 5 000.00 from period 7 on.
+        assertThat(r.schedule().installments().get(0).interestAccrued())
+                .isEqualByComparingTo("2500.00");
+        assertThat(r.schedule().installments().get(6).interestAccrued())
+                .isEqualByComparingTo("5000.00");
+        assertThat(r.schedule().installments().get(11).rentDue())
+                .isEqualByComparingTo("1005000.00");
+    }
+
+    @Test
+    void principal_first_applies_rule_resolved_segmented_rates() {
+        // Deferred interest accrues at the rule rate on the declining balance and settles with
+        // the final rent. Equal principal instalments of 83 333.33: the 3% segment accrues
+        // 2 500.00 + 2 291.67 + 2 083.33 + 1 875.00 + 1 666.67 + 1 458.33 = 11 875.00 and the 6%
+        // segment 2 500.00 + 2 083.33 + 1 666.67 + 1 250.00 + 833.33 + 416.67 = 8 750.00, so the
+        // final rent pays 20 625.00 of deferred interest on top of the last instalment.
+        LeaseElement element = baseElement(RepaymentMethodId.PRINCIPAL_FIRST);
+        CompiledRuleSet set = compiler().compile(List.of(
+                rateRow("R1", 10, 1, 6, "0.03"),
+                rateRow("R2", 20, 7, 12, "0.06")), element, false);
+
+        CalculationResult r = CalculationFacade.defaults().calculate(
+                new CalculationRequest(element, set, CalculationOptions.defaults()));
+
+        assertThat(r.schedule().hasErrors()).isFalse();
+        assertThat(r.schedule().installments().get(5).appliedRate())
+                .isEqualByComparingTo("0.03");
+        assertThat(r.schedule().installments().get(6).appliedRate())
+                .isEqualByComparingTo("0.06");
+        assertThat(r.schedule().installments().get(0).interestAccrued())
+                .isEqualByComparingTo("2500.00");
+        assertThat(r.schedule().installments().get(1).interestAccrued())
+                .isEqualByComparingTo("2291.67");
+        assertThat(r.schedule().installments().get(11).interestAccrued())
+                .isEqualByComparingTo("416.67");
+        assertThat(r.schedule().installments().get(11).interestPaid())
+                .isEqualByComparingTo("20625.00");
+    }
+
     // ---- Helpers (R6: per-class fixtures; mirror CalculationFacadeTest) ----
 
     private static RuleCompiler compiler() {
