@@ -1277,3 +1277,6 @@ financial-calc-service/
 | §11 持久化 / 版本链 / 底稿留存 | 延后至存在真实消费方（如 Web 模块）再随其消费需求设计（用户指令，2026-11-07）；引擎侧编排已预留 PersistencePort 插入点 |
 | §8 Excel 适配（模板/解析/对账） | 延后并待重估：出现真实 Excel 用户或拿到存量模板时按最小适配器重立范围；`04_现金流` → `LeaseElement.explicitRents` 映射点不变（用户指令，2026-11-07） |
 | Plan 2 范围 | 重定位为最小 REST 模块（calc-server：Spring Boot 薄壳，JSON API + 异常映射 + OpenAPI），Excel/持久化剔除 |
+| R76 DTO 边界（Plan 2，2026-11-07） | 核心模块零 Jackson/Swagger 注解；JSON 绑定、手写映射与 `@Schema` 文档全部由 calc-server 的 DTO 层承担，`RepaymentMethodId` 等领域类型不加任何注解 |
+| R77 异常映射（Plan 2，2026-11-07） | `BusinessException` → HTTP 400、`SystemException`/未捕获异常 → HTTP 500，错误体统一 `{code, message}`（§B 之外新增 `FCS-SRV-1001` 请求体非法 / `FCS-SRV-1002` 系统内部错误）；`FCS-ENG-1002/1003` 等请求性错误按 400 处理 |
+| R79 资源限制（Plan 2，2026-11-07） | §15 资源限制按最小执行：Tomcat form/multipart 上限配 1MB；纯 JSON 请求体的严格 1MB 过滤器未实现（calc-server `application.yml` 内已注明），待真实消费方出现再补 |

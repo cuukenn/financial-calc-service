@@ -94,6 +94,76 @@ Task-30 固化的租金表与指标黄金基线位于 `calc-testkit` 的
 THIRTY_360、12 期月付期末付，`TOTAL_RENT = 1 032 797.15`）。改动算法或舍入逻辑前先跑
 `calc-testkit` 的黄金测试，防止基线无意识漂移。
 
+## REST API（calc-server）
+
+`calc-server` 是 Spring Boot 2.7.18 薄壳（Plan 2），把 `CalculationFacade` 暴露为 JSON API；
+依赖版本集中于 `calc-bom`（R78）。机器可读契约见 OpenAPI 文档 `GET /v3/api-docs`
+（springdoc-openapi 1.7.x，DTO 层 `@Schema` 注解；核心模块零注解，R76）。
+
+### POST /api/v1/calculations
+
+最小正路请求（12 期标准租约黄金基线）：
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/calculations \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "principal": 1000000,
+    "nominalRate": 0.06,
+    "commenceDate": "2024-01-01",
+    "firstRentDate": "2024-02-01",
+    "periods": 12,
+    "frequency": "MONTHLY",
+    "timing": "IN_ARREARS",
+    "dayCountCode": "THIRTY_360",
+    "dateRollCode": "NONE",
+    "residualValue": 0,
+    "residualHandling": "SEPARATE",
+    "deposit": 0,
+    "vatRate": 0.06,
+    "method": "EQUAL_INSTALLMENT",
+    "currency": "CNY",
+    "rateChangePolicy": "RESOLVE"
+  }'
+```
+
+正路返回 HTTP 200；`$.schedule.header.metrics.TOTAL_RENT` 应为 **`"1032797.15"`**
+（11 × 86 066.43 + 末期调整 86 066.42，Task-21 修正后的黄金基线）。
+
+响应约定（money-as-string）：所有金额与利率一律为 JSON **字符串**（`BigDecimal.toPlainString()`），
+避免客户端按二进制浮点解析破坏精确小数；期数/天数/序号等整数为 JSON 数值；日期为 ISO-8601
+字符串；不可计算的指标序列化为显式 `null`（字段不省略）。请求字段与枚举取值的完整说明见
+`/v3/api-docs` 的 `CalculationRequestDto` schema。
+
+### 错误体契约
+
+所有失败返回统一错误体 `{code, message}`（R77），无其他形态：
+
+| 场景 | HTTP | code |
+|---|---|---|
+| 业务失败（领域校验 `FCS-DOM-1xxx`、规则编译 `FCS-RULE-2xxx`/`FCS-COM-0001`、编排 `FCS-ENG-1002` 未知的还款方式 / `FCS-ENG-1003` 规则驱动缺规则集、指标 `FCS-CALC-3xxx`） | 400 | 引擎/领域/规则 FCS 码 |
+| 请求体 JSON 非法或字段绑定失败 | 400 | `FCS-SRV-1001` |
+| `SystemException` 与一切未捕获异常 | 500 | `FCS-SRV-1002`（消息不含内部细节） |
+
+错误码清单以设计文档 **§B 错误码草案** 为基础（`docs/superpowers/specs/2026-11-02-financial-calc-service-design.md`），
+加上引擎实际扩充（如 `FCS-CALC-3006/3007`，见文末「实现偏差记录」勘误节）。
+
+### GET /api/v1/algorithms
+
+```bash
+curl -s http://localhost:8080/api/v1/algorithms
+```
+
+返回全部还款方式 code 及中文说明：`[{"code": "EQUAL_INSTALLMENT", "description": "…"}, …]`
+（含 `EXPLICIT_RENT`）。code → 说明映射手写于 `AlgorithmController`（领域枚举不携带注解，R76），
+与上文「还款算法 code 对照表」一致。
+
+### 范围说明（v1）
+
+Excel 适配与持久化/版本链已延后（设计文档文末「实现偏差记录」勘误，2026-11-07）：出现真实
+Excel 用户或持久化消费方时再按最小适配器立项；`04_现金流` → `LeaseElement.explicitRents`
+映射点不变。v1 仅含基础资源限制（R79），无鉴权体系。
+
 ## 构建
 
 ```bash

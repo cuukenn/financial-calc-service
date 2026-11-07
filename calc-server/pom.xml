@@ -31,6 +31,13 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- OpenAPI documentation (R78): version managed in calc-bom (springdoc 1.7.x, the
+             Boot 2.7-compatible line). Brings swagger-annotations for the DTO @Schema docs. -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-ui</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
