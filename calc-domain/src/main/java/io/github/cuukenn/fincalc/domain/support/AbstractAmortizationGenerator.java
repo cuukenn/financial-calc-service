@@ -365,6 +365,10 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         private BigDecimal cumulativePrincipal = MoneyUtils.ZERO;
         private BigDecimal cumulativeInterest = MoneyUtils.ZERO;
         private BigDecimal pmt;
+        private BigDecimal segmentRate;
+        private BigDecimal segmentRent;
+        private List<PeriodDate> periods;
+        private DayCountConvention dayCount;
         private String solver;
 
         public BigDecimal deferredInterest() {
@@ -398,6 +402,57 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
         public void pmt(BigDecimal pmt) {
             this.pmt = pmt;
+        }
+
+        /**
+         * Annual rate of the rent segment currently being walked (R71 segmented solve);
+         * {@code null} until the generator opens the first segment. A generator detects a
+         * segment boundary by comparing the period's resolved annual rate against this.
+         */
+        public BigDecimal segmentRate() {
+            return segmentRate;
+        }
+
+        public void segmentRate(BigDecimal segmentRate) {
+            this.segmentRate = segmentRate;
+        }
+
+        /**
+         * Rent of the segment currently being walked (R71 segmented solve); {@code null} until
+         * the first segment's payment is solved.
+         */
+        public BigDecimal segmentRent() {
+            return segmentRent;
+        }
+
+        public void segmentRent(BigDecimal segmentRent) {
+            this.segmentRent = segmentRent;
+        }
+
+        /**
+         * The schedule's period windows, recorded by {@link #prepare} when the walk needs them
+         * after the fact (the R71 segmented solve re-prices from the remaining windows when the
+         * day-count convention does not give every window the same periodic rate); {@code null}
+         * when the generator does not need them.
+         */
+        public List<PeriodDate> periods() {
+            return periods;
+        }
+
+        public void periods(List<PeriodDate> periods) {
+            this.periods = periods;
+        }
+
+        /**
+         * The day-count convention, recorded by {@link #prepare} alongside {@link #periods()} for
+         * generators that re-price during the walk; {@code null} when not needed.
+         */
+        public DayCountConvention dayCount() {
+            return dayCount;
+        }
+
+        public void dayCount(DayCountConvention dayCount) {
+            this.dayCount = dayCount;
         }
 
         /**
