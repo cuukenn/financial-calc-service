@@ -182,12 +182,24 @@ final class Parser {
             case STRING:
                 advance();
                 return new AstNode.LiteralNode(Value.text(token.text()));
-            case TRUE:
+            case TRUE: {
                 advance();
+                // TRUE()/FALSE() with parentheses are calls of the registered logical functions;
+                // a bare TRUE/FALSE stays the literal (Excel supports both spellings).
+                if (peek().type() == Type.LPAREN) {
+                    pos--;
+                    return parseIdentifier();
+                }
                 return new AstNode.LiteralNode(Value.bool(true));
-            case FALSE:
+            }
+            case FALSE: {
                 advance();
+                if (peek().type() == Type.LPAREN) {
+                    pos--;
+                    return parseIdentifier();
+                }
                 return new AstNode.LiteralNode(Value.bool(false));
+            }
             case BLANK:
                 advance();
                 return new AstNode.LiteralNode(Value.blank());

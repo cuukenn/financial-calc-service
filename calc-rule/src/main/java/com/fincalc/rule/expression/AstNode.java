@@ -4,6 +4,7 @@ import com.fincalc.common.error.BusinessException;
 import com.fincalc.domain.support.DecimalMath;
 import com.fincalc.rule.RuleErrorCode;
 import com.fincalc.rule.function.FormulaFunction;
+import com.fincalc.rule.function.LazyFunction;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.util.ArrayList;
@@ -142,7 +143,8 @@ public interface AstNode {
      * ({@code 2^2000 → #NUM!}, both paths, checked before computation).
      *
      * <p>Comparisons compare numbers, or strings when both operands are text; mixed text/number
-     * coerces the text to a number like Excel.
+     * coerces the text to a number like Excel. Text comparison is case-insensitive (ruling R59,
+     * Excel-aligned): {@code "ABC" = "abc"} is TRUE.
      */
     final class BinaryNode implements AstNode {
 
@@ -215,7 +217,8 @@ public interface AstNode {
             }
             try {
                 int cmp = leftValue.type() == ValueType.TEXT && rightValue.type() == ValueType.TEXT
-                        ? leftValue.asText().compareTo(rightValue.asText())
+                        // R59: TEXT/TEXT comparison is case-insensitive, Excel-aligned.
+                        ? leftValue.asText().compareToIgnoreCase(rightValue.asText())
                         : leftValue.asNumber().compareTo(rightValue.asNumber());
                 switch (op) {
                     case EQ:
@@ -314,9 +317,12 @@ public interface AstNode {
     }
 
     /**
-     * A function call, validated at parse time (existence and arity). Arguments are evaluated
-     * eagerly and passed verbatim — including {@code ERROR} values, so the function (for example
-     * {@code IFERROR}) decides what an error means.
+     * A function call, validated at parse time (existence and arity). Arguments of an ordinary
+     * {@link FormulaFunction} are evaluated eagerly and passed verbatim — including {@code ERROR}
+     * values, so the function (for example {@code CONCAT}) decides what an error means. A resolved
+     * {@link LazyFunction} ({@code IF}, {@code IFS}, {@code SWITCH}, {@code IFERROR}, {@code IFNA})
+     * instead receives the argument nodes unevaluated — each wrapped as an {@link Expression} — so
+     * it evaluates only the branch it selects (brief Task 25 Step 3).
      */
     final class CallNode implements AstNode {
 
@@ -333,6 +339,13 @@ public interface AstNode {
             FormulaFunction function = context.functions().find(code);
             if (function == null) {
                 throw new BusinessException(RuleErrorCode.UNKNOWN_FUNCTION, code);
+            }
+            if (function instanceof LazyFunction) {
+                List<Expression> lazyArgs = new ArrayList<>(args.size());
+                for (AstNode arg : args) {
+                    lazyArgs.add(arg::eval);
+                }
+                return ((LazyFunction) function).invokeLazy(lazyArgs, context);
             }
             List<Value> values = new ArrayList<>(args.size());
             for (AstNode arg : args) {
