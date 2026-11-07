@@ -126,9 +126,9 @@ class StandardCashFlowBuilderTest {
         LeaseElement withDeposit = element().toBuilder().deposit(new BigDecimal("50000")).build();
 
         List<CashFlow> none = builder.build(schedule(), withDeposit,
-                new CalculationOptions(false, RateChangePolicy.RESOLVE, CashFlowBasis.INCLUDE_FEES));
+                new CalculationOptions(false, CashFlowBasis.INCLUDE_FEES));
         List<CashFlow> with = builder.build(schedule(), withDeposit,
-                new CalculationOptions(false, RateChangePolicy.RESOLVE,
+                new CalculationOptions(false,
                         CashFlowBasis.INCLUDE_DEPOSIT));
 
         assertThat(none).noneMatch(f -> f.type() == CashFlowType.DEPOSIT);
@@ -174,7 +174,7 @@ class StandardCashFlowBuilderTest {
                 .fees(Collections.singletonList(
                         fee("HANDLING", "20000", FeeChargeMode.UPFRONT, true)))
                 .build();
-        CalculationOptions options = new CalculationOptions(false, RateChangePolicy.RESOLVE,
+        CalculationOptions options = new CalculationOptions(false,
                 CashFlowBasis.INCLUDE_DEPOSIT);
 
         List<CashFlow> flows = builder.build(schedule(), busy, options);
@@ -191,7 +191,7 @@ class StandardCashFlowBuilderTest {
                 .deposit(new BigDecimal("50000"))
                 .residualValue(new BigDecimal("100000"))
                 .build();
-        CalculationOptions options = new CalculationOptions(false, RateChangePolicy.RESOLVE,
+        CalculationOptions options = new CalculationOptions(false,
                 CashFlowBasis.INCLUDE_DEPOSIT);
 
         List<CashFlow> flows = builder.build(generate(elementWithBoth), elementWithBoth, options);
@@ -253,7 +253,7 @@ class StandardCashFlowBuilderTest {
     @Test
     void empty_schedule_emits_only_the_t0_outflow_and_no_unbalanced_deposit() {
         LeaseElement withDeposit = element().toBuilder().deposit(new BigDecimal("50000")).build();
-        CalculationOptions options = new CalculationOptions(false, RateChangePolicy.RESOLVE,
+        CalculationOptions options = new CalculationOptions(false,
                 CashFlowBasis.INCLUDE_DEPOSIT);
         Schedule empty = scheduleOf(0, T0, Collections.emptyList());
 
@@ -267,7 +267,7 @@ class StandardCashFlowBuilderTest {
 
     @Test
     void vat_split_basis_is_rejected_not_silently_degraded() {
-        CalculationOptions options = new CalculationOptions(false, RateChangePolicy.RESOLVE,
+        CalculationOptions options = new CalculationOptions(false,
                 CashFlowBasis.VAT_SPLIT);
 
         assertThatThrownBy(() -> builder.build(schedule(), element(), options))

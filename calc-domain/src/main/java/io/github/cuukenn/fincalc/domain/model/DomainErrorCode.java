@@ -28,6 +28,10 @@ public enum DomainErrorCode implements ErrorCode {
     EXPLICIT_RENTS_INVALID("FCS-DOM-1008",
             "FCS-DOM-1008: 显式租金为空或长度与期数不符: %s"),
 
+    /** Same stable code as {@link #EXPLICIT_RENTS_INVALID}; the cross-method failure reads on its own. */
+    EXPLICIT_RENTS_CROSS_METHOD("FCS-DOM-1008",
+            "FCS-DOM-1008: 非显式租金方式不得携带 explicitRents（method=%s）"),
+
     EXPLICIT_RENTS_MUST_BE_POSITIVE("FCS-DOM-1009",
             "FCS-DOM-1009: 显式租金必须为正: %s"),
 

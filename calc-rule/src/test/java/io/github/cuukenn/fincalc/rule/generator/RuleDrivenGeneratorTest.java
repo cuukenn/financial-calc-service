@@ -99,7 +99,7 @@ class RuleDrivenGeneratorTest {
         CompiledRuleSet set = compiler().compile(List.of(
                 rateRow("R1", 10, 1, 6, "0.06")), element(12), true);
         Schedule s = new RuleDrivenGenerator(set).generate(context(baseElement(),
-                new CalculationOptions(true, RateChangePolicy.RESOLVE,
+                new CalculationOptions(true,
                         io.github.cuukenn.fincalc.domain.model.CashFlowBasis.INCLUDE_FEES)));
 
         assertThat(s.installments().get(5).memo()).isEqualTo("R1");

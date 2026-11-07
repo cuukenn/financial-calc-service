@@ -5,28 +5,24 @@ package io.github.cuukenn.fincalc.domain.model;
  */
 public final class CalculationOptions {
 
+    // R73: the rate change policy is a contract term and lives on LeaseElement (like
+    // residualHandling); it was never read from these options, so it has no field here.
+
     private final boolean allowPartialRuleSet;
-    private final RateChangePolicy rateChangePolicy;
     private final CashFlowBasis cashFlowBasis;
 
-    public CalculationOptions(boolean allowPartialRuleSet, RateChangePolicy rateChangePolicy,
-            CashFlowBasis cashFlowBasis) {
+    public CalculationOptions(boolean allowPartialRuleSet, CashFlowBasis cashFlowBasis) {
         this.allowPartialRuleSet = allowPartialRuleSet;
-        this.rateChangePolicy = rateChangePolicy == null ? RateChangePolicy.RESOLVE : rateChangePolicy;
         this.cashFlowBasis = cashFlowBasis == null ? CashFlowBasis.INCLUDE_FEES : cashFlowBasis;
     }
 
-    /** (no partial rule sets, resolve rate changes, include fees in cash flows). */
+    /** (no partial rule sets, include fees in cash flows). */
     public static CalculationOptions defaults() {
-        return new CalculationOptions(false, RateChangePolicy.RESOLVE, CashFlowBasis.INCLUDE_FEES);
+        return new CalculationOptions(false, CashFlowBasis.INCLUDE_FEES);
     }
 
     public boolean allowPartialRuleSet() {
         return allowPartialRuleSet;
-    }
-
-    public RateChangePolicy rateChangePolicy() {
-        return rateChangePolicy;
     }
 
     public CashFlowBasis cashFlowBasis() {

@@ -209,7 +209,7 @@ class CalculationFacadeTest {
                 List.of(rateRow("R1", 10, 1, 6, "0.06")), baseElement(), true);
         CalculationResult r = CalculationFacade.defaults().calculate(new CalculationRequest(
                 baseElement().toBuilder().method(RepaymentMethodId.RULE_DRIVEN).build(), set,
-                new CalculationOptions(true, RateChangePolicy.RESOLVE,
+                new CalculationOptions(true,
                         io.github.cuukenn.fincalc.domain.model.CashFlowBasis.INCLUDE_FEES)));
 
         assertThat(r.schedule().installments()).hasSize(12);

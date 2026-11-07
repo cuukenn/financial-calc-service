@@ -98,8 +98,10 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
             addFlow(flows, maturity, deposit, CashFlowType.DEPOSIT, CashFlowDirection.OUTFLOW);
         }
         for (Installment installment : installments) {
-            // tax is already part of rentDue and AMORTIZED fee events ride inside it;
-            // listing them again would count them twice.
+            // tax is already part of rentDue. v1 consumes only UPFRONT fees (see
+            // addUpfrontFees): AMORTIZED fee folding into rentDue is NOT implemented, and it
+            // MUST NOT be applied to EXPLICIT_RENT schedules, whose rentDue is the verbatim
+            // input rent (Plan 2's FeeAllocator work must respect this constraint).
             addFlow(flows, installment.endDate(), installment.rentDue(), CashFlowType.RENT,
                     CashFlowDirection.INFLOW);
         }

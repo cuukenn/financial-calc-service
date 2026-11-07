@@ -160,13 +160,11 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
     /**
      * Whether the level rent may be priced by the closed form. The annuity formula assumes one
      * periodic rate, so the nominal-derived periodic rates must be uniform across the schedule.
-     * Only consulted when the run has no rule set.
-     *
-     * <p>R70: without a rule set a stub period that breaks uniformity fails fast
-     * ({@code FCS-DOM-2002}) — better than emitting a schedule with negative balances that still
-     * passes the conservation check. With a rule set the per-period rates are rule-resolved and
-     * may legitimately vary, so the guard is never reached: the R71 segmented solve
-     * ({@code rateChangePolicy}) prices those runs instead.
+     * Only ever called from the no-rule-set path of {@link #prepare}: without a rule set a stub
+     * period that breaks uniformity fails fast ({@code FCS-DOM-2002}) — better than emitting a
+     * schedule with negative balances that still passes the conservation check. Runs with a rule
+     * set never reach this guard; the R71 segmented solve ({@code rateChangePolicy}) prices
+     * those instead.
      */
     private static boolean closedFormPricing(CalculationContext context, List<PeriodDate> periods) {
         // Deliberately inlines the periodRate hook's formula (nominal x yearFraction) rather than
@@ -180,11 +178,8 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
             BigDecimal rate = context.element().nominalRate()
                     .multiply(context.dayCount().yearFraction(period.startDate(), period.endDate()));
             if (rate.subtract(firstRate).abs().compareTo(RATE_EPSILON) > 0) {
-                if (context.ruleSet() == null) {
-                    throw new BusinessException(DomainErrorCode.NON_UNIFORM_PERIOD_RATE,
-                            index + 1, rate.toPlainString(), firstRate.toPlainString());
-                }
-                return false;
+                throw new BusinessException(DomainErrorCode.NON_UNIFORM_PERIOD_RATE,
+                        index + 1, rate.toPlainString(), firstRate.toPlainString());
             }
         }
         return true;

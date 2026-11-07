@@ -153,8 +153,9 @@ public final class LeaseElement {
                 }
             }
         } else if (!explicitRents.isEmpty()) {
-            throw new BusinessException(DomainErrorCode.EXPLICIT_RENTS_INVALID,
-                    "非显式租金方式不得携带 explicitRents");
+            // Same stable code FCS-DOM-1008 as the empty/length failure, but with its own
+            // message so the cross-method rejection does not read self-contradictory.
+            throw new BusinessException(DomainErrorCode.EXPLICIT_RENTS_CROSS_METHOD, method);
         }
     }
 
