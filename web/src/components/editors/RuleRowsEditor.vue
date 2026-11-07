@@ -41,13 +41,14 @@ const presetLabel = computed(() => {
   })
 })
 
-/** 预设：1 ~ 半程 @3%、半程+1 ~ 期末 @6%（期数 12 时即黄金分段 1-6 / 7-12）。 */
+/** 预设：1 ~ 半程 @3%、半程+1 ~ 期末 @6%（期数 12 时即黄金分段 1-6 / 7-12）。
+    R92-6：行内持有百分数口径展示值（3 / 6），提交前由表单层换算为 0.03 / 0.06。 */
 function presetSegmentedRates(): void {
   const total = props.periods ?? 0
   const half = Math.floor(total / 2)
   rows.value = [
-    { ruleId: 'R1', priority: 10, fromPeriod: 1, toPeriod: half, annualRate: '0.03' },
-    { ruleId: 'R2', priority: 20, fromPeriod: half + 1, toPeriod: total, annualRate: '0.06' },
+    { ruleId: 'R1', priority: 10, fromPeriod: 1, toPeriod: half, annualRate: '3' },
+    { ruleId: 'R2', priority: 20, fromPeriod: half + 1, toPeriod: total, annualRate: '6' },
   ]
 }
 </script>

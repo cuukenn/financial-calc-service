@@ -1,5 +1,5 @@
 /**
- * zh-CN 文案（默认语言，R85）。键按领域分域：app / engine / form / enums / result / charts。
+ * zh-CN 文案（默认语言，R85）。键按领域分域：app / form / enums / result / charts。
  * en-US.ts 以 `typeof zhCN` 做编译期键位对齐（两目录结构必须完全一致）。
  *
  * 约定：
@@ -13,12 +13,6 @@ const zhCN = {
     title: '租赁测算工作台',
     footer: 'financial-calc-service · 可视化测算前端（Plan 3/4）',
   },
-  engine: {
-    cardTitle: '引擎状态',
-    checking: '检测中…',
-    backendDown: '后端不可达',
-    algorithmsFailed: '算法清单加载失败（{code}）',
-  },
   form: {
     cardTitle: '测算表单',
     basic: {
@@ -27,12 +21,22 @@ const zhCN = {
       principal: '租赁本金',
       principalPh: '如 1000000',
       nominalRate: '名义年利率',
-      nominalRatePh: '小数，如 0.06',
+      // R92-6：百分数口径输入（6 或 6% → 0.06，600bp → 0.06），提交前由表单层换算为小数字符串。
+      nominalRatePh: '如 6% 或 600bp',
       commenceDate: '起租日',
       firstRentDate: '首期租金支付日',
       periods: '期数',
       currency: '币种',
-      currencyPh: 'ISO-4217，如 CNY',
+      // R92-2：常见币种下拉（标签「中文名（码）」，提交值为 ISO-4217 码）。
+      currencies: {
+        CNY: '人民币（CNY）',
+        USD: '美元（USD）',
+        EUR: '欧元（EUR）',
+        HKD: '港币（HKD）',
+        JPY: '日元（JPY）',
+        GBP: '英镑（GBP）',
+        SGD: '新加坡元（SGD）',
+      },
       frequency: '支付频率',
       timing: '支付时点',
       dayCountCode: '计息基准',
@@ -49,7 +53,8 @@ const zhCN = {
         priorityPh: '优先级',
         fromPeriodPh: '起始期',
         toPeriodPh: '截止期',
-        annualRatePh: '年利率（如 0.03）',
+        // R92-6：规则行年利率同为百分数口径（3 / 3% / 300bp → 0.03）。
+        annualRatePh: '年利率（如 3% 或 300bp）',
         remove: '删除',
         add: '+ 添加规则行',
         preset: "分段费率预设（{from}-{to} 期 {'@'}3%，{from2}-{to2} 期 {'@'}6%）",
@@ -79,7 +84,10 @@ const zhCN = {
       residualHandling: '残值处理',
       deposit: '保证金',
       vatRate: '增值税率',
-      vatRatePh: '小数，如 0.06',
+      // R92-5：百分数口径输入（6 或 6% → 0.06），附中国增值税档次快选。
+      vatRatePh: '如 6 或 6%',
+      vatRateFormat: '格式无效：请输入如 6 或 6% 的增值税率',
+      vatRatePreset: '增值税档次：',
     },
     submit: '开始测算',
     submitting: '测算中…',
@@ -87,6 +95,7 @@ const zhCN = {
     validation: {
       principal: '请输入租赁本金',
       nominalRate: '请输入名义年利率',
+      nominalRateFormat: '格式无效：请输入如 6% 或 600bp 的名义年利率',
       commenceDate: '请选择起租日',
       firstRentDate: '请选择首期租金支付日',
       periods: '请输入期数',

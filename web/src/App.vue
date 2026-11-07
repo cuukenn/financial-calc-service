@@ -6,7 +6,6 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import CalculationForm from '@/components/CalculationForm.vue'
-import EngineStatus from '@/components/EngineStatus.vue'
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 
 // R82: 最小 v1 单页形态（无 Router / Pinia）；R85: 语言切换器入页头，
@@ -29,7 +28,6 @@ const { Header, Content, Footer } = Layout
       </Header>
       <Content style="padding: 24px">
         <Space direction="vertical" size="large" style="width: 100%">
-          <EngineStatus />
           <CalculationForm />
         </Space>
       </Content>

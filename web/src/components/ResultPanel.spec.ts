@@ -86,22 +86,27 @@ describe('ResultPanel', () => {
     setLocale('zh-CN')
   })
 
-  it('renders metric cards from the catalog verbatim and shows 「—」 for null metrics', () => {
+  it('renders metric cards with the R92-8 primary-display rule and 「—」 for null metrics', () => {
     const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 
     const rent = wrapper.find('[data-test="metric-TOTAL_RENT"]')
-    // R86：指标卡标签来自指标目录（§9.5 中文名），不再是 UI 内的别名。
+    // 自定义 code 指标：主文本为目录中文名，原码以次要小字随卡（对账用）。
     expect(rent.text()).toContain('租金合计')
+    expect(rent.find('[data-test="metric-card-code"]').text()).toBe('TOTAL_RENT')
     // R90a：金额显示千分位 + 固定 4 位小数（原值随 tooltip 透出）。
     expect(rent.text()).toContain('1,032,797.1500')
 
     const xirr = wrapper.find('[data-test="metric-XIRR"]')
-    // 目录名（§9.5）：实际日期 IRR；null 值渲染「—」。
-    expect(xirr.text()).toContain('实际日期 IRR')
+    // R92-4：标准缩写原样展示，不再强行译作「实际日期 IRR」，也不重复次要原码。
+    expect(xirr.find('[data-test="metric-card-title"]').text()).toContain('XIRR')
+    expect(xirr.text()).not.toContain('实际日期')
+    expect(xirr.find('[data-test="metric-card-code"]').exists()).toBe(false)
+    // null 值渲染「—」。
     expect(xirr.text()).toContain('—')
 
-    // R90b：利率类指标显示为百分比（×100 固定 4 位小数）。
+    // IRR 家族：家族缩写为主 + 口径限定语；R90b 利率类显示为百分比（×100 固定 4 位小数）。
     const irr = wrapper.find('[data-test="metric-IRR_ANNUAL"]')
+    expect(irr.text()).toContain('IRR（年化 复利）')
     expect(irr.text()).toContain('6.1700%')
   })
 
@@ -112,42 +117,52 @@ describe('ResultPanel', () => {
     expect(tooltips.length).toBeGreaterThan(0)
     const titles = tooltips.map((tp) => tp.props('title') as string)
 
-    // 指标卡：悬浮内容含目录的中文名 + 公式。
+    // 指标卡：悬浮内容含目录的中文名 + 公式（R86 机制不变）。
     expect(titles.join('\n')).toContain('租金合计｜公式：Σ rentDue')
     expect(titles.join('\n')).toContain('年化 IRR（复利）｜公式：(1 + IRR_PERIOD)^m − 1')
-    // 指标表行头（未入选卡片的指标）同样绑定目录；R88 后行头主文本为目录本地化名，
-    // 原码以次要小字随行（对账断言保留）。
+    // 指标表行头（未入选卡片的指标）同样绑定目录；R92-4 后 NPV 主文本为标准缩写。
     const headers = wrapper.findAll('[data-test="metric-header"]').map((h) => h.text())
-    expect(headers).toContain('净现值NPV')
+    expect(headers).toContain('NPV')
+    // hover 仍透出目录中文名（不得出现强行翻译的主标签，但悬浮解释保留中文）。
     expect(titles.join('\n')).toContain('净现值')
   })
 
-  it('renders catalog localized names as primary row text with the raw code as secondary (R88)', () => {
+  it('renders standard abbreviations raw as row-header primary text with no duplicated code (R92-4)', () => {
     // 指标卡精选之外的目录指标（MIRR）也进指标表，与 NPV 一同覆盖。
     const withMIRR = result()
     withMIRR.schedule.header.metrics = { ...withMIRR.schedule.header.metrics, MIRR: '0.058' }
     const wrapper = mountWithI18n(ResultPanel, { props: { result: withMIRR } })
 
-    // zh-CN：主文本为目录中文名（§9.5），不再是裸驼峰/下划线原码。
+    // zh-CN：标准缩写 NPV / MIRR 原样作为主文本。
     const names = wrapper.findAll('[data-test="metric-header-name"]').map((n) => n.text())
-    expect(names).toContain('修正 IRR')
-    expect(names).toContain('净现值')
+    expect(names).toContain('NPV')
+    expect(names).toContain('MIRR')
 
-    // 原码仅作次要小字出现（映射保持可对账），且不再作为主文本。
+    // 标准缩写主文本即原码：不重复渲染次要原码。
     const codes = wrapper.findAll('[data-test="metric-header-code"]').map((c) => c.text())
-    expect(codes).toContain('MIRR')
-    expect(codes).toContain('NPV')
-    expect(names).not.toContain('MIRR')
-    expect(names).not.toContain('NPV')
+    expect(codes).not.toContain('NPV')
+    expect(codes).not.toContain('MIRR')
+
+    // IRR 家族进指标表时：主文本 IRR（期间），原码作次要小字。
+    const withFamily = result()
+    withFamily.schedule.header.metrics = {
+      ...withFamily.schedule.header.metrics,
+      IRR_PERIOD: '0.005',
+    }
+    const familyWrapper = mountWithI18n(ResultPanel, { props: { result: withFamily } })
+    const familyNames = familyWrapper.findAll('[data-test="metric-header-name"]').map((n) => n.text())
+    expect(familyNames).toContain('IRR（期间）')
+    const familyCodes = familyWrapper.findAll('[data-test="metric-header-code"]').map((c) => c.text())
+    expect(familyCodes).toContain('IRR_PERIOD')
   })
 
-  it('renders the English catalog name as the primary row text in en-US (R88)', () => {
+  it('keeps the English catalog name as the primary row text in en-US (standard names stay English)', () => {
     setLocale('en-US')
     const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 
     const names = wrapper.findAll('[data-test="metric-header-name"]').map((n) => n.text())
     expect(names).toContain('Net Present Value (NPV)')
-    // 标准缩写可出现在目录英文名内（R88 允许），原码仍以次要小字保留。
+    // en-US 主文本为目录英文名（非原码），原码仍以次要小字保留。
     const codes = wrapper.findAll('[data-test="metric-header-code"]').map((c) => c.text())
     expect(codes).toContain('NPV')
   })

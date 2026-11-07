@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { METRIC_CATALOG, METRIC_CODES, metricLabel, metricTooltip } from './metricCatalog'
+import {
+  METRIC_CATALOG,
+  METRIC_CODES,
+  metricLabel,
+  metricPrimaryLabel,
+  metricShowsSecondaryCode,
+  metricTooltip,
+} from './metricCatalog'
 
 /** §9.5 指标表全量 21 项（与设计文档表格一一对应）。 */
 const EXPECTED_CODES = [
@@ -69,5 +76,62 @@ describe('metric catalog (R86)', () => {
   it('passes unknown codes through verbatim (backend may add metrics)', () => {
     expect(metricLabel('FUTURE_METRIC', 'zh-CN')).toBe('FUTURE_METRIC')
     expect(metricTooltip('FUTURE_METRIC', 'en-US')).toBe('FUTURE_METRIC')
+  })
+})
+
+describe('metric primary display classification (R92-4/R92-8)', () => {
+  it('shows genuinely standard abbreviations raw in zh-CN (no forced translation)', () => {
+    expect(metricPrimaryLabel('NPV', 'zh-CN')).toBe('NPV')
+    expect(metricPrimaryLabel('XNPV', 'zh-CN')).toBe('XNPV')
+    expect(metricPrimaryLabel('XIRR', 'zh-CN')).toBe('XIRR')
+    expect(metricPrimaryLabel('MIRR', 'zh-CN')).toBe('MIRR')
+    // 不再出现「实际日期 XIRR」这类强行翻译的主标签。
+    expect(metricPrimaryLabel('XIRR', 'zh-CN')).not.toContain('实际日期')
+  })
+
+  it('shows the IRR family as the family abbreviation with a qualifier', () => {
+    expect(metricPrimaryLabel('IRR_PERIOD', 'zh-CN')).toBe('IRR（期间）')
+    expect(metricPrimaryLabel('IRR_ANNUAL', 'zh-CN')).toBe('IRR（年化 复利）')
+    expect(metricPrimaryLabel('IRR_ANNUAL_SIMPLE', 'zh-CN')).toBe('IRR（年化 单利）')
+    expect(metricPrimaryLabel('IRR_PERIOD', 'en-US')).toBe('IRR (periodic)')
+    expect(metricPrimaryLabel('IRR_ANNUAL', 'en-US')).toBe('IRR (annual, compounded)')
+  })
+
+  it('shows custom-code metrics by the catalog localized name (zh-CN)', () => {
+    expect(metricPrimaryLabel('TOTAL_RENT', 'zh-CN')).toBe('租金合计')
+    expect(metricPrimaryLabel('TOTAL_PRINCIPAL', 'zh-CN')).toBe('本金合计')
+    expect(metricPrimaryLabel('RESIDUAL_VALUE', 'zh-CN')).toBe('残值')
+    expect(metricPrimaryLabel('PAYBACK_PERIOD', 'zh-CN')).toBe('静态回收期（年）')
+    expect(metricPrimaryLabel('CONVEXITY', 'zh-CN')).toBe('凸性')
+    expect(metricPrimaryLabel('TRUE_ANNUAL_RATE', 'zh-CN')).toBe('真实年化')
+    // 久期：目录中文名（麦考利久期/修正久期）即行业标准中文术语，仍作主文本。
+    expect(metricPrimaryLabel('DURATION_MACAULAY', 'zh-CN')).toBe('麦考利久期（年）')
+    expect(metricPrimaryLabel('DURATION_MODIFIED', 'zh-CN')).toBe('修正久期')
+  })
+
+  it('keeps standard English catalog names as the primary display in en-US', () => {
+    expect(metricPrimaryLabel('NPV', 'en-US')).toBe('Net Present Value (NPV)')
+    expect(metricPrimaryLabel('XIRR', 'en-US')).toBe('XIRR')
+    expect(metricPrimaryLabel('TOTAL_RENT', 'en-US')).toBe('Total Rent')
+    expect(metricPrimaryLabel('DURATION_MACAULAY', 'en-US')).toBe('Macaulay Duration (years)')
+  })
+
+  it('attaches the secondary raw code only when the primary text is not the code itself', () => {
+    // 标准缩写在 zh 下主文本即原码：不重复显示次要原码。
+    expect(metricShowsSecondaryCode('NPV', 'zh-CN')).toBe(false)
+    expect(metricShowsSecondaryCode('XIRR', 'zh-CN')).toBe(false)
+    // IRR 家族与目录名指标附原码（对账用）。
+    expect(metricShowsSecondaryCode('IRR_PERIOD', 'zh-CN')).toBe(true)
+    expect(metricShowsSecondaryCode('TOTAL_RENT', 'zh-CN')).toBe(true)
+    expect(metricShowsSecondaryCode('DURATION_MACAULAY', 'zh-CN')).toBe(true)
+    // en-US 主文本是目录英文名（非原码）时附原码。
+    expect(metricShowsSecondaryCode('NPV', 'en-US')).toBe(true)
+    // 目录外 code 原样透出，不重复显示。
+    expect(metricShowsSecondaryCode('CUSTOM_METRIC', 'zh-CN')).toBe(false)
+  })
+
+  it('passes unknown codes through verbatim as the primary label', () => {
+    expect(metricPrimaryLabel('FUTURE_METRIC', 'zh-CN')).toBe('FUTURE_METRIC')
+    expect(metricPrimaryLabel('FUTURE_METRIC', 'en-US')).toBe('FUTURE_METRIC')
   })
 })

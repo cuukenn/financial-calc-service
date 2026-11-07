@@ -98,7 +98,8 @@ describe('CalculationForm', () => {
     const wrapper = mountWithI18n(CalculationForm)
 
     expect((wrapper.find('[data-test="principal"]').element as HTMLInputElement).value).toBe('1000000')
-    expect((wrapper.find('[data-test="nominal-rate"]').element as HTMLInputElement).value).toBe('0.06')
+    // R92-6：名义年利率为百分数口径展示值（提交前换算为 0.06）。
+    expect((wrapper.find('[data-test="nominal-rate"]').element as HTMLInputElement).value).toBe('6')
     expect((wrapper.find('[data-test="periods"]').element as HTMLInputElement).value).toBe('12')
     expect((wrapper.find('[data-test="commence-date"] input').element as HTMLInputElement).value).toBe('2024-01-01')
     expect((wrapper.find('[data-test="first-rent-date"] input').element as HTMLInputElement).value).toBe('2024-02-01')
@@ -173,6 +174,111 @@ describe('CalculationForm', () => {
     expect(wrapper.text()).toContain('Commencement date')
     expect(wrapper.text()).toContain('First rent payment date')
     expect(wrapper.text()).toContain('Residual value / Purchase price')
+  })
+
+  it('renders the currency select with common currencies and submits the ISO code (R92-2)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+
+    // 触发器显示「中文名（码）」，默认人民币。
+    const trigger = wrapper.find('[data-test="currency"]')
+    expect(trigger.text()).toContain('人民币（CNY）')
+
+    await trigger.find('.ant-select-selector').trigger('mousedown')
+    await flushPromises()
+    await flushPromises()
+
+    // AntD 下拉挂在 body 上且先前用例的弹层可能残留：锁定包含币种清单的那个弹层。
+    const currencyDropdown = [...document.querySelectorAll('.ant-select-dropdown')].find((d) =>
+      d.textContent?.includes('人民币（CNY）'),
+    )
+    expect(currencyDropdown).toBeTruthy()
+
+    const options = [...currencyDropdown!.querySelectorAll('.ant-select-item-option')]
+    const labels = options.map((o) => o.textContent?.trim())
+    expect(labels).toEqual([
+      '人民币（CNY）',
+      '美元（USD）',
+      '欧元（EUR）',
+      '港币（HKD）',
+      '日元（JPY）',
+      '英镑（GBP）',
+      '新加坡元（SGD）',
+    ])
+
+    // show-search：按本地化标签过滤（中文名或 ISO 码均可命中）。
+    await trigger.find('input').setValue('美元')
+    await flushPromises()
+    const filtered = [...currencyDropdown!.querySelectorAll('.ant-select-item-option')].filter(
+      (o) => !o.getAttribute('style')?.includes('display: none') && !o.classList.contains('ant-select-item-option-hidden'),
+    )
+    expect(filtered.map((o) => o.textContent?.trim())).toEqual(['美元（USD）'])
+
+    // 选择美元 → 提交值为 ISO-4217 码 USD（后端契约不变）。
+    await trigger.find('input').setValue('')
+    await flushPromises()
+    const usd = [...currencyDropdown!.querySelectorAll('.ant-select-item-option')].find((o) =>
+      o.textContent?.includes('USD'),
+    )
+    expect(usd).toBeTruthy()
+    usd!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+    usd!.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    usd!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    await submit(wrapper)
+
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.currency).toBe('USD')
+  })
+
+  it('converts percent-style rate inputs to decimal strings on submit (R92-6)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    // 默认展示值 6 → 提交 0.06（黄金请求不变）。
+    await submit(wrapper)
+    let req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.nominalRate).toBe('0.06')
+
+    // 「6%」与「600bp」两种后缀均接受，存储/提交恒为小数字符串。
+    vi.mocked(calculate).mockClear()
+    await wrapper.find('[data-test="nominal-rate"]').setValue('600bp')
+    await submit(wrapper)
+    req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.nominalRate).toBe('0.06')
+
+    vi.mocked(calculate).mockClear()
+    await wrapper.find('[data-test="nominal-rate"]').setValue('6%')
+    await submit(wrapper)
+    req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.nominalRate).toBe('0.06')
+  })
+
+  it('blocks submit with a format message when the nominal rate is invalid (R92-6)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="nominal-rate"]').setValue('abc')
+    await submit(wrapper)
+
+    expect(calculate).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('格式无效：请输入如 6% 或 600bp 的名义年利率')
+  })
+
+  it('fills the VAT rate from the China bracket presets and submits decimals (R92-5)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+
+    // 快选按钮以百分数口径回填展示值。
+    await wrapper.find('[data-test="vat-rate-preset-13"]').trigger('click')
+    await flushPromises()
+    expect((wrapper.find('[data-test="vat-rate"]').element as HTMLInputElement).value).toBe('13')
+
+    await submit(wrapper)
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.vatRate).toBe('0.13')
+
+    // 0 档：提交 "0"。
+    vi.mocked(calculate).mockClear()
+    await wrapper.find('[data-test="vat-rate-preset-0"]').trigger('click')
+    await flushPromises()
+    await submit(wrapper)
+    const req0 = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req0.vatRate).toBe('0')
   })
 
   it('submits a correctly-shaped CalculationRequest on golden defaults', async () => {
@@ -317,10 +423,11 @@ describe('CalculationForm', () => {
 
     const rows = wrapper.findAll('[data-test="rule-row"]')
     expect(rows).toHaveLength(2)
+    // R92-6：预设回填百分数口径展示值（提交前换算为 0.03 / 0.06）。
     const rates = wrapper.findAll('[data-test="rule-annual-rate"]').map(
       (input) => (input.element as HTMLInputElement).value,
     )
-    expect(rates).toEqual(['0.03', '0.06'])
+    expect(rates).toEqual(['3', '6'])
   })
 
   it('sends the rule rows on submit when present (built-in method + segmented rates)', async () => {

@@ -36,6 +36,7 @@ import RentsEditor from './editors/RentsEditor.vue'
 import type { FeeDraft, RuleRowDraft } from './editors/types'
 import ResultPanel from './ResultPanel.vue'
 import { nextRuleId } from './ruleIds'
+import { parseRateInput } from '@/utils/rate'
 
 const { t } = useI18n()
 
@@ -111,8 +112,28 @@ const rateChangePolicyOptions = computed(() =>
   RATE_CHANGE_POLICY_VALUES.map((value) => ({ value, label: t(`enums.rateChangePolicy.${value}`) })),
 )
 
+/**
+ * R92-2：常见币种下拉（提交值为 ISO-4217 码，后端契约不变）。
+ * 标签为「中文名（码）」（en-US 为英文名（码）），随语言切换响应式更新；
+ * show-search 按本地化标签模糊过滤（码或名称均可命中）。
+ */
+const CURRENCY_CODES = ['CNY', 'USD', 'EUR', 'HKD', 'JPY', 'GBP', 'SGD'] as const
+
+const currencyOptions = computed(() =>
+  CURRENCY_CODES.map((code) => ({ value: code, label: t(`form.basic.currencies.${code}`) })),
+)
+
+function filterCurrencyOption(input: string, option: { label?: unknown }): boolean {
+  const label = typeof option.label === 'string' ? option.label : ''
+  return label.toLowerCase().includes(input.trim().toLowerCase())
+}
+
+/** R92-5：中国增值税档次快选（百分数口径展示值，提交前经 parseRateInput 换算为小数）。 */
+const VAT_RATE_PRESETS = ['13', '9', '6', '0'] as const
+
 interface FormState {
   principal: string
+  /** 名义年利率的展示值（R92-6 百分数口径：6 / 6% / 600bp），提交前换算为小数字符串。 */
   nominalRate: string
   commenceDate: string
   firstRentDate: string
@@ -127,6 +148,7 @@ interface FormState {
   residualValue: string
   residualHandling: ResidualHandling
   deposit: string
+  /** 增值税率的展示值（R92-5 百分数口径：6 / 6%），提交前换算为小数字符串。 */
   vatRate: string
   interestOnlyPeriods: number
   fullGracePeriods: number
@@ -135,11 +157,11 @@ interface FormState {
 /**
  * 默认值 = Task-21 黄金要素（Fixtures.leaseElement）：1M @ 6%，2024-01-01 起租、
  * 2024-02-01 首期租金，12 期月付、期末付、30/360，等额本息 —— 开箱提交即复现
- * 黄金 TOTAL_RENT 1 032 797.15。
+ * 黄金 TOTAL_RENT 1 032 797.15。利率字段持有百分数口径展示值（6 → 提交 0.06）。
  */
 const form = reactive<FormState>({
   principal: '1000000',
-  nominalRate: '0.06',
+  nominalRate: '6',
   commenceDate: '2024-01-01',
   firstRentDate: '2024-02-01',
   periods: 12,
@@ -153,16 +175,30 @@ const form = reactive<FormState>({
   residualValue: '0',
   residualHandling: 'SEPARATE',
   deposit: '0',
-  vatRate: '0.06',
+  vatRate: '6',
   interestOnlyPeriods: 0,
   fullGracePeriods: 0,
 })
 
 // dayCountCode/dateRollCode/method/periods 是后端必填字段：表单始终持有默认值，
 // 规则仅作兜底（清空时提示阻断提交）。校验文案随语言切换响应式更新。
+// R92-5/R92-6：利率字段为百分数口径展示值，附格式校验（6 / 6% / 600bp 可解析）。
+function rateFormatRule(message: string): Rule {
+  return {
+    validator: (_rule: unknown, value: unknown) =>
+      typeof value === 'string' && value.trim() !== '' && parseRateInput(value) === null
+        ? Promise.reject(new Error(message))
+        : Promise.resolve(),
+    trigger: 'change',
+  }
+}
+
 const rules = computed<Record<string, Rule[]>>(() => ({
   principal: [{ required: true, message: t('form.validation.principal') }],
-  nominalRate: [{ required: true, message: t('form.validation.nominalRate') }],
+  nominalRate: [
+    { required: true, message: t('form.validation.nominalRate') },
+    rateFormatRule(t('form.validation.nominalRateFormat')),
+  ],
   commenceDate: [{ required: true, message: t('form.validation.commenceDate') }],
   firstRentDate: [{ required: true, message: t('form.validation.firstRentDate') }],
   periods: [{ required: true, message: t('form.validation.periods') }],
@@ -171,6 +207,7 @@ const rules = computed<Record<string, Rule[]>>(() => ({
   dayCountCode: [{ required: true, message: t('form.validation.dayCountCode') }],
   dateRollCode: [{ required: true, message: t('form.validation.dateRollCode') }],
   method: [{ required: true, message: t('form.validation.method') }],
+  vatRate: [rateFormatRule(t('form.feesOther.vatRateFormat'))],
 }))
 
 /** EXPLICIT_RENT 的逐期租金（长度始终与期数对齐）。 */
@@ -206,7 +243,8 @@ function mapRuleRows(): RuleRow[] {
     priority: row.priority ?? (index + 1) * 10,
     fromPeriod: row.fromPeriod ?? undefined,
     toPeriod: row.toPeriod ?? undefined,
-    annualRate: row.annualRate.trim(),
+    // R92-6：规则行年利率同为百分数口径（3 / 3% / 300bp），提交前换算为小数字符串。
+    annualRate: parseRateInput(row.annualRate) ?? row.annualRate.trim(),
     // 与后端 segmented 用例同款缺省列：继承本金计划、付息即付、期末付、无特殊动作。
     principalPlan: 'INHERIT',
     interestTreatment: 'PAY_AS_INCURRED',
@@ -219,14 +257,16 @@ function buildRequest(): CalculationRequest {
   const req: CalculationRequest = {
     // 金额以 JSON 字符串传输（R76：保留 BigDecimal 精度）。
     principal: form.principal.trim(),
-    nominalRate: form.nominalRate.trim(),
+    // R92-6：名义年利率为百分数口径展示值（6 / 6% / 600bp），提交前换算为小数字符串。
+    nominalRate: parseRateInput(form.nominalRate) ?? form.nominalRate.trim(),
     // 日期为 ISO-8601 字符串（DatePicker value-format 绑定）。
     commenceDate: form.commenceDate,
     firstRentDate: form.firstRentDate,
     periods: form.periods ?? 0,
     frequency: form.frequency,
     timing: form.timing,
-    currency: form.currency.trim(),
+    // R92-2：币种下拉的值即 ISO-4217 码字符串。
+    currency: form.currency,
     dayCountCode: form.dayCountCode,
     dateRollCode: form.dateRollCode,
     rateChangePolicy: form.rateChangePolicy,
@@ -234,7 +274,8 @@ function buildRequest(): CalculationRequest {
     residualValue: form.residualValue.trim(),
     residualHandling: form.residualHandling,
     deposit: form.deposit.trim(),
-    vatRate: form.vatRate.trim(),
+    // R92-5：增值税率为百分数口径展示值（6 / 6%），提交前换算为小数字符串。
+    vatRate: parseRateInput(form.vatRate) ?? form.vatRate.trim(),
   }
 
   if (form.method === 'EXPLICIT_RENT') {
@@ -361,10 +402,15 @@ async function onFinish(): Promise<void> {
               </Col>
               <Col :span="12">
                 <FormItem :label="t('form.basic.currency')" name="currency">
-                  <Input
+                  <!-- R92-2：常见币种下拉（标签「中文名（码）」，提交值为 ISO-4217 码）。 -->
+                  <Select
                     v-model:value="form.currency"
+                    :options="currencyOptions"
+                    show-search
+                    :filter-option="filterCurrencyOption"
+                    :popup-match-select-width="false"
+                    style="width: 100%"
                     data-test="currency"
-                    :placeholder="t('form.basic.currencyPh')"
                   />
                 </FormItem>
               </Col>
@@ -402,8 +448,11 @@ async function onFinish(): Promise<void> {
                     data-test="day-count-code"
                   >
                     <template #option="{ label, code }">
-                      <span data-test="day-count-option">
-                        <span data-test="day-count-option-name">{{ label }}</span>
+                      <!-- R92-7：名称与原码分列（flex 两栏），小号灰码不再与主文本挤在同一行内。 -->
+                      <span data-test="day-count-option" class="day-count-option">
+                        <span data-test="day-count-option-name" class="day-count-option-name">
+                          {{ label }}
+                        </span>
                         <span
                           data-test="day-count-option-code"
                           class="day-count-option-code"
@@ -531,11 +580,27 @@ async function onFinish(): Promise<void> {
               </Col>
               <Col :span="12">
                 <FormItem :label="t('form.feesOther.vatRate')" name="vatRate">
+                  <!-- R92-5：百分数口径输入（6 或 6% → 0.06）+ 中国增值税档次快选。 -->
                   <Input
                     v-model:value="form.vatRate"
                     data-test="vat-rate"
                     :placeholder="t('form.feesOther.vatRatePh')"
                   />
+                  <div class="vat-rate-presets" data-test="vat-rate-presets">
+                    <Typography.Text type="secondary">
+                      {{ t('form.feesOther.vatRatePreset') }}
+                    </Typography.Text>
+                    <Button
+                      v-for="preset in VAT_RATE_PRESETS"
+                      :key="preset"
+                      size="small"
+                      class="vat-rate-preset-btn"
+                      :data-test="`vat-rate-preset-${preset}`"
+                      @click="form.vatRate = preset"
+                    >
+                      {{ preset }}%
+                    </Button>
+                  </div>
                 </FormItem>
               </Col>
             </Row>
@@ -600,10 +665,36 @@ async function onFinish(): Promise<void> {
   padding-bottom: 4px;
 }
 
-/* R89：计息基准下拉项内的原码次要小字（仅下拉项内，触发器不显示）。 */
+/* R89/R92-7：计息基准下拉项两栏布局——主文本（斜杠记法）左对齐可省略，
+   原码小号灰字固定右列，基线对齐；避免原先两个不同字号 inline span
+   在省略号容器内相互挤压、随宽度被截断的问题。 */
+.day-count-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.day-count-option-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .day-count-option-code {
-  margin-left: 8px;
+  flex: 0 0 auto;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
+}
+
+/* R92-5：增值税档次快选按钮行。 */
+.vat-rate-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.vat-rate-preset-btn {
+  min-width: 40px;
 }
 </style>

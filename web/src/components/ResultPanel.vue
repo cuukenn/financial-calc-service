@@ -17,7 +17,7 @@ import { useI18n } from 'vue-i18n'
 
 import type { CalculationResult, CashFlowEvent, EffectiveInterestRow, Installment, Issue } from '@/api/types'
 import type { AppLocale } from '@/i18n'
-import { METRIC_CATALOG, metricLabel, metricTooltip } from '@/i18n/metricCatalog'
+import { metricPrimaryLabel, metricShowsSecondaryCode, metricTooltip } from '@/i18n/metricCatalog'
 
 import { formatMoney, formatNumber, formatPercent } from '@/utils/format'
 
@@ -92,10 +92,15 @@ function metricTooltipWithRaw(code: string, value: string | null): string {
   return value === null ? base : `${base}｜${t('result.raw', { value })}`
 }
 
+/**
+ * R92-8：指标卡主展示名与指标表行头同规则（R92-4 分类：标准缩写原样 / IRR 家族带
+ * 口径限定 / 其余目录本地化名），目录内且主文本非原码时附原码次要小字。
+ */
 const metricCards = computed(() =>
   METRIC_CARD_CODES.map((code) => ({
     code,
-    label: metricLabel(code, locale.value as AppLocale),
+    label: metricPrimaryLabel(code, locale.value as AppLocale),
+    showCode: metricShowsSecondaryCode(code, locale.value as AppLocale),
     tooltip: metricTooltipWithRaw(code, metrics.value[code] ?? null),
     value: metrics.value[code] ?? null,
   })),
@@ -112,16 +117,16 @@ function otherMetricTooltip(code: string, value: string | null): string {
 }
 
 /**
- * R88：指标表行头主文本为指标目录的本地化名称（同指标卡），
+ * R92-4：指标表行头主文本为标准缩写/目录本地化名（与指标卡同规则），
  * 目录外 code 原样透出（后端新增指标的对账约定）。
  */
 function otherMetricLabel(code: string): string {
-  return metricLabel(code, locale.value as AppLocale)
+  return metricPrimaryLabel(code, locale.value as AppLocale)
 }
 
-/** 目录内 code 以小号灰字在行头附上原码，便于与接口字段对账；目录外不重复显示。 */
-function isCatalogMetric(code: string): boolean {
-  return code in METRIC_CATALOG
+/** 目录内且主文本非原码时，以小号灰字在行头附上原码（对账用）；目录外/标准缩写不重复显示。 */
+function showsSecondaryCode(code: string): boolean {
+  return metricShowsSecondaryCode(code, locale.value as AppLocale)
 }
 
 /** ERROR 红 / WARN 橙 / INFO 灰（后端 IssueLevel 枚举名）。 */
@@ -299,11 +304,21 @@ function issueKey(issue: Issue, index: number): string {
             <Card size="small" data-test="metric-card">
               <!-- 自定义 formatter：绕开 Statistic 内置重排版；R90a/R90b 按 #,##0.0000 / 百分比 / 4 位小数显示，原值随 tooltip 透出。 -->
               <Statistic
-                :title="card.label"
                 :value="card.value ?? '—'"
                 :data-test="`metric-${card.code}`"
                 :value-style="card.value === null ? { color: 'rgba(0,0,0,0.45)' } : undefined"
               >
+                <!-- R92-8：主展示名同指标表行头规则；目录内指标附原码次要小字（对账用）。 -->
+                <template #title>
+                  <span data-test="metric-card-title">
+                    {{ card.label }}
+                    <span
+                      v-if="card.showCode"
+                      data-test="metric-card-code"
+                      class="metric-header-code"
+                    >{{ card.code }}</span>
+                  </span>
+                </template>
                 <template #formatter>{{ formatMetricValue(card.code, card.value) }}</template>
               </Statistic>
             </Card>
@@ -320,12 +335,12 @@ function issueKey(issue: Issue, index: number): string {
         >
           <Descriptions.Item v-for="[code, value] in otherMetrics" :key="code">
             <template #label>
-              <!-- R88：行头主文本为目录本地化名，原码作次要小字（对账用）；R86 hover 不变。 -->
+              <!-- R92-4：行头主文本为标准缩写（原样）/目录本地化名，R86 hover 不变。 -->
               <Tooltip :title="otherMetricTooltip(code, value)">
                 <span data-test="metric-header">
                   <span data-test="metric-header-name">{{ otherMetricLabel(code) }}</span>
                   <span
-                    v-if="isCatalogMetric(code)"
+                    v-if="showsSecondaryCode(code)"
                     data-test="metric-header-code"
                     class="metric-header-code"
                   >{{ code }}</span>

@@ -9,12 +9,6 @@ const enUS: typeof zhCN = {
     title: 'Lease Calculation Workbench',
     footer: 'financial-calc-service · visualization frontend (Plan 3/4)',
   },
-  engine: {
-    cardTitle: 'Engine Status',
-    checking: 'Checking…',
-    backendDown: 'Backend unreachable',
-    algorithmsFailed: 'Failed to load the algorithm list ({code})',
-  },
   form: {
     cardTitle: 'Calculation Form',
     basic: {
@@ -22,12 +16,23 @@ const enUS: typeof zhCN = {
       principal: 'Lease principal',
       principalPh: 'e.g. 1000000',
       nominalRate: 'Nominal annual rate',
-      nominalRatePh: 'decimal, e.g. 0.06',
+      // R92-6: percent-style input (6 or 6% → 0.06, 600bp → 0.06); converted to a
+      // decimal string in the form layer before submit.
+      nominalRatePh: 'e.g. 6% or 600bp',
       commenceDate: 'Commencement date',
       firstRentDate: 'First rent payment date',
       periods: 'Periods',
       currency: 'Currency',
-      currencyPh: 'ISO-4217, e.g. CNY',
+      // R92-2: common-currency select (label "English name (code)", value = ISO-4217 code).
+      currencies: {
+        CNY: 'Chinese Yuan (CNY)',
+        USD: 'US Dollar (USD)',
+        EUR: 'Euro (EUR)',
+        HKD: 'Hong Kong Dollar (HKD)',
+        JPY: 'Japanese Yen (JPY)',
+        GBP: 'British Pound (GBP)',
+        SGD: 'Singapore Dollar (SGD)',
+      },
       frequency: 'Payment frequency',
       timing: 'Payment timing',
       dayCountCode: 'Day count convention',
@@ -46,7 +51,8 @@ const enUS: typeof zhCN = {
         priorityPh: 'Priority',
         fromPeriodPh: 'From period',
         toPeriodPh: 'To period',
-        annualRatePh: 'Annual rate (e.g. 0.03)',
+        // R92-6: rule-row annual rates use the same percent-style input (3 / 3% / 300bp → 0.03).
+        annualRatePh: 'Annual rate (e.g. 3% or 300bp)',
         remove: 'Remove',
         add: '+ Add rule row',
         preset: "Segmented preset ({from}-{to} {'@'}3%, {from2}-{to2} {'@'}6%)",
@@ -77,7 +83,10 @@ const enUS: typeof zhCN = {
       residualHandling: 'Residual handling',
       deposit: 'Deposit',
       vatRate: 'VAT rate',
-      vatRatePh: 'decimal, e.g. 0.06',
+      // R92-5: percent-style input (6 or 6% → 0.06), with China VAT bracket quick picks.
+      vatRatePh: 'e.g. 6 or 6%',
+      vatRateFormat: 'Invalid format: enter a VAT rate like 6 or 6%',
+      vatRatePreset: 'VAT brackets: ',
     },
     submit: 'Calculate',
     submitting: 'Calculating…',
@@ -85,6 +94,7 @@ const enUS: typeof zhCN = {
     validation: {
       principal: 'Please enter the lease principal',
       nominalRate: 'Please enter the nominal annual rate',
+      nominalRateFormat: 'Invalid format: enter a nominal annual rate like 6% or 600bp',
       commenceDate: 'Please select the commencement date',
       firstRentDate: 'Please select the first rent payment date',
       periods: 'Please enter the number of periods',

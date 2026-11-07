@@ -223,6 +223,45 @@ export function metricLabel(code: string, locale: AppLocale): string {
   return locale === 'en-US' ? info.nameEn : info.nameZh
 }
 
+/**
+ * R92-4/R92-8 主展示名分类（行业标准名称以原文展示，不得强行翻译）：
+ * - RAW_STANDARD：真正通用的行业标准缩写（NPV / XNPV / XIRR / MIRR）——
+ *   中文界面下原样展示缩写本身，不译作「净现值」等；
+ * - IRR 家族（IRR_PERIOD / IRR_ANNUAL / IRR_ANNUAL_SIMPLE）：家族缩写 IRR 作主文本、
+ *   口径限定语作次要后缀（IRR（期间）/ IRR（年化 复利）/ IRR（年化 单利））；
+ * - 其余自定义 code（TOTAL_RENT / RESIDUAL_VALUE / PAYBACK_PERIOD / 凸性 / 久期等，
+ *   含 DURATION_MACAULAY / DURATION_MODIFIED——「麦考利久期 / 修正久期」即行业标准
+ *   中文名）：主文本用目录本地化名，原码作次要小字（R88 行为）。
+ * en-US 下目录 nameEn 本就是标准英文名，全部走目录名（不做强行翻译/缩写替换）。
+ */
+const RAW_STANDARD_METRIC_CODES: ReadonlySet<string> = new Set(['NPV', 'XNPV', 'XIRR', 'MIRR'])
+
+/** IRR 家族：主文本 IRR + 口径限定语（zh 用全角括号，en 用半角括号）。 */
+const IRR_FAMILY_LABELS: Record<string, { zh: string; en: string }> = {
+  IRR_PERIOD: { zh: 'IRR（期间）', en: 'IRR (periodic)' },
+  IRR_ANNUAL: { zh: 'IRR（年化 复利）', en: 'IRR (annual, compounded)' },
+  IRR_ANNUAL_SIMPLE: { zh: 'IRR（年化 单利）', en: 'IRR (annual, simple)' },
+}
+
+/** 指标主展示名（指标卡与指标表行头共用）。未知 code 原样返回。 */
+export function metricPrimaryLabel(code: string, locale: AppLocale): string {
+  const family = IRR_FAMILY_LABELS[code]
+  if (family) return locale === 'en-US' ? family.en : family.zh
+  // en-US：目录英文名即行业标准名（含 NPV/XIRR 等缩写的完整写法），原样使用。
+  if (locale === 'en-US') return metricLabel(code, locale)
+  if (RAW_STANDARD_METRIC_CODES.has(code)) return code
+  return metricLabel(code, locale)
+}
+
+/**
+ * 是否在主展示名旁附原码次要小字（对账用）：目录内且主文本不是原码本身时附加
+ * （RAW_STANDARD 在 zh 下主文本即原码，不重复；IRR 家族与目录名指标附原码）。
+ */
+export function metricShowsSecondaryCode(code: string, locale: AppLocale): boolean {
+  if (!(code in METRIC_CATALOG)) return false
+  return metricPrimaryLabel(code, locale) !== code
+}
+
 /** 指标悬浮解释：本地化名称 + 公式 + 一行说明；未知 code 原样返回。 */
 export function metricTooltip(code: string, locale: AppLocale): string {
   const info = METRIC_CATALOG[code as MetricCode]
