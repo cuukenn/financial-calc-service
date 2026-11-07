@@ -53,6 +53,11 @@ public final class ExtensionRegistry<T extends OrderedExtension> {
      * <p>Any {@link ServiceConfigurationError} raised by a broken provider declaration is reported as
      * a {@link SystemException}: it is an environment or packaging defect, not a business failure.
      *
+     * <p>JPMS note: the extension type is a generic parameter, so the service dependency cannot be
+     * declared statically with a {@code uses} directive in {@code module-info.java}. This method
+     * therefore declares it dynamically via {@link Module#addUses(Class)} before loading. It is a
+     * no-op on the classpath, where {@code uses} does not apply.
+     *
      * @param type extension type; never {@code null}
      * @param <T>  extension type
      * @return a registry holding the discovered providers, ordered by
@@ -61,6 +66,10 @@ public final class ExtensionRegistry<T extends OrderedExtension> {
      */
     public static <T extends OrderedExtension> ExtensionRegistry<T> load(Class<T> type) {
         Objects.requireNonNull(type, "type");
+        Module module = ExtensionRegistry.class.getModule();
+        if (module.isNamed()) {
+            module.addUses(type);
+        }
         ExtensionRegistry<T> registry = new ExtensionRegistry<>();
         try {
             for (T extension : ServiceLoader.load(type)) {
