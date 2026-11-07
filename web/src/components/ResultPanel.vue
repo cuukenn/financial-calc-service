@@ -9,44 +9,61 @@ import {
   TabPane,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
 } from 'ant-design-vue'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { CalculationResult, EffectiveInterestRow, Installment, Issue } from '@/api/types'
+import type { AppLocale } from '@/i18n'
+import { metricLabel, metricTooltip } from '@/i18n/metricCatalog'
 
 import EChart from './charts/EChart.vue'
-import { buildBalanceOption, buildCompositionOption } from './charts/options'
+import { buildBalanceOption, buildCompositionOption, type ChartLabels } from './charts/options'
 
 /**
  * Task 1（Plan 4）结果区 Tabs 化：指标 / 摊销计划（图表 + 16 列表格，行为不变）/
  * 现金流占位（Task 3 填充）/ 实际利率法（有数据即渲染 6 列摊销表，否则 Empty 占位）。
  * 指标 Statistic 卡金额字符串原样直显，null → 「—」。
+ * Task 2（Plan 4 / R85-R86）：全量文案 i18n；指标卡与指标表 hover 显示指标目录
+ * （中文名/公式/说明，来自 §9.5）。
  */
 const props = defineProps<{ result: CalculationResult }>()
 
-/** 指标卡精选（code 对齐 calc-domain MetricCodes；null 值渲染「—」）。 */
-const METRIC_CARDS: { code: string; label: string }[] = [
-  { code: 'TOTAL_RENT', label: '总租金' },
-  { code: 'TOTAL_INTEREST', label: '总利息' },
-  { code: 'TOTAL_FEE', label: '总费用' },
-  { code: 'TOTAL_TAX', label: '总税额' },
-  { code: 'RENTAL_RATE', label: '租金率' },
-  { code: 'IRR_ANNUAL', label: 'IRR（年化）' },
-  { code: 'XIRR', label: 'XIRR' },
+const { t, te, locale } = useI18n()
+
+/** 指标卡精选（code 对齐 calc-domain MetricCodes；名称/悬浮解释来自指标目录 §9.5）。 */
+const METRIC_CARD_CODES = [
+  'TOTAL_RENT',
+  'TOTAL_INTEREST',
+  'TOTAL_FEE',
+  'TOTAL_TAX',
+  'RENTAL_RATE',
+  'IRR_ANNUAL',
+  'XIRR',
 ]
 
 const metrics = computed(() => props.result.schedule.header.metrics)
 
 const metricCards = computed(() =>
-  METRIC_CARDS.map(({ code, label }) => ({ code, label, value: metrics.value[code] ?? null })),
+  METRIC_CARD_CODES.map((code) => ({
+    code,
+    label: metricLabel(code, locale.value as AppLocale),
+    tooltip: metricTooltip(code, locale.value as AppLocale),
+    value: metrics.value[code] ?? null,
+  })),
 )
 
-/** 未入选指标卡的全量指标（保持 §9.5 全量可见）。 */
+/** 未入选指标卡的全量指标（保持 §9.5 全量可见），行头 hover 同样挂指标目录。 */
 const otherMetrics = computed(() => {
-  const cardCodes = new Set(METRIC_CARDS.map((c) => c.code))
+  const cardCodes = new Set(METRIC_CARD_CODES)
   return Object.entries(metrics.value).filter(([code]) => !cardCodes.has(code))
 })
+
+function otherMetricTooltip(code: string): string {
+  return metricTooltip(code, locale.value as AppLocale)
+}
 
 /** ERROR 红 / WARN 橙 / INFO 灰（后端 IssueLevel 枚举名）。 */
 function issueColor(level: string): string {
@@ -55,49 +72,78 @@ function issueColor(level: string): string {
   return 'default'
 }
 
-const installmentColumns: {
-  title: string
-  dataIndex: keyof Installment
-  width: number
-  align?: 'right' | 'left'
-}[] = [
-  { title: '期次', dataIndex: 'periodNo', width: 60 },
-  { title: '开始日', dataIndex: 'startDate', width: 105 },
-  { title: '结束日', dataIndex: 'endDate', width: 105 },
-  { title: '天数', dataIndex: 'days', width: 60, align: 'right' },
-  { title: '期初余额', dataIndex: 'openingBalance', width: 120, align: 'right' },
-  { title: '本金', dataIndex: 'principalDue', width: 110, align: 'right' },
-  { title: '利息（计提）', dataIndex: 'interestAccrued', width: 110, align: 'right' },
-  { title: '利息（支付）', dataIndex: 'interestPaid', width: 110, align: 'right' },
-  { title: '费用', dataIndex: 'fee', width: 100, align: 'right' },
-  { title: '税', dataIndex: 'tax', width: 100, align: 'right' },
-  { title: '租金', dataIndex: 'rentDue', width: 110, align: 'right' },
-  { title: '期末余额', dataIndex: 'closingBalance', width: 120, align: 'right' },
-  { title: '累计本金', dataIndex: 'cumulativePrincipal', width: 120, align: 'right' },
-  { title: '累计利息', dataIndex: 'cumulativeInterest', width: 120, align: 'right' },
-  { title: '适用利率', dataIndex: 'appliedRate', width: 90, align: 'right' },
-  { title: '备注', dataIndex: 'memo', width: 160 },
-]
+/** 问题级别本地化标签；目录外的枚举名（后端新增）原样透出。 */
+function issueLevelLabel(level: string): string {
+  const key = `result.issues.levels.${level}`
+  return te(key) ? t(key) : level
+}
+
+const installmentColumns = computed<
+  { title: string; dataIndex: keyof Installment; width: number; align?: 'right' | 'left' }[]
+>(() => [
+  { title: t('result.table.periodNo'), dataIndex: 'periodNo', width: 60 },
+  { title: t('result.table.startDate'), dataIndex: 'startDate', width: 105 },
+  { title: t('result.table.endDate'), dataIndex: 'endDate', width: 105 },
+  { title: t('result.table.days'), dataIndex: 'days', width: 60, align: 'right' },
+  { title: t('result.table.openingBalance'), dataIndex: 'openingBalance', width: 120, align: 'right' },
+  { title: t('result.table.principalDue'), dataIndex: 'principalDue', width: 110, align: 'right' },
+  { title: t('result.table.interestAccrued'), dataIndex: 'interestAccrued', width: 110, align: 'right' },
+  { title: t('result.table.interestPaid'), dataIndex: 'interestPaid', width: 110, align: 'right' },
+  { title: t('result.table.fee'), dataIndex: 'fee', width: 100, align: 'right' },
+  { title: t('result.table.tax'), dataIndex: 'tax', width: 100, align: 'right' },
+  { title: t('result.table.rentDue'), dataIndex: 'rentDue', width: 110, align: 'right' },
+  { title: t('result.table.closingBalance'), dataIndex: 'closingBalance', width: 120, align: 'right' },
+  { title: t('result.table.cumulativePrincipal'), dataIndex: 'cumulativePrincipal', width: 120, align: 'right' },
+  { title: t('result.table.cumulativeInterest'), dataIndex: 'cumulativeInterest', width: 120, align: 'right' },
+  { title: t('result.table.appliedRate'), dataIndex: 'appliedRate', width: 90, align: 'right' },
+  { title: t('result.table.memo'), dataIndex: 'memo', width: 160 },
+])
 
 /** §9.7 实际利率法摊销表六列（金额均为字符串原样）。 */
-const eirColumns: {
-  title: string
-  dataIndex: keyof EffectiveInterestRow
-  width: number
-  align?: 'right' | 'left'
-}[] = [
-  { title: '期次', dataIndex: 'periodNo', width: 60 },
-  { title: '期初净投资', dataIndex: 'openingNetInvestment', width: 130, align: 'right' },
-  { title: '利息收入', dataIndex: 'interestIncome', width: 110, align: 'right' },
-  { title: '现金流入', dataIndex: 'cashReceived', width: 110, align: 'right' },
-  { title: '本金回收', dataIndex: 'principalRecovery', width: 110, align: 'right' },
-  { title: '期末净投资', dataIndex: 'closingNetInvestment', width: 130, align: 'right' },
-]
+const eirColumns = computed<
+  { title: string; dataIndex: keyof EffectiveInterestRow; width: number; align?: 'right' | 'left' }[]
+>(() => [
+  { title: t('result.table.periodNo'), dataIndex: 'periodNo', width: 60 },
+  {
+    title: t('result.table.eirOpeningNetInvestment'),
+    dataIndex: 'openingNetInvestment',
+    width: 130,
+    align: 'right',
+  },
+  { title: t('result.table.eirInterestIncome'), dataIndex: 'interestIncome', width: 110, align: 'right' },
+  { title: t('result.table.eirCashReceived'), dataIndex: 'cashReceived', width: 110, align: 'right' },
+  {
+    title: t('result.table.eirPrincipalRecovery'),
+    dataIndex: 'principalRecovery',
+    width: 110,
+    align: 'right',
+  },
+  {
+    title: t('result.table.eirClosingNetInvestment'),
+    dataIndex: 'closingNetInvestment',
+    width: 130,
+    align: 'right',
+  },
+])
 
 const effectiveInterest = computed(() => props.result.effectiveInterest)
 
-const compositionOption = computed(() => buildCompositionOption(props.result.schedule.installments))
-const balanceOption = computed(() => buildBalanceOption(props.result.schedule.installments))
+/** R85：图表系列名/轴名文案从 locale 组装后传入 option 构造器。 */
+const chartLabels = computed<ChartLabels>(() => ({
+  principal: t('charts.principal'),
+  interest: t('charts.interest'),
+  closingBalance: t('charts.closingBalance'),
+  periodAxis: t('charts.periodAxis'),
+  amount: t('charts.amount'),
+  periodLabel: (n: number) => t('charts.periodLabel', { n }),
+}))
+
+const compositionOption = computed(() =>
+  buildCompositionOption(props.result.schedule.installments, chartLabels.value),
+)
+const balanceOption = computed(() =>
+  buildBalanceOption(props.result.schedule.installments, chartLabels.value),
+)
 
 function issueKey(issue: Issue, index: number): string {
   return `${issue.code}-${issue.periodNo ?? 'all'}-${index}`
@@ -105,37 +151,42 @@ function issueKey(issue: Issue, index: number): string {
 </script>
 
 <template>
-  <Card title="测算结果" data-test="result-card">
-    <Typography.Text type="secondary">runId：{{ result.runId }}</Typography.Text>
+  <Card :title="t('result.cardTitle')" data-test="result-card">
+    <Typography.Text type="secondary">
+      {{ t('result.runId', { runId: result.runId }) }}
+    </Typography.Text>
 
     <!-- hasErrors：问题列表含 ERROR 级条目（预期结果，非请求失败）。 -->
     <Alert
       v-if="result.schedule.hasErrors"
       type="warning"
       show-icon
-      message="测算结果包含 ERROR 级问题，请检查下方问题列表"
+      :message="t('result.hasErrors')"
       data-test="has-errors-alert"
       style="margin-top: 8px"
     />
 
     <Tabs data-test="result-tabs">
       <!-- Tab 1：指标（Statistic 卡 + 全量指标 + 问题列表）。 -->
-      <TabPane key="metrics" tab="指标">
+      <TabPane key="metrics" :tab="t('result.tabs.metrics')">
         <div
           data-test="metric-cards"
           style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px"
         >
-          <Card v-for="card in metricCards" :key="card.code" size="small" data-test="metric-card">
-            <!-- 自定义 formatter：金额字符串原样直显，绕开 Statistic 内置的千分位重排版。 -->
-            <Statistic
-              :title="card.label"
-              :value="card.value ?? '—'"
-              :data-test="`metric-${card.code}`"
-              :value-style="card.value === null ? { color: 'rgba(0,0,0,0.45)' } : undefined"
-            >
-              <template #formatter>{{ card.value ?? '—' }}</template>
-            </Statistic>
-          </Card>
+          <!-- R86：指标卡 hover 显示指标目录（中文名/公式/说明）。 -->
+          <Tooltip v-for="card in metricCards" :key="card.code" :title="card.tooltip">
+            <Card size="small" data-test="metric-card">
+              <!-- 自定义 formatter：金额字符串原样直显，绕开 Statistic 内置的千分位重排版。 -->
+              <Statistic
+                :title="card.label"
+                :value="card.value ?? '—'"
+                :data-test="`metric-${card.code}`"
+                :value-style="card.value === null ? { color: 'rgba(0,0,0,0.45)' } : undefined"
+              >
+                <template #formatter>{{ card.value ?? '—' }}</template>
+              </Statistic>
+            </Card>
+          </Tooltip>
         </div>
         <Descriptions
           v-if="otherMetrics.length > 0"
@@ -145,31 +196,49 @@ function issueKey(issue: Issue, index: number): string {
           data-test="metrics-list"
           style="margin-top: 12px"
         >
-          <Descriptions.Item v-for="[code, value] in otherMetrics" :key="code" :label="code">
+          <Descriptions.Item v-for="[code, value] in otherMetrics" :key="code">
+            <template #label>
+              <!-- R86：指标表行头 hover 同样显示指标目录。 -->
+              <Tooltip :title="otherMetricTooltip(code)">
+                <span data-test="metric-header">{{ code }}</span>
+              </Tooltip>
+            </template>
             {{ value ?? '—' }}
           </Descriptions.Item>
         </Descriptions>
 
         <template v-if="result.schedule.issues.length > 0">
-          <Typography.Title :level="5" style="margin-top: 12px">问题列表</Typography.Title>
+          <Typography.Title :level="5" style="margin-top: 12px">
+            {{ t('result.issues.title') }}
+          </Typography.Title>
           <ul data-test="issues-list" style="padding-left: 20px; margin: 0">
             <li v-for="(issue, idx) in result.schedule.issues" :key="issueKey(issue, idx)">
-              <Tag :color="issueColor(issue.level)" data-test="issue-level">{{ issue.level }}</Tag>
+              <Tag :color="issueColor(issue.level)" data-test="issue-level">
+                {{ issueLevelLabel(issue.level) }}
+              </Tag>
               {{ issue.code }} {{ issue.message }}
-              <template v-if="issue.periodNo !== null">（第 {{ issue.periodNo }} 期）</template>
+              <template v-if="issue.periodNo !== null">
+                {{ t('result.issues.period', { n: issue.periodNo }) }}
+              </template>
             </li>
           </ul>
         </template>
       </TabPane>
 
       <!-- Tab 2：摊销计划（构成/余额图表在上，16 列表格在下，行为不变）。 -->
-      <TabPane key="schedule" tab="摊销计划">
-        <Typography.Title :level="5" style="margin-top: 4px">构成（本金 vs 利息）</Typography.Title>
+      <TabPane key="schedule" :tab="t('result.tabs.schedule')">
+        <Typography.Title :level="5" style="margin-top: 4px">
+          {{ t('result.scheduleTab.compositionTitle') }}
+        </Typography.Title>
         <EChart :option="compositionOption" data-test="composition-chart" />
-        <Typography.Title :level="5" style="margin-top: 12px">余额曲线</Typography.Title>
+        <Typography.Title :level="5" style="margin-top: 12px">
+          {{ t('result.scheduleTab.balanceTitle') }}
+        </Typography.Title>
         <EChart :option="balanceOption" data-test="balance-chart" />
 
-        <Typography.Title :level="5" style="margin-top: 12px">摊销计划</Typography.Title>
+        <Typography.Title :level="5" style="margin-top: 12px">
+          {{ t('result.scheduleTab.tableTitle') }}
+        </Typography.Title>
         <Table
           :columns="installmentColumns"
           :data-source="result.schedule.installments"
@@ -182,16 +251,19 @@ function issueKey(issue: Issue, index: number): string {
       </TabPane>
 
       <!-- Tab 3：现金流占位（Task 3 填充现金流表 + 累计回收曲线）。 -->
-      <TabPane key="cashflow" tab="现金流">
-        <Empty description="现金流表与累计回收曲线将在后续任务中提供" data-test="cashflow-empty" />
+      <TabPane key="cashflow" :tab="t('result.tabs.cashflow')">
+        <Empty :description="t('result.cashflowEmpty')" data-test="cashflow-empty" />
       </TabPane>
 
       <!-- Tab 4：实际利率法（§9.7 六列摊销表；IRR 未收敛/不可建表时占位）。 -->
-      <TabPane key="eir" tab="实际利率法">
+      <TabPane key="eir" :tab="t('result.tabs.eir')">
         <template v-if="effectiveInterest">
           <Typography.Text type="secondary" style="display: block; margin-bottom: 8px">
-            实际利率（EIR）：{{ effectiveInterest.eir }} · 利息总额调整差：{{
-              effectiveInterest.totalInterestDifference
+            {{
+              t('result.eir.summary', {
+                eir: effectiveInterest.eir,
+                diff: effectiveInterest.totalInterestDifference,
+              })
             }}
           </Typography.Text>
           <Table
@@ -206,7 +278,7 @@ function issueKey(issue: Issue, index: number): string {
         </template>
         <Empty
           v-else
-          description="IRR 未收敛或不可建表，暂无实际利率法摊销表"
+          :description="t('result.eir.empty')"
           data-test="eir-empty"
         />
       </TabPane>

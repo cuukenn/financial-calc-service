@@ -1,8 +1,10 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '@/api/client'
 import type { CalculationRequest, CalculationResult } from '@/api/types'
+import { mountWithI18n } from '@/test-utils/mount'
+import { activateTab } from '@/test-utils/tabs'
 import CalculationForm from './CalculationForm.vue'
 
 vi.mock('@/api/client', () => ({
@@ -75,17 +77,9 @@ function resultWithIssues(hasErrors: boolean): CalculationResult {
   return base
 }
 
-async function submit(wrapper: ReturnType<typeof mount>): Promise<void> {
+async function submit(wrapper: ReturnType<typeof mountWithI18n>): Promise<void> {
   await wrapper.find('form').trigger('submit')
   await flushPromises()
-  await flushPromises()
-}
-
-/** 结果区 Tabs 懒渲染：先点激活目标 Tab，再断言其内容。 */
-async function activateResultTab(wrapper: ReturnType<typeof mount>, tabLabel: string): Promise<void> {
-  const tab = wrapper.findAll('.ant-tabs-tab').find((t) => t.text() === tabLabel)
-  expect(tab, `结果 Tab 「${tabLabel}」 应存在`).toBeTruthy()
-  await tab!.trigger('click')
   await flushPromises()
 }
 
@@ -99,7 +93,7 @@ describe('CalculationForm', () => {
   })
 
   it('renders the form pre-filled with the golden fixture defaults', () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
 
     expect((wrapper.find('[data-test="principal"]').element as HTMLInputElement).value).toBe('1000000')
     expect((wrapper.find('[data-test="nominal-rate"]').element as HTMLInputElement).value).toBe('0.06')
@@ -114,7 +108,7 @@ describe('CalculationForm', () => {
   })
 
   it('submits a correctly-shaped CalculationRequest on golden defaults', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await submit(wrapper)
 
     expect(calculate).toHaveBeenCalledTimes(1)
@@ -145,7 +139,7 @@ describe('CalculationForm', () => {
     vi.mocked(calculate).mockRejectedValue(
       new ApiError('FCS-DOM-1001', '租赁本金必须为正数', 400),
     )
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await submit(wrapper)
 
     const alert = wrapper.find('[data-test="error-alert"]')
@@ -156,7 +150,7 @@ describe('CalculationForm', () => {
   })
 
   it('renders header metrics, installments and hides the error alert on success', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await submit(wrapper)
 
     // Task 3：指标升级为 Statistic 卡（金额字符串原样直显，位于默认「指标」Tab）。
@@ -165,7 +159,7 @@ describe('CalculationForm', () => {
     expect(wrapper.find('[data-test="metric-TOTAL_RENT"]').text()).toContain('1032797.15')
 
     // Plan 4 Task 1：摊销计划移入同名 Tab（懒渲染，须先激活）。
-    await activateResultTab(wrapper, '摊销计划')
+    await activateTab(wrapper, '摊销计划')
     const rows = wrapper.find('[data-test="installments-table"]').findAll('.ant-table-row')
     expect(rows.length).toBeGreaterThanOrEqual(1)
     expect(rows[0].text()).toContain('84271.24')
@@ -173,7 +167,7 @@ describe('CalculationForm', () => {
   })
 
   it('groups the form fields into the three compact block cards (R84)', () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
 
     // 三个大块卡片均存在。
     const titles = wrapper.findAll('.ant-card-head-title').map((t) => t.text())
@@ -201,16 +195,16 @@ describe('CalculationForm', () => {
   })
 
   it('shows the cash-flow tab as a placeholder after a successful calculation', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await submit(wrapper)
 
-    await activateResultTab(wrapper, '现金流')
+    await activateTab(wrapper, '现金流')
     expect(wrapper.find('[data-test="cashflow-empty"]').exists()).toBe(true)
   })
 
   it('lists issues and shows the warning alert when the schedule hasErrors', async () => {
     vi.mocked(calculate).mockResolvedValue(resultWithIssues(true))
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await submit(wrapper)
 
     expect(wrapper.find('[data-test="has-errors-alert"]').exists()).toBe(true)
@@ -220,7 +214,7 @@ describe('CalculationForm', () => {
   })
 
   it('gates the submit when a required field is cleared', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await wrapper.find('[data-test="principal"]').setValue('')
     await submit(wrapper)
 
@@ -229,7 +223,7 @@ describe('CalculationForm', () => {
   })
 
   it('shows the explicit rents editor sized by periods when EXPLICIT_RENT is selected', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await wrapper.find('input[value="EXPLICIT_RENT"]').setValue()
     await flushPromises()
 
@@ -239,7 +233,7 @@ describe('CalculationForm', () => {
   })
 
   it('resizes the explicit rents list when periods changes', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await wrapper.find('input[value="EXPLICIT_RENT"]').setValue()
     await wrapper.find('[data-test="periods"]').setValue('3')
     await flushPromises()
@@ -248,7 +242,7 @@ describe('CalculationForm', () => {
   })
 
   it('fills the segmented-rate preset rows when the preset button is clicked', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await wrapper.find('[data-test="rule-preset"]').trigger('click')
     await flushPromises()
 
@@ -261,7 +255,7 @@ describe('CalculationForm', () => {
   })
 
   it('sends the rule rows on submit when present (built-in method + segmented rates)', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await wrapper.find('[data-test="rule-preset"]').trigger('click')
     await submit(wrapper)
 
@@ -294,7 +288,7 @@ describe('CalculationForm', () => {
   })
 
   it('keeps the optional rule-rows editor available for built-in methods', () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
 
     const editor = wrapper.find('[data-test="rule-rows-editor"]')
     expect(editor.exists()).toBe(true)
@@ -304,7 +298,7 @@ describe('CalculationForm', () => {
   })
 
   it('shows the rule-rows editor as the primary editor for RULE_DRIVEN', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     await wrapper.find('input[value="RULE_DRIVEN"]').setValue()
     await flushPromises()
 
@@ -313,7 +307,7 @@ describe('CalculationForm', () => {
   })
 
   it('derives the preset button label from the actual periods (10 → 1-5/6-10)', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
     expect(wrapper.find('[data-test="rule-preset"]').text()).toContain(
       '1-6 期 @3%，7-12 期 @6%',
     )
@@ -325,7 +319,7 @@ describe('CalculationForm', () => {
   })
 
   it('assigns unique ruleIds when adding rows after a removal', async () => {
-    const wrapper = mount(CalculationForm)
+    const wrapper = mountWithI18n(CalculationForm)
 
     await wrapper.find('[data-test="rule-add"]').trigger('click')
     await wrapper.find('[data-test="rule-add"]').trigger('click')

@@ -1,8 +1,9 @@
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '@/api/client'
 import type { AlgorithmInfo } from '@/api/types'
+import { mountWithI18n } from '@/test-utils/mount'
 import EngineStatus from './EngineStatus.vue'
 
 vi.mock('@/api/client', () => ({
@@ -38,7 +39,7 @@ describe('EngineStatus', () => {
   })
 
   it('renders the ping status and the algorithms fetched from the API client', async () => {
-    const wrapper = mount(EngineStatus)
+    const wrapper = mountWithI18n(EngineStatus)
     await flushPromises()
 
     const tag = wrapper.find('[data-test="engine-up"]')
@@ -56,7 +57,7 @@ describe('EngineStatus', () => {
     vi.mocked(getAlgorithms).mockRejectedValue(
       new ApiError('FCS-SYS-9999', '系统繁忙', 500),
     )
-    const wrapper = mount(EngineStatus)
+    const wrapper = mountWithI18n(EngineStatus)
     await flushPromises()
 
     const alert = wrapper.find('.ant-alert-error')
@@ -67,7 +68,7 @@ describe('EngineStatus', () => {
 
   it('marks the engine as unreachable when ping fails', async () => {
     vi.mocked(ping).mockRejectedValue(new ApiError('NETWORK_ERROR', '请求失败', 0))
-    const wrapper = mount(EngineStatus)
+    const wrapper = mountWithI18n(EngineStatus)
     await flushPromises()
 
     expect(wrapper.find('[data-test="engine-down"]').exists()).toBe(true)

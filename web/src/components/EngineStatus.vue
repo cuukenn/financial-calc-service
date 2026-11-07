@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { Alert, Card, List, Space, Tag, Typography } from 'ant-design-vue'
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { getAlgorithms, ping, ApiError } from '@/api/client'
 import type { AlgorithmInfo } from '@/api/types'
+
+const { t } = useI18n()
 
 const pingStatus = ref<PingState>({ state: 'loading' })
 const algorithms = ref<AlgorithmListState>({ state: 'loading' })
@@ -49,20 +52,22 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Card title="引擎状态" data-test="engine-status-card">
+  <Card :title="t('engine.cardTitle')" data-test="engine-status-card">
     <template #extra>
       <Tag v-if="pingStatus.state === 'ready'" color="green" data-test="engine-up">
         {{ pingStatus.status }} · engine {{ pingStatus.engine }}
       </Tag>
-      <Tag v-else-if="pingStatus.state === 'loading'" color="blue">检测中…</Tag>
-      <Tag v-else color="red" data-test="engine-down">后端不可达</Tag>
+      <Tag v-else-if="pingStatus.state === 'loading'" color="blue">
+        {{ t('engine.checking') }}
+      </Tag>
+      <Tag v-else color="red" data-test="engine-down">{{ t('engine.backendDown') }}</Tag>
     </template>
 
     <Alert
       v-if="algorithms.state === 'error'"
       type="error"
       show-icon
-      :message="`算法清单加载失败（${algorithms.error?.code}）`"
+      :message="t('engine.algorithmsFailed', { code: algorithms.error?.code ?? '' })"
       :description="algorithms.error?.message"
     />
 

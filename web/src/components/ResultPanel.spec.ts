@@ -1,8 +1,10 @@
-import { flushPromises, mount } from '@vue/test-utils'
-import type { VueWrapper } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { Tooltip } from 'ant-design-vue'
+
 import type { CalculationResult, Installment } from '@/api/types'
+import { mountWithI18n } from '@/test-utils/mount'
+import { activateTab } from '@/test-utils/tabs'
 
 vi.mock('echarts', () => ({
   init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
@@ -68,31 +70,39 @@ describe('ResultPanel', () => {
     vi.clearAllMocks()
   })
 
-  /** Tabs 懒渲染：先点激活目标 Tab，再断言其内容。 */
-  async function activateTab(wrapper: VueWrapper, tabLabel: string): Promise<void> {
-    const tab = wrapper
-      .findAll('.ant-tabs-tab')
-      .find((t) => t.text() === tabLabel)
-    expect(tab, `tab 「${tabLabel}」 应存在`).toBeTruthy()
-    await tab!.trigger('click')
-    await flushPromises()
-  }
-
-  it('renders metric cards verbatim and shows 「—」 for null metrics', () => {
-    const wrapper = mount(ResultPanel, { props: { result: result() } })
+  it('renders metric cards from the catalog verbatim and shows 「—」 for null metrics', () => {
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 
     const rent = wrapper.find('[data-test="metric-TOTAL_RENT"]')
-    expect(rent.text()).toContain('总租金')
+    // R86：指标卡标签来自指标目录（§9.5 中文名），不再是 UI 内的别名。
+    expect(rent.text()).toContain('租金合计')
     // 金额字符串原样直显（不重排版、不加千分位）。
     expect(rent.text()).toContain('1032797.15')
 
     const xirr = wrapper.find('[data-test="metric-XIRR"]')
-    expect(xirr.text()).toContain('XIRR')
+    // 目录名（§9.5）：实际日期 IRR；null 值渲染「—」。
+    expect(xirr.text()).toContain('实际日期 IRR')
     expect(xirr.text()).toContain('—')
   })
 
-  it('renders the four tabs (指标/摊销计划/现金流/实际利率法) with a cash-flow placeholder', async () => {
-    const wrapper = mount(ResultPanel, { props: { result: result() } })
+  it('wires the metric catalog into tooltips on cards and table row headers (R86)', () => {
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
+
+    const tooltips = wrapper.findAllComponents(Tooltip)
+    expect(tooltips.length).toBeGreaterThan(0)
+    const titles = tooltips.map((tp) => tp.props('title') as string)
+
+    // 指标卡：悬浮内容含目录的中文名 + 公式。
+    expect(titles.join('\n')).toContain('租金合计｜公式：Σ rentDue')
+    expect(titles.join('\n')).toContain('年化 IRR（复利）｜公式：(1 + IRR_PERIOD)^m − 1')
+    // 指标表行头（未入选卡片的指标）同样绑定目录。
+    const headers = wrapper.findAll('[data-test="metric-header"]').map((h) => h.text())
+    expect(headers).toContain('NPV')
+    expect(titles.join('\n')).toContain('净现值')
+  })
+
+  it('renders the four tabs with a cash-flow placeholder', async () => {
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 
     const tabs = wrapper.findAll('.ant-tabs-tab')
     expect(tabs.map((t) => t.text())).toEqual(['指标', '摊销计划', '现金流', '实际利率法'])
@@ -118,7 +128,7 @@ describe('ResultPanel', () => {
       eir: '0.0051',
       totalInterestDifference: '1200.00',
     }
-    const wrapper = mount(ResultPanel, { props: { result: withEir } })
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withEir } })
 
     await activateTab(wrapper, '实际利率法')
     const table = wrapper.find('[data-test="effective-interest-table"]')
@@ -128,13 +138,13 @@ describe('ResultPanel', () => {
     expect(table.find('.ant-table-row').text()).toContain('920828.76')
 
     // 无数据（IRR 未收敛等）时占位而非空表。
-    const nullWrapper = mount(ResultPanel, { props: { result: result() } })
+    const nullWrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
     await activateTab(nullWrapper, '实际利率法')
     expect(nullWrapper.find('[data-test="eir-empty"]').exists()).toBe(true)
     expect(nullWrapper.find('[data-test="effective-interest-table"]').exists()).toBe(false)
   })
 
-  it('colors issue levels: ERROR red / WARN orange / INFO grey', () => {
+  it('colors issue levels: ERROR red / WARN orange / INFO grey with localized labels', () => {
     const withIssues = result({
       hasErrors: true,
       issues: [
@@ -143,10 +153,11 @@ describe('ResultPanel', () => {
         { level: 'INFO', code: 'FCS-CHK-1001', message: '首期含宽限期', periodNo: null },
       ],
     })
-    const wrapper = mount(ResultPanel, { props: { result: withIssues } })
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withIssues } })
 
     const tags = wrapper.findAll('[data-test="issue-level"]')
-    expect(tags.map((tag) => tag.text())).toEqual(['ERROR', 'WARN', 'INFO'])
+    // 级别标签走 i18n（zh-CN：错误/警告/提示）。
+    expect(tags.map((tag) => tag.text())).toEqual(['错误', '警告', '提示'])
     expect(tags[0].attributes('class')).toContain('red')
     expect(tags[1].attributes('class')).toContain('orange')
     // INFO 灰：不带任何彩色修饰类。
@@ -155,12 +166,22 @@ describe('ResultPanel', () => {
   })
 
   it('renders both charts (composition + balance) fed from the installments', async () => {
-    const wrapper = mount(ResultPanel, { props: { result: result() } })
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 
     // 图表位于「摊销计划」Tab 内（懒渲染，须先激活）。
     await activateTab(wrapper, '摊销计划')
     expect(wrapper.find('[data-test="composition-chart"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="balance-chart"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="installments-table"]').exists()).toBe(true)
+  })
+
+  it('keeps an unknown issue level verbatim (backend-added levels pass through)', () => {
+    const withUnknown = result({
+      hasErrors: true,
+      issues: [{ level: 'WARNING', code: 'FCS-CHK-9999', message: '未知级别', periodNo: null }],
+    })
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withUnknown } })
+
+    expect(wrapper.find('[data-test="issue-level"]').text()).toBe('WARNING')
   })
 })

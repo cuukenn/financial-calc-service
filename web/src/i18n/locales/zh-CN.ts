@@ -1,0 +1,211 @@
+/**
+ * zh-CN 文案（默认语言，R85）。键按领域分域：app / engine / form / enums / result / charts。
+ * en-US.ts 以 `typeof zhCN` 做编译期键位对齐（两目录结构必须完全一致）。
+ *
+ * 约定：
+ * - 枚举选项标签保留后端 code，仅翻译描述后缀（如 MONTHLY（月））。
+ * - 后端 FCS 消息（错误体 message、算法 description）原样透出，不入本目录。
+ * - vue-i18n 消息中的字面 `@` 需写作 {'@'}（链接消息保留字）。
+ */
+const zhCN = {
+  app: {
+    title: '租赁测算工作台',
+    footer: 'financial-calc-service · 可视化测算前端（Plan 3）',
+  },
+  engine: {
+    cardTitle: '引擎状态',
+    checking: '检测中…',
+    backendDown: '后端不可达',
+    algorithmsFailed: '算法清单加载失败（{code}）',
+  },
+  form: {
+    cardTitle: '测算表单',
+    basic: {
+      title: '基础要素',
+      principal: '租赁本金',
+      principalPh: '如 1000000',
+      nominalRate: '名义年利率',
+      nominalRatePh: '小数，如 0.06',
+      commenceDate: '起租日',
+      firstRentDate: '首期租金日',
+      periods: '期数',
+      currency: '币种',
+      currencyPh: 'ISO-4217，如 CNY',
+      frequency: '还款频率',
+      timing: '付款时点',
+      dayCountCode: '天数口径',
+      dateRollCode: '日期滚动',
+      rateChangePolicy: '利率变更策略',
+      method: '还款方式',
+    },
+    rentStructure: {
+      title: '租金结构',
+      ruleRows: {
+        title: '规则行（可选：分段利率）',
+        hint: '对全部方式开放：携带规则行即启用分段利率（RULE_DRIVEN 则为必填规则集）',
+        ruleIdPh: '规则 ID',
+        priorityPh: '优先级',
+        fromPeriodPh: '起始期',
+        toPeriodPh: '截止期',
+        annualRatePh: '年利率（如 0.03）',
+        remove: '删除',
+        add: '+ 添加规则行',
+        preset: "分段费率预设（{from}-{to} 期 {'@'}3%，{from2}-{to2} 期 {'@'}6%）",
+      },
+      explicitRents: {
+        label: '逐期租金（共 {periods} 期，每期须大于 0）',
+        periodPh: '第 {n} 期',
+        incomplete: '显式租金方式须填满全部 {periods} 期租金且每期大于 0',
+      },
+      grace: {
+        title: '宽限期（可选）',
+        interestOnlyPeriods: '只付息期数',
+        fullGracePeriods: '全免期数',
+      },
+    },
+    feesOther: {
+      title: '费用与其他',
+      fees: {
+        title: '费用（可选）',
+        typePh: '费用类型',
+        amountPh: '金额',
+        remove: '删除',
+        add: '+ 添加费用',
+      },
+      residualValue: '残值金额',
+      residualHandling: '残值处理',
+      deposit: '保证金',
+      vatRate: '增值税率',
+      vatRatePh: '小数，如 0.06',
+    },
+    submit: '开始测算',
+    submitting: '测算中…',
+    submitFailed: '测算失败（{code}）',
+    validation: {
+      principal: '请输入租赁本金',
+      nominalRate: '请输入名义年利率',
+      commenceDate: '请选择起租日',
+      firstRentDate: '请选择首期租金日',
+      periods: '请输入期数',
+      frequency: '请选择还款频率',
+      timing: '请选择付款时点',
+      dayCountCode: '请选择天数口径',
+      dateRollCode: '请选择日期滚动规则',
+      method: '请选择还款方式',
+    },
+  },
+  enums: {
+    frequency: {
+      MONTHLY: 'MONTHLY（月）',
+      QUARTERLY: 'QUARTERLY（季）',
+      SEMI_ANNUAL: 'SEMI_ANNUAL（半年）',
+      ANNUAL: 'ANNUAL（年）',
+      IRREGULAR: 'IRREGULAR（不规则）',
+    },
+    timing: {
+      IN_ARREARS: 'IN_ARREARS（期末付）',
+      IN_ADVANCE: 'IN_ADVANCE（期初付）',
+    },
+    dayCount: {
+      THIRTY_360: 'THIRTY_360（30/360）',
+      THIRTY_E_360: 'THIRTY_E_360（30E/360）',
+      ACT_360: 'ACT_360（实际/360）',
+      ACT_365F: 'ACT_365F（实际/365 固定）',
+      ACT_365_25: 'ACT_365_25（实际/365.25）',
+      ACT_ACT: 'ACT_ACT（实际/实际）',
+    },
+    dateRoll: {
+      NONE: 'NONE（不滚动）',
+      FOLLOWING: 'FOLLOWING（向后）',
+      MODIFIED_FOLLOWING: 'MODIFIED_FOLLOWING（修正向后）',
+      PRECEDING: 'PRECEDING（向前）',
+      MODIFIED_PRECEDING: 'MODIFIED_PRECEDING（修正向前）',
+      END_OF_MONTH: 'END_OF_MONTH（对齐月末）',
+    },
+    residualHandling: {
+      SEPARATE: 'SEPARATE（期末单独回收）',
+      BALLOON_IN_RENT: 'BALLOON_IN_RENT（摊入租金）',
+    },
+    rateChangePolicy: {
+      RESOLVE: 'RESOLVE（自变更日重算）',
+      FIXED_RENT: 'FIXED_RENT（租金不变，尾差吸收）',
+      DRIFT: 'DRIFT（差额滚入期末余额）',
+    },
+    chargeMode: {
+      UPFRONT: 'UPFRONT（期初一次性）',
+      DEDUCT_FROM_PRINCIPAL: 'DEDUCT_FROM_PRINCIPAL（抵减本金）',
+      AMORTIZED: 'AMORTIZED（摊入租金）',
+    },
+    method: {
+      EQUAL_INSTALLMENT: '等额本息',
+      EQUAL_PRINCIPAL: '等额本金',
+      INTEREST_FIRST: '先息后本',
+      PRINCIPAL_FIRST: '先本后息',
+      RULE_DRIVEN: '规则驱动',
+      EXPLICIT_RENT: '显式租金',
+    },
+  },
+  result: {
+    cardTitle: '测算结果',
+    runId: 'runId：{runId}',
+    hasErrors: '测算结果包含 ERROR 级问题，请检查下方问题列表',
+    tabs: {
+      metrics: '指标',
+      schedule: '摊销计划',
+      cashflow: '现金流',
+      eir: '实际利率法',
+    },
+    issues: {
+      title: '问题列表',
+      period: '（第 {n} 期）',
+      levels: {
+        INFO: '提示',
+        WARN: '警告',
+        ERROR: '错误',
+      },
+    },
+    scheduleTab: {
+      compositionTitle: '构成（本金 vs 利息）',
+      balanceTitle: '余额曲线',
+      tableTitle: '摊销计划',
+    },
+    cashflowEmpty: '现金流表与累计回收曲线将在后续任务中提供',
+    eir: {
+      summary: '实际利率（EIR）：{eir} · 利息总额调整差：{diff}',
+      empty: 'IRR 未收敛或不可建表，暂无实际利率法摊销表',
+    },
+    table: {
+      periodNo: '期次',
+      startDate: '开始日',
+      endDate: '结束日',
+      days: '天数',
+      openingBalance: '期初余额',
+      principalDue: '本金',
+      interestAccrued: '利息（计提）',
+      interestPaid: '利息（支付）',
+      fee: '费用',
+      tax: '税',
+      rentDue: '租金',
+      closingBalance: '期末余额',
+      cumulativePrincipal: '累计本金',
+      cumulativeInterest: '累计利息',
+      appliedRate: '适用利率',
+      memo: '备注',
+      eirOpeningNetInvestment: '期初净投资',
+      eirInterestIncome: '利息收入',
+      eirCashReceived: '现金流入',
+      eirPrincipalRecovery: '本金回收',
+      eirClosingNetInvestment: '期末净投资',
+    },
+  },
+  charts: {
+    principal: '本金',
+    interest: '利息',
+    periodLabel: '第 {n} 期',
+    periodAxis: '期次',
+    amount: '金额',
+    closingBalance: '期末余额',
+  },
+}
+
+export default zhCN

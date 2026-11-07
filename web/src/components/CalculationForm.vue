@@ -13,11 +13,11 @@ import {
   RadioGroup,
   Row,
   Select,
-  Space,
   Typography,
 } from 'ant-design-vue'
 import type { Rule } from 'ant-design-vue/es/form'
 import { computed, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { ApiError, calculate } from '@/api/client'
 import type {
@@ -30,74 +30,82 @@ import type {
   RuleRow,
 } from '@/api/types'
 
+import FeesEditor from './editors/FeesEditor.vue'
+import RuleRowsEditor from './editors/RuleRowsEditor.vue'
+import RentsEditor from './editors/RentsEditor.vue'
+import type { FeeDraft, RuleRowDraft } from './editors/types'
 import ResultPanel from './ResultPanel.vue'
 import { nextRuleId } from './ruleIds'
 
-interface Option {
-  label: string
-  value: string
-}
+const { t } = useI18n()
 
 /** 天数口径：六个已注册的 DayCountConvention code（calc-domain/support/daycount）。 */
-const DAY_COUNT_CODES: Option[] = [
-  { label: 'THIRTY_360（30/360）', value: 'THIRTY_360' },
-  { label: 'THIRTY_E_360（30E/360）', value: 'THIRTY_E_360' },
-  { label: 'ACT_360（实际/360）', value: 'ACT_360' },
-  { label: 'ACT_365F（实际/365 固定）', value: 'ACT_365F' },
-  { label: 'ACT_365_25（实际/365.25）', value: 'ACT_365_25' },
-  { label: 'ACT_ACT（实际/实际）', value: 'ACT_ACT' },
-]
+const DAY_COUNT_VALUES = [
+  'THIRTY_360',
+  'THIRTY_E_360',
+  'ACT_360',
+  'ACT_365F',
+  'ACT_365_25',
+  'ACT_ACT',
+] as const
 
 /** 日期滚动：六个已注册的 DateRollConvention code（calc-domain/support/dateroll）。 */
-const DATE_ROLL_CODES: Option[] = [
-  { label: 'NONE（不滚动）', value: 'NONE' },
-  { label: 'FOLLOWING（向后）', value: 'FOLLOWING' },
-  { label: 'MODIFIED_FOLLOWING（修正向后）', value: 'MODIFIED_FOLLOWING' },
-  { label: 'PRECEDING（向前）', value: 'PRECEDING' },
-  { label: 'MODIFIED_PRECEDING（修正向前）', value: 'MODIFIED_PRECEDING' },
-  { label: 'END_OF_MONTH（对齐月末）', value: 'END_OF_MONTH' },
+const DATE_ROLL_VALUES = [
+  'NONE',
+  'FOLLOWING',
+  'MODIFIED_FOLLOWING',
+  'PRECEDING',
+  'MODIFIED_PRECEDING',
+  'END_OF_MONTH',
+] as const
+
+const FREQUENCY_VALUES: PaymentFrequency[] = [
+  'MONTHLY',
+  'QUARTERLY',
+  'SEMI_ANNUAL',
+  'ANNUAL',
+  'IRREGULAR',
 ]
 
-const FREQUENCIES: Option[] = [
-  { label: 'MONTHLY（月）', value: 'MONTHLY' },
-  { label: 'QUARTERLY（季）', value: 'QUARTERLY' },
-  { label: 'SEMI_ANNUAL（半年）', value: 'SEMI_ANNUAL' },
-  { label: 'ANNUAL（年）', value: 'ANNUAL' },
-  { label: 'IRREGULAR（不规则）', value: 'IRREGULAR' },
-]
-
-const TIMINGS: Option[] = [
-  { label: 'IN_ARREARS（期末付）', value: 'IN_ARREARS' },
-  { label: 'IN_ADVANCE（期初付）', value: 'IN_ADVANCE' },
-]
+const TIMING_VALUES: PaymentTiming[] = ['IN_ARREARS', 'IN_ADVANCE']
 
 /** RepaymentMethodId 枚举名（见 GET /api/v1/algorithms）。 */
-const METHODS: Option[] = [
-  { label: '等额本息', value: 'EQUAL_INSTALLMENT' },
-  { label: '等额本金', value: 'EQUAL_PRINCIPAL' },
-  { label: '先息后本', value: 'INTEREST_FIRST' },
-  { label: '先本后息', value: 'PRINCIPAL_FIRST' },
-  { label: '规则驱动', value: 'RULE_DRIVEN' },
-  { label: '显式租金', value: 'EXPLICIT_RENT' },
-]
+const METHOD_VALUES = [
+  'EQUAL_INSTALLMENT',
+  'EQUAL_PRINCIPAL',
+  'INTEREST_FIRST',
+  'PRINCIPAL_FIRST',
+  'RULE_DRIVEN',
+  'EXPLICIT_RENT',
+] as const
 
-const RESIDUAL_HANDLINGS: Option[] = [
-  { label: 'SEPARATE（期末单独回收）', value: 'SEPARATE' },
-  { label: 'BALLOON_IN_RENT（摊入租金）', value: 'BALLOON_IN_RENT' },
-]
+const RESIDUAL_HANDLING_VALUES: ResidualHandling[] = ['SEPARATE', 'BALLOON_IN_RENT']
 
 /** RateChangePolicy 枚举（分段利率生效策略）。 */
-const RATE_CHANGE_POLICIES: Option[] = [
-  { label: 'RESOLVE（自变更日重算）', value: 'RESOLVE' },
-  { label: 'FIXED_RENT（租金不变，尾差吸收）', value: 'FIXED_RENT' },
-  { label: 'DRIFT（差额滚入期末余额）', value: 'DRIFT' },
-]
+const RATE_CHANGE_POLICY_VALUES = ['RESOLVE', 'FIXED_RENT', 'DRIFT'] as const
 
-const CHARGE_MODES: Option[] = [
-  { label: 'UPFRONT（期初一次性）', value: 'UPFRONT' },
-  { label: 'DEDUCT_FROM_PRINCIPAL（抵减本金）', value: 'DEDUCT_FROM_PRINCIPAL' },
-  { label: 'AMORTIZED（摊入租金）', value: 'AMORTIZED' },
-]
+/** 枚举选项标签走 i18n（保留 code、翻译描述后缀），随语言切换响应式更新。 */
+const dayCountOptions = computed(() =>
+  DAY_COUNT_VALUES.map((value) => ({ value, label: t(`enums.dayCount.${value}`) })),
+)
+const dateRollOptions = computed(() =>
+  DATE_ROLL_VALUES.map((value) => ({ value, label: t(`enums.dateRoll.${value}`) })),
+)
+const frequencyOptions = computed(() =>
+  FREQUENCY_VALUES.map((value) => ({ value, label: t(`enums.frequency.${value}`) })),
+)
+const timingOptions = computed(() =>
+  TIMING_VALUES.map((value) => ({ value, label: t(`enums.timing.${value}`) })),
+)
+const methodOptions = computed(() =>
+  METHOD_VALUES.map((value) => ({ value, label: t(`enums.method.${value}`) })),
+)
+const residualHandlingOptions = computed(() =>
+  RESIDUAL_HANDLING_VALUES.map((value) => ({ value, label: t(`enums.residualHandling.${value}`) })),
+)
+const rateChangePolicyOptions = computed(() =>
+  RATE_CHANGE_POLICY_VALUES.map((value) => ({ value, label: t(`enums.rateChangePolicy.${value}`) })),
+)
 
 interface FormState {
   principal: string
@@ -147,33 +155,19 @@ const form = reactive<FormState>({
 })
 
 // dayCountCode/dateRollCode/method/periods 是后端必填字段：表单始终持有默认值，
-// 规则仅作兜底（清空时以中文提示阻断提交）。
-const rules: Record<string, Rule[]> = {
-  principal: [{ required: true, message: '请输入租赁本金' }],
-  nominalRate: [{ required: true, message: '请输入名义年利率' }],
-  commenceDate: [{ required: true, message: '请选择起租日' }],
-  firstRentDate: [{ required: true, message: '请选择首期租金日' }],
-  periods: [{ required: true, message: '请输入期数' }],
-  frequency: [{ required: true, message: '请选择还款频率' }],
-  timing: [{ required: true, message: '请选择付款时点' }],
-  dayCountCode: [{ required: true, message: '请选择天数口径' }],
-  dateRollCode: [{ required: true, message: '请选择日期滚动规则' }],
-  method: [{ required: true, message: '请选择还款方式' }],
-}
-
-interface RuleRowDraft {
-  ruleId: string
-  priority?: number
-  fromPeriod?: number
-  toPeriod?: number
-  annualRate: string
-}
-
-interface FeeDraft {
-  type: string
-  amount: string
-  chargeMode: string
-}
+// 规则仅作兜底（清空时提示阻断提交）。校验文案随语言切换响应式更新。
+const rules = computed<Record<string, Rule[]>>(() => ({
+  principal: [{ required: true, message: t('form.validation.principal') }],
+  nominalRate: [{ required: true, message: t('form.validation.nominalRate') }],
+  commenceDate: [{ required: true, message: t('form.validation.commenceDate') }],
+  firstRentDate: [{ required: true, message: t('form.validation.firstRentDate') }],
+  periods: [{ required: true, message: t('form.validation.periods') }],
+  frequency: [{ required: true, message: t('form.validation.frequency') }],
+  timing: [{ required: true, message: t('form.validation.timing') }],
+  dayCountCode: [{ required: true, message: t('form.validation.dayCountCode') }],
+  dateRollCode: [{ required: true, message: t('form.validation.dateRollCode') }],
+  method: [{ required: true, message: t('form.validation.method') }],
+}))
 
 /** EXPLICIT_RENT 的逐期租金（长度始终与期数对齐）。 */
 const explicitRents = ref<string[]>([])
@@ -198,45 +192,6 @@ const result = ref<CalculationResult | null>(null)
 const submitError = ref<ApiError | null>(null)
 /** 提交前的本地校验提示（如显式租金未填满）。 */
 const localError = ref<string | null>(null)
-
-function addRuleRow(): void {
-  const id = nextRuleId(ruleRows.value.map((row) => row.ruleId))
-  ruleRows.value.push({
-    ruleId: id,
-    priority: (ruleRows.value.length + 1) * 10,
-    annualRate: '',
-  })
-}
-
-function removeRuleRow(index: number): void {
-  ruleRows.value.splice(index, 1)
-}
-
-
-/** 预设按钮文案由实际计算派生（Task 3 修正：不再硬编码 1-6/7-12）。 */
-const presetLabel = computed(() => {
-  const total = form.periods ?? 0
-  const half = Math.floor(total / 2)
-  return `分段费率预设（1-${half} 期 @3%，${half + 1}-${total} 期 @6%）`
-})
-
-/** 预设：1 ~ 半程 @3%、半程+1 ~ 期末 @6%（期数 12 时即黄金分段 1-6 / 7-12）。 */
-function presetSegmentedRates(): void {
-  const total = form.periods ?? 0
-  const half = Math.floor(total / 2)
-  ruleRows.value = [
-    { ruleId: 'R1', priority: 10, fromPeriod: 1, toPeriod: half, annualRate: '0.03' },
-    { ruleId: 'R2', priority: 20, fromPeriod: half + 1, toPeriod: total, annualRate: '0.06' },
-  ]
-}
-
-function addFee(): void {
-  fees.value.push({ type: '', amount: '', chargeMode: 'UPFRONT' })
-}
-
-function removeFee(index: number): void {
-  fees.value.splice(index, 1)
-}
 
 function mapRuleRows(): RuleRow[] {
   return ruleRows.value.map((row, index) => ({
@@ -309,7 +264,9 @@ function buildRequest(): CalculationRequest {
 /** AntD Form 的 @finish 仅在内置校验通过后触发（无效表单被阻断）。 */
 async function onFinish(): Promise<void> {
   if (form.method === 'EXPLICIT_RENT' && explicitRents.value.some((rent) => rent.trim() === '')) {
-    localError.value = `显式租金方式须填满全部 ${form.periods ?? 0} 期租金且每期大于 0`
+    localError.value = t('form.rentStructure.explicitRents.incomplete', {
+      periods: form.periods ?? 0,
+    })
     return
   }
 
@@ -332,7 +289,7 @@ async function onFinish(): Promise<void> {
   <!-- R84 整体布局：宽视口表单左（10）/结果右（14）双栏，窄视口纵向堆叠。 -->
   <Row :gutter="16" data-test="workbench-layout">
     <Col :xs="24" :lg="10">
-      <Card title="测算表单" data-test="calc-form-card">
+      <Card :title="t('form.cardTitle')" data-test="calc-form-card">
         <Form
           :model="form"
           :rules="rules"
@@ -341,20 +298,33 @@ async function onFinish(): Promise<void> {
           @finish="onFinish"
         >
           <!-- 大块 1：基础要素（基础字段 + 口径 + 还款方式）。 -->
-          <Card title="基础要素" size="small" data-test="card-basic" class="block-card">
+          <Card
+            :title="t('form.basic.title')"
+            size="small"
+            data-test="card-basic"
+            class="block-card"
+          >
             <Row :gutter="12">
               <Col :span="12">
-                <FormItem label="租赁本金" name="principal">
-                  <Input v-model:value="form.principal" data-test="principal" placeholder="如 1000000" />
+                <FormItem :label="t('form.basic.principal')" name="principal">
+                  <Input
+                    v-model:value="form.principal"
+                    data-test="principal"
+                    :placeholder="t('form.basic.principalPh')"
+                  />
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="名义年利率" name="nominalRate">
-                  <Input v-model:value="form.nominalRate" data-test="nominal-rate" placeholder="小数，如 0.06" />
+                <FormItem :label="t('form.basic.nominalRate')" name="nominalRate">
+                  <Input
+                    v-model:value="form.nominalRate"
+                    data-test="nominal-rate"
+                    :placeholder="t('form.basic.nominalRatePh')"
+                  />
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="起租日" name="commenceDate">
+                <FormItem :label="t('form.basic.commenceDate')" name="commenceDate">
                   <span data-test="commence-date" style="display: block">
                     <DatePicker
                       v-model:value="form.commenceDate"
@@ -365,7 +335,7 @@ async function onFinish(): Promise<void> {
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="首期租金日" name="firstRentDate">
+                <FormItem :label="t('form.basic.firstRentDate')" name="firstRentDate">
                   <span data-test="first-rent-date" style="display: block">
                     <DatePicker
                       v-model:value="form.firstRentDate"
@@ -376,7 +346,7 @@ async function onFinish(): Promise<void> {
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="期数" name="periods">
+                <FormItem :label="t('form.basic.periods')" name="periods">
                   <InputNumber
                     v-model:value="form.periods"
                     :min="1"
@@ -386,51 +356,61 @@ async function onFinish(): Promise<void> {
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="币种" name="currency">
-                  <Input v-model:value="form.currency" data-test="currency" placeholder="ISO-4217，如 CNY" />
+                <FormItem :label="t('form.basic.currency')" name="currency">
+                  <Input
+                    v-model:value="form.currency"
+                    data-test="currency"
+                    :placeholder="t('form.basic.currencyPh')"
+                  />
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="还款频率" name="frequency">
-                  <Select v-model:value="form.frequency" :options="FREQUENCIES" data-test="frequency" />
+                <FormItem :label="t('form.basic.frequency')" name="frequency">
+                  <Select
+                    v-model:value="form.frequency"
+                    :options="frequencyOptions"
+                    data-test="frequency"
+                  />
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="付款时点" name="timing">
-                  <Select v-model:value="form.timing" :options="TIMINGS" data-test="timing" />
+                <FormItem :label="t('form.basic.timing')" name="timing">
+                  <Select v-model:value="form.timing" :options="timingOptions" data-test="timing" />
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="天数口径" name="dayCountCode">
+                <FormItem :label="t('form.basic.dayCountCode')" name="dayCountCode">
                   <Select
                     v-model:value="form.dayCountCode"
-                    :options="DAY_COUNT_CODES"
+                    :options="dayCountOptions"
                     data-test="day-count-code"
                   />
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="日期滚动" name="dateRollCode">
+                <FormItem :label="t('form.basic.dateRollCode')" name="dateRollCode">
                   <Select
                     v-model:value="form.dateRollCode"
-                    :options="DATE_ROLL_CODES"
+                    :options="dateRollOptions"
                     data-test="date-roll-code"
                   />
                 </FormItem>
               </Col>
               <Col :span="24">
-                <FormItem label="利率变更策略" name="rateChangePolicy">
+                <FormItem :label="t('form.basic.rateChangePolicy')" name="rateChangePolicy">
                   <Select
                     v-model:value="form.rateChangePolicy"
-                    :options="RATE_CHANGE_POLICIES"
+                    :options="rateChangePolicyOptions"
                     data-test="rate-change-policy"
                   />
                 </FormItem>
               </Col>
               <Col :span="24">
-                <FormItem label="还款方式" name="method">
+                <FormItem :label="t('form.basic.method')" name="method">
                   <RadioGroup v-model:value="form.method" data-test="method-group">
-                    <Radio v-for="m in METHODS" :key="m.value" :value="m.value">{{ m.label }}</Radio>
+                    <Radio v-for="m in methodOptions" :key="m.value" :value="m.value">
+                      {{ m.label }}
+                    </Radio>
                   </RadioGroup>
                 </FormItem>
               </Col>
@@ -438,85 +418,31 @@ async function onFinish(): Promise<void> {
           </Card>
 
           <!-- 大块 2：租金结构（规则行 + 显式租金 + 宽限期，按方式联动显隐不变）。 -->
-          <Card title="租金结构" size="small" data-test="card-rent-structure" class="block-card">
-            <Card
-              type="inner"
-              title="规则行（可选：分段利率）"
-              size="small"
-              data-test="rule-rows-editor"
-            >
-              <Typography.Text type="secondary">
-                对全部方式开放：携带规则行即启用分段利率（RULE_DRIVEN 则为必填规则集）
-              </Typography.Text>
-              <div style="margin-top: 8px">
-                <div
-                  v-for="(row, idx) in ruleRows"
-                  :key="idx"
-                  style="display: flex; gap: 8px; margin-bottom: 8px"
-                  data-test="rule-row"
-                >
-                  <Input v-model:value="row.ruleId" placeholder="规则 ID" style="width: 90px" />
-                  <InputNumber
-                    v-model:value="row.priority"
-                    placeholder="优先级"
-                    style="width: 90px"
-                  />
-                  <InputNumber
-                    v-model:value="row.fromPeriod"
-                    :min="1"
-                    placeholder="起始期"
-                    style="width: 100px"
-                  />
-                  <InputNumber
-                    v-model:value="row.toPeriod"
-                    :min="1"
-                    placeholder="截止期"
-                    style="width: 100px"
-                  />
-                  <Input
-                    v-model:value="row.annualRate"
-                    placeholder="年利率（如 0.03）"
-                    style="width: 150px"
-                    data-test="rule-annual-rate"
-                  />
-                  <Button danger @click="removeRuleRow(idx)">删除</Button>
-                </div>
-              </div>
-              <Space>
-                <Button type="dashed" data-test="rule-add" @click="addRuleRow()">+ 添加规则行</Button>
-                <Button data-test="rule-preset" @click="presetSegmentedRates()">
-                  {{ presetLabel }}
-                </Button>
-              </Space>
-            </Card>
+          <Card
+            :title="t('form.rentStructure.title')"
+            size="small"
+            data-test="card-rent-structure"
+            class="block-card"
+          >
+            <!-- 规则行编辑器（子组件）：预设按钮依赖期数。 -->
+            <RuleRowsEditor v-model="ruleRows" :periods="form.periods ?? 0" />
 
-            <!-- EXPLICIT_RENT 联动：显式逐期租金编辑器（长度与期数对齐）。 -->
-            <div
+            <!-- EXPLICIT_RENT 联动：显式逐期租金编辑器（子组件，长度与期数对齐）。 -->
+            <RentsEditor
               v-if="form.method === 'EXPLICIT_RENT'"
-              data-test="rents-editor"
-              style="margin-top: 12px"
-            >
-              <Typography.Text type="secondary">
-                逐期租金（共 {{ form.periods ?? 0 }} 期，每期须大于 0）
-              </Typography.Text>
-              <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px">
-                <Input
-                  v-for="(_, idx) in explicitRents"
-                  :key="idx"
-                  v-model:value="explicitRents[idx]"
-                  :placeholder="`第 ${idx + 1} 期`"
-                  style="width: 120px"
-                  data-test="rent-input"
-                />
-              </div>
-            </div>
+              v-model="explicitRents"
+              :periods="form.periods ?? 0"
+            />
 
             <Typography.Text type="secondary" style="display: block; margin-top: 12px">
-              宽限期（可选）
+              {{ t('form.rentStructure.grace.title') }}
             </Typography.Text>
             <Row :gutter="12">
               <Col :span="12">
-                <FormItem label="只付息期数" name="interestOnlyPeriods">
+                <FormItem
+                  :label="t('form.rentStructure.grace.interestOnlyPeriods')"
+                  name="interestOnlyPeriods"
+                >
                   <InputNumber
                     v-model:value="form.interestOnlyPeriods"
                     :min="0"
@@ -526,7 +452,10 @@ async function onFinish(): Promise<void> {
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="全免期数" name="fullGracePeriods">
+                <FormItem
+                  :label="t('form.rentStructure.grace.fullGracePeriods')"
+                  name="fullGracePeriods"
+                >
                   <InputNumber
                     v-model:value="form.fullGracePeriods"
                     :min="0"
@@ -539,46 +468,42 @@ async function onFinish(): Promise<void> {
           </Card>
 
           <!-- 大块 3：费用与其他（费用编辑器 + 残值/保证金/税率）。 -->
-          <Card title="费用与其他" size="small" data-test="card-fees-other" class="block-card">
-            <Typography.Text type="secondary">费用（可选）</Typography.Text>
-            <div style="margin-top: 8px">
-              <div
-                v-for="(fee, idx) in fees"
-                :key="idx"
-                style="display: flex; gap: 8px; margin-bottom: 8px"
-                data-test="fee-row"
-              >
-                <Input v-model:value="fee.type" placeholder="费用类型" style="width: 160px" />
-                <Input v-model:value="fee.amount" placeholder="金额" style="width: 140px" />
-                <Select v-model:value="fee.chargeMode" :options="CHARGE_MODES" style="width: 220px" />
-                <Button danger @click="removeFee(idx)">删除</Button>
-              </div>
-            </div>
-            <Button type="dashed" data-test="fee-add" @click="addFee()">+ 添加费用</Button>
+          <Card
+            :title="t('form.feesOther.title')"
+            size="small"
+            data-test="card-fees-other"
+            class="block-card"
+          >
+            <!-- 费用编辑器（子组件）。 -->
+            <FeesEditor v-model="fees" />
 
             <Row :gutter="12" style="margin-top: 12px">
               <Col :span="12">
-                <FormItem label="残值金额" name="residualValue">
+                <FormItem :label="t('form.feesOther.residualValue')" name="residualValue">
                   <Input v-model:value="form.residualValue" data-test="residual-value" />
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="残值处理" name="residualHandling">
+                <FormItem :label="t('form.feesOther.residualHandling')" name="residualHandling">
                   <Select
                     v-model:value="form.residualHandling"
-                    :options="RESIDUAL_HANDLINGS"
+                    :options="residualHandlingOptions"
                     data-test="residual-handling"
                   />
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="保证金" name="deposit">
+                <FormItem :label="t('form.feesOther.deposit')" name="deposit">
                   <Input v-model:value="form.deposit" data-test="deposit" />
                 </FormItem>
               </Col>
               <Col :span="12">
-                <FormItem label="增值税率" name="vatRate">
-                  <Input v-model:value="form.vatRate" data-test="vat-rate" placeholder="小数，如 0.06" />
+                <FormItem :label="t('form.feesOther.vatRate')" name="vatRate">
+                  <Input
+                    v-model:value="form.vatRate"
+                    data-test="vat-rate"
+                    :placeholder="t('form.feesOther.vatRatePh')"
+                  />
                 </FormItem>
               </Col>
             </Row>
@@ -592,7 +517,7 @@ async function onFinish(): Promise<void> {
               size="large"
               data-test="submit-btn"
             >
-              {{ loading ? '测算中…' : '开始测算' }}
+              {{ loading ? t('form.submitting') : t('form.submit') }}
             </Button>
           </FormItem>
         </Form>
@@ -610,7 +535,7 @@ async function onFinish(): Promise<void> {
           v-if="submitError"
           type="error"
           show-icon
-          :message="`测算失败（${submitError.code}）`"
+          :message="t('form.submitFailed', { code: submitError.code })"
           :description="submitError.message"
           data-test="error-alert"
           style="margin-top: 12px"
