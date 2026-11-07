@@ -145,8 +145,25 @@ public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
             throw new BusinessException(DomainErrorCode.NEGATIVE_PRINCIPAL_DUE,
                     input.periodNo(), principal.toPlainString());
         }
+        requireSupportedAction(outcome, input);
         return new Allocation(principal, interestToPay(outcome, input), null, null,
                 outcome.matched() ? outcome.ruleId() : FALLBACK_MEMO);
+    }
+
+    /**
+     * Special-action guard (R65): v1 does not implement {@code FEE_AMORTIZE} or
+     * {@code DEPOSIT_OFFSET} (they need actionParam parsing, a deposit ledger and defined
+     * conservation interactions), and design §8.2.2 forbids silently ignoring a compiled
+     * action — so a row carrying one fails generation with the compiler's own
+     * {@code FCS-RULE-2005} code, naming the action and the period, mirroring the
+     * {@link #interestToPay} posture. {@code NONE} passes through.
+     */
+    private static void requireSupportedAction(RuleOutcome outcome, AllocationInput input) {
+        SpecialActionKind action = outcome.specialAction();
+        if (action != null && action != SpecialActionKind.NONE) {
+            throw new BusinessException(RuleErrorCode.UNSUPPORTED_SPECIAL_ACTION,
+                    "规则动作 " + action + " 暂不支持（第 " + input.periodNo() + " 期）");
+        }
     }
 
     /**

@@ -149,6 +149,21 @@ class RuleDrivenGeneratorTest {
         assertThat(ex.errorCode()).isEqualTo(RuleErrorCode.PRINCIPAL_PLAN_TOTAL);
     }
 
+    // ---- R65: special actions other than NONE fail generation loudly (design §8.2.2) ----
+
+    @Test
+    void fee_amortize_action_is_rejected_loudly() {
+        // V8 accepts FEE_AMORTIZE at compile time; the generator must not silently ignore it.
+        CompiledRuleSet set = compiler().compile(List.of(
+                builder("R1", 10, 1, 12).rate("0.06")
+                        .action(SpecialActionKind.FEE_AMORTIZE).build()),
+                element(12), false);
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> new RuleDrivenGenerator(set).generate(context(baseElement())));
+        assertThat(ex.errorCode().code()).isEqualTo("FCS-RULE-2005");
+        assertThat(ex.getMessage()).contains("FEE_AMORTIZE");
+    }
+
     // ---- Identity ----
 
     @Test
@@ -259,6 +274,11 @@ class RuleDrivenGeneratorTest {
 
         RuleRowBuilder treatment(InterestTreatmentKind treatment) {
             this.treatment = treatment;
+            return this;
+        }
+
+        RuleRowBuilder action(SpecialActionKind action) {
+            this.action = action;
             return this;
         }
 
