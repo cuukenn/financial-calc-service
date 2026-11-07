@@ -29,9 +29,10 @@ import com.fincalc.common.error.ErrorCode;
  * row-range check. Task 26 (the rule compiler) raises its V1–V8 checks: V1/V3 reuse
  * {@link #INVALID_ROW_RANGE}, and the remaining checks each carry their own constant below.
  * Tasks 25/26 add their own codes at their own raise sites. Task 27 (external function scripts)
- * adds {@code FCS-RULE-3010}/{@code FCS-RULE-3011} at the loader's override and recursion checks;
- * script-line syntax errors and the post-inlining depth cap reuse {@link #EXPRESSION_SYNTAX_ERROR}
- * (3004), and unknown/mis-arity references inside a script body reuse {@link #UNKNOWN_FUNCTION}.
+ * adds {@code FCS-RULE-3010}/{@code FCS-RULE-3011} at the loader's override and recursion checks
+ * and {@code FCS-RULE-3012} at the inliner's node budget; script-line syntax errors and the
+ * post-inlining depth cap reuse {@link #EXPRESSION_SYNTAX_ERROR} (3004), and unknown/mis-arity
+ * references inside a script body reuse {@link #UNKNOWN_FUNCTION}.
  */
 public enum RuleErrorCode implements ErrorCode {
 
@@ -109,7 +110,18 @@ public enum RuleErrorCode implements ErrorCode {
      * direct or indirect cycle; the message names the recursive call chain and the definition
      * location ({@code 文件 行}).
      */
-    SCRIPT_RECURSION("FCS-RULE-3011", "FCS-RULE-3011: 函数定义禁止递归: %s");
+    SCRIPT_RECURSION("FCS-RULE-3011", "FCS-RULE-3011: 函数定义禁止递归: %s"),
+
+    /**
+     * Script inlining check (Task 27, review round 1 / R63): the total number of AST nodes
+     * produced while inlining one {@code withDefinitions} run exceeded the per-run node budget
+     * of 100,000 (see {@code ScriptInliner.MAX_EXPANSION_NODES}). Memoized expansion still
+     * re-expands a callee's body at every call site, so a chained-doubler definition graph grows
+     * exponentially; the budget turns that load-time hang/OOM surface into a coded failure
+     * attributed to the definition being expanded. Legitimate business scripts stay orders of
+     * magnitude below the cap.
+     */
+    SCRIPT_NODE_BUDGET_EXCEEDED("FCS-RULE-3012", "FCS-RULE-3012: 脚本展开超出节点预算: %s");
 
     private final String code;
     private final String message;

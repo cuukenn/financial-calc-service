@@ -32,7 +32,10 @@ import java.util.Set;
  * {@link #inline} first DFS-checks the call graph ({@code FCS-RULE-3011} on any direct or
  * indirect cycle), then memoized-expands every definition, substituting formal parameters by
  * their argument subtrees, and re-checks the §8.6 depth cap of 64 <em>after</em> expansion
- * (R58) on the expanded AST.
+ * (R58) on the expanded AST. A per-run node budget ({@value #MAX_EXPANSION_NODES} nodes,
+ * R63) bounds the total expansion: because each call site re-expands the callee's body, a
+ * pathological chained-doubler graph would otherwise grow exponentially and hang/OOM the
+ * load; the budget aborts it with {@code FCS-RULE-3012}.
  *
  * <p>Substitution is lexical: argument subtrees are expanded under the caller's parameter
  * environment first, then bound to the callee's formal names, so shadowing across composition
@@ -43,6 +46,20 @@ public final class ScriptInliner {
 
     /** §8.6's 单表达式深度 ≤ 64, re-checked on the inlined AST (R58). */
     static final int MAX_DEPTH = 64;
+
+    /**
+     * R63: total node budget of one {@code withDefinitions} expansion run. Memoization caches
+     * each definition's expanded body, but every call site still re-expands the callee's body
+     * under its own environment, so a chained-doubler graph ({@code Fn(X) = Fn+1(X) + Fn+1(X)})
+     * grows exponentially and the depth cap bounds runtime recursion, not AST <em>size</em>.
+     * The expansion therefore spends one unit per produced node — the counter lives outside the
+     * per-definition memoization, so total expansion work is genuinely bounded — and aborts at
+     * this ceiling with {@code FCS-RULE-3012}, attributed to the definition being expanded.
+     * 100,000 is generous: §8.6's caps (≤ 500 definitions per file, single-expression depth
+     * ≤ 64) keep legitimate business scripts orders of magnitude below it, while the cap turns
+     * the load-time hang/OOM surface into a coded, attributed failure.
+     */
+    static final int MAX_EXPANSION_NODES = 100_000;
 
     private ScriptInliner() {
     }
@@ -77,16 +94,21 @@ public final class ScriptInliner {
      * @param definitions the definitions keyed by upper-cased name
      * @param bodies      the parsed bodies from {@link #compileBodies}
      * @return the fully expanded ASTs keyed by upper-cased name
-     * @throws BusinessException with {@code FCS-RULE-3011} on a recursive definition chain, or
+     * @throws BusinessException with {@code FCS-RULE-3011} on a recursive definition chain,
      *                           {@code FCS-RULE-3004} when an expanded AST exceeds
-     *                           {@value #MAX_DEPTH} nesting levels
+     *                           {@value #MAX_DEPTH} nesting levels, or {@code FCS-RULE-3012}
+     *                           when the total expansion exceeds {@value #MAX_EXPANSION_NODES}
+     *                           nodes (R63)
      */
     public static Map<String, AstNode> inline(Map<String, FunctionDefinition> definitions,
             Map<String, AstNode> bodies) {
         checkAcyclic(definitions, bodies);
         Map<String, AstNode> inlined = new LinkedHashMap<>();
+        Budget budget = new Budget();
         for (FunctionDefinition definition : definitions.values()) {
-            AstNode expanded = expandDefinition(definition.name(), definitions, bodies, inlined);
+            budget.begin(definition);
+            AstNode expanded = expandDefinition(definition.name(), definitions, bodies, inlined,
+                    budget);
             int depth = depth(expanded);
             if (depth > MAX_DEPTH) {
                 throw new BusinessException(RuleErrorCode.EXPRESSION_SYNTAX_ERROR,
@@ -184,12 +206,12 @@ public final class ScriptInliner {
     /** Expands one definition (memoized); the graph is known acyclic, so this terminates. */
     private static AstNode expandDefinition(String name,
             Map<String, FunctionDefinition> definitions, Map<String, AstNode> bodies,
-            Map<String, AstNode> memo) {
+            Map<String, AstNode> memo, Budget budget) {
         AstNode done = memo.get(name);
         if (done != null) {
             return done;
         }
-        AstNode expanded = expand(bodies.get(name), definitions, bodies, memo, Map.of());
+        AstNode expanded = expand(bodies.get(name), definitions, bodies, memo, Map.of(), budget);
         memo.put(name, expanded);
         return expanded;
     }
@@ -200,7 +222,9 @@ public final class ScriptInliner {
      * arguments bound to the formal names. Built-in calls are rebuilt with expanded arguments.
      */
     private static AstNode expand(AstNode node, Map<String, FunctionDefinition> definitions,
-            Map<String, AstNode> bodies, Map<String, AstNode> memo, Map<String, AstNode> env) {
+            Map<String, AstNode> bodies, Map<String, AstNode> memo, Map<String, AstNode> env,
+            Budget budget) {
+        budget.spend();
         if (node instanceof AstNode.VarNode) {
             AstNode substituted = env.get(((AstNode.VarNode) node).name());
             return substituted != null ? substituted : node;
@@ -211,18 +235,18 @@ public final class ScriptInliner {
         if (node instanceof AstNode.UnaryNode) {
             AstNode.UnaryNode unary = (AstNode.UnaryNode) node;
             return new AstNode.UnaryNode(unary.op(),
-                    expand(unary.operand(), definitions, bodies, memo, env));
+                    expand(unary.operand(), definitions, bodies, memo, env, budget));
         }
         if (node instanceof AstNode.BinaryNode) {
             AstNode.BinaryNode binary = (AstNode.BinaryNode) node;
             return new AstNode.BinaryNode(binary.op(),
-                    expand(binary.left(), definitions, bodies, memo, env),
-                    expand(binary.right(), definitions, bodies, memo, env));
+                    expand(binary.left(), definitions, bodies, memo, env, budget),
+                    expand(binary.right(), definitions, bodies, memo, env, budget));
         }
         AstNode.CallNode call = (AstNode.CallNode) node;
         List<AstNode> expandedArgs = new ArrayList<>(call.args().size());
         for (AstNode arg : call.args()) {
-            expandedArgs.add(expand(arg, definitions, bodies, memo, env));
+            expandedArgs.add(expand(arg, definitions, bodies, memo, env, budget));
         }
         FunctionDefinition callee = definitions.get(call.code());
         if (callee == null) {
@@ -234,12 +258,12 @@ public final class ScriptInliner {
                     call.code() + " 恰好需要 " + callee.parameters().size()
                             + " 个参数, 实际 " + expandedArgs.size());
         }
-        AstNode calleeBody = expandDefinition(callee.name(), definitions, bodies, memo);
+        AstNode calleeBody = expandDefinition(callee.name(), definitions, bodies, memo, budget);
         Map<String, AstNode> bound = new LinkedHashMap<>();
         for (int i = 0; i < callee.parameters().size(); i++) {
             bound.put(callee.parameters().get(i), expandedArgs.get(i));
         }
-        return expand(calleeBody, definitions, bodies, memo, bound);
+        return expand(calleeBody, definitions, bodies, memo, bound, budget);
     }
 
     // ---- recursion check (FCS-RULE-3011) ----
@@ -314,6 +338,35 @@ public final class ScriptInliner {
     }
 
     // ---- helpers ----
+
+    /**
+     * Per-run expansion budget (R63): counts every AST node the expansion produces — across
+     * and outside the per-definition memoization — so total expansion work is bounded even
+     * though a callee's body is re-expanded at each call site. Attribution points at the
+     * top-level definition whose expansion is in progress (set by {@link #inline} per
+     * definition), since a budget breach during its expansion is the observable failure.
+     */
+    private static final class Budget {
+
+        private int used;
+        private String sourceName;
+        private int line;
+
+        /** Points node attribution at the definition whose expansion is starting. */
+        void begin(FunctionDefinition definition) {
+            this.sourceName = definition.sourceName();
+            this.line = definition.line();
+        }
+
+        /** Spends one node; the {@value ScriptInliner#MAX_EXPANSION_NODES}th + 1 raises {@code FCS-RULE-3012}. */
+        void spend() {
+            if (++used > MAX_EXPANSION_NODES) {
+                throw new BusinessException(RuleErrorCode.SCRIPT_NODE_BUDGET_EXCEEDED,
+                        "定义 " + sourceName + " 第 " + line + " 行展开超过 " + MAX_EXPANSION_NODES
+                                + " 个节点");
+            }
+        }
+    }
 
     /** Re-raises a body parse failure with the definition's {@code 文件:行号} prepended. */
     private static BusinessException withLocation(FunctionDefinition definition,

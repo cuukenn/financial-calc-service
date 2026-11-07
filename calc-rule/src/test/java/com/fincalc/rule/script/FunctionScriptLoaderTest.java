@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -108,6 +109,31 @@ class FunctionScriptLoaderTest {
         FunctionRegistry a = load("VERSION 1\nDEFINE F(X) = X + 1\n");
         FunctionRegistry b = load("VERSION 1\nDEFINE F(X) = X + 2\n");
         assertThat(a.hash()).isNotEqualTo(b.hash());
+    }
+
+    // ---- Expansion node budget (R63) ----
+
+    @Test
+    void rejects_exponential_expansion_with_node_budget() {
+        // 40 chained-doubler definitions: F39(X) = X, Fn(X) = Fn+1(X) + Fn+1(X). Full expansion
+        // of F0 would materialize > 2^40 nodes — far beyond any heap — so the load must abort
+        // with FCS-RULE-3012 and must do so FAST: if the budget is not enforced, this test
+        // hangs/OOMs instead of failing.
+        StringBuilder script = new StringBuilder("VERSION 1\n");
+        int chain = 40;
+        for (int i = 0; i < chain; i++) {
+            script.append("DEFINE F").append(i).append("(X) = ");
+            if (i == chain - 1) {
+                script.append("X\n");
+            } else {
+                script.append("F").append(i + 1).append("(X) + F").append(i + 1).append("(X)\n");
+            }
+        }
+        long start = System.nanoTime();
+        assertThatThrownBy(() -> load(script.toString()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-RULE-3012");
+        assertThat(System.nanoTime() - start).isLessThan(TimeUnit.SECONDS.toNanos(10));
     }
 
     // ---- Classpath loading (Task 29 startup wiring) ----
