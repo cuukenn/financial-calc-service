@@ -3,7 +3,8 @@
  * en-US.ts 以 `typeof zhCN` 做编译期键位对齐（两目录结构必须完全一致）。
  *
  * 约定：
- * - 枚举选项标签保留后端 code，仅翻译描述后缀（如 MONTHLY（月））。
+ * - 表单要素名称对齐设计文档 §4 统一语言与行业标准术语（R91：计息基准/日期调整等）。
+ * - 枚举选项标签主文本为本地化名称，内部 code 不入标签（R89）。
  * - 后端 FCS 消息（错误体 message、算法 description）原样透出，不入本目录。
  * - vue-i18n 消息中的字面 `@` 需写作 {'@'}（链接消息保留字）。
  */
@@ -21,20 +22,21 @@ const zhCN = {
   form: {
     cardTitle: '测算表单',
     basic: {
-      title: '基础要素',
+      // R91：要素名对齐 §4 统一语言（租赁要素/计息基准）与行业惯例（支付频率等）。
+      title: '租赁要素',
       principal: '租赁本金',
       principalPh: '如 1000000',
       nominalRate: '名义年利率',
       nominalRatePh: '小数，如 0.06',
       commenceDate: '起租日',
-      firstRentDate: '首期租金日',
+      firstRentDate: '首期租金支付日',
       periods: '期数',
       currency: '币种',
       currencyPh: 'ISO-4217，如 CNY',
-      frequency: '还款频率',
-      timing: '付款时点',
-      dayCountCode: '天数口径',
-      dateRollCode: '日期滚动',
+      frequency: '支付频率',
+      timing: '支付时点',
+      dayCountCode: '计息基准',
+      dateRollCode: '日期调整',
       rateChangePolicy: '利率变更策略',
       method: '还款方式',
     },
@@ -72,7 +74,8 @@ const zhCN = {
         remove: '删除',
         add: '+ 添加费用',
       },
-      residualValue: '残值金额',
+      // R91：§9.6 语义 —— SEPARATE 下该金额即留购价，BALLOON_IN_RENT 下为气球残值。
+      residualValue: '残值 / 留购价',
       residualHandling: '残值处理',
       deposit: '保证金',
       vatRate: '增值税率',
@@ -85,18 +88,18 @@ const zhCN = {
       principal: '请输入租赁本金',
       nominalRate: '请输入名义年利率',
       commenceDate: '请选择起租日',
-      firstRentDate: '请选择首期租金日',
+      firstRentDate: '请选择首期租金支付日',
       periods: '请输入期数',
-      frequency: '请选择还款频率',
-      timing: '请选择付款时点',
-      dayCountCode: '请选择天数口径',
-      dateRollCode: '请选择日期滚动规则',
+      frequency: '请选择支付频率',
+      timing: '请选择支付时点',
+      dayCountCode: '请选择计息基准',
+      dateRollCode: '请选择日期调整规则',
       method: '请选择还款方式',
     },
   },
   enums: {
     // R89：下拉主文本一律为本地化名称（纯中文）；内部 code 不再出现在标签中
-    // （天数口径例外：行业标准斜杠记法为主文本，code 仅作下拉项次要小字）。
+    // （计息基准例外：行业标准斜杠记法为主文本，code 仅作下拉项次要小字）。
     frequency: {
       MONTHLY: '月',
       QUARTERLY: '季',
@@ -116,17 +119,18 @@ const zhCN = {
       ACT_365_25: 'ACT/365.25（实际/365.25）',
       ACT_ACT: 'ACT/ACT（实际/实际）',
     },
+    // R91：日期调整选项用行业惯例动词（顺延/提前），NONE 对齐「日期调整」字段名。
     dateRoll: {
-      NONE: '不滚动',
-      FOLLOWING: '向后',
-      MODIFIED_FOLLOWING: '修正向后',
-      PRECEDING: '向前',
-      MODIFIED_PRECEDING: '修正向前',
-      END_OF_MONTH: '对齐月末',
+      NONE: '不调整',
+      FOLLOWING: '顺延',
+      MODIFIED_FOLLOWING: '修正顺延',
+      PRECEDING: '提前',
+      MODIFIED_PRECEDING: '修正提前',
+      END_OF_MONTH: '月末对齐',
     },
     residualHandling: {
-      SEPARATE: '期末单独回收',
-      BALLOON_IN_RENT: '摊入租金',
+      SEPARATE: '期末单独支付（留购价）',
+      BALLOON_IN_RENT: '摊入租金（气球本金）',
     },
     rateChangePolicy: {
       RESOLVE: '自变更日重算',

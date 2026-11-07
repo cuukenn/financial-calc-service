@@ -107,7 +107,15 @@ describe('CalculationForm', () => {
     const dayCountText = wrapper.find('[data-test="day-count-code"]').text()
     expect(dayCountText).toContain('30/360')
     expect(dayCountText).not.toContain('THIRTY_360')
-    expect(wrapper.find('[data-test="date-roll-code"]').text()).toContain('不滚动')
+    expect(wrapper.find('[data-test="date-roll-code"]').text()).toContain('不调整')
+
+    // R91：要素名对齐 §4 统一语言与行业术语（旧自造名不再出现）。
+    expect(wrapper.text()).toContain('计息基准')
+    expect(wrapper.text()).toContain('日期调整')
+    expect(wrapper.text()).toContain('支付频率')
+    expect(wrapper.text()).toContain('残值 / 留购价')
+    expect(wrapper.text()).not.toContain('天数口径')
+    expect(wrapper.text()).not.toContain('还款频率')
     const methodRadio = wrapper.find('input[value="EQUAL_INSTALLMENT"]')
     expect((methodRadio.element as HTMLInputElement).checked).toBe(true)
   })
@@ -145,7 +153,7 @@ describe('CalculationForm', () => {
     expect(wrapper.find('[data-test="timing"]').text()).not.toContain('IN_ARREARS')
     expect(wrapper.find('[data-test="rate-change-policy"]').text()).toContain('自变更日重算')
     expect(wrapper.find('[data-test="rate-change-policy"]').text()).not.toContain('RESOLVE')
-    expect(wrapper.find('[data-test="residual-handling"]').text()).toContain('期末单独回收')
+    expect(wrapper.find('[data-test="residual-handling"]').text()).toContain('期末单独支付')
     expect(wrapper.find('[data-test="residual-handling"]').text()).not.toContain('SEPARATE')
   })
 
@@ -158,6 +166,13 @@ describe('CalculationForm', () => {
     const dayCountText = wrapper.find('[data-test="day-count-code"]').text()
     expect(dayCountText).toContain('30/360')
     expect(dayCountText).not.toContain('THIRTY_360')
+
+    // R91：英文名对齐 §4 术语与行业惯例。
+    expect(wrapper.text()).toContain('Day count convention')
+    expect(wrapper.text()).toContain('Business day convention')
+    expect(wrapper.text()).toContain('Commencement date')
+    expect(wrapper.text()).toContain('First rent payment date')
+    expect(wrapper.text()).toContain('Residual value / Purchase price')
   })
 
   it('submits a correctly-shaped CalculationRequest on golden defaults', async () => {
@@ -225,11 +240,11 @@ describe('CalculationForm', () => {
 
     // 三个大块卡片均存在。
     const titles = wrapper.findAll('.ant-card-head-title').map((t) => t.text())
-    expect(titles).toContain('基础要素')
+    expect(titles).toContain('租赁要素')
     expect(titles).toContain('租金结构')
     expect(titles).toContain('费用与其他')
 
-    // 基础要素：基础字段 + 口径 + 方式 radio。
+    // 租赁要素：基础字段 + 口径 + 方式 radio。
     const basic = wrapper.find('[data-test="card-basic"]')
     expect(basic.find('[data-test="principal"]').exists()).toBe(true)
     expect(basic.find('[data-test="day-count-code"]').exists()).toBe(true)

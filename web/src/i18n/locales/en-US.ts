@@ -1,6 +1,6 @@
 /**
  * en-US 文案（R85）。类型标注 `typeof zhCN` 强制两语言键位完全一致（编译期对齐）。
- * 枚举选项标签同样保留后端 code，仅翻译描述后缀。
+ * R91: element names follow the design doc §4 unified language and industry usage.
  */
 import type zhCN from './zh-CN'
 
@@ -23,15 +23,15 @@ const enUS: typeof zhCN = {
       principalPh: 'e.g. 1000000',
       nominalRate: 'Nominal annual rate',
       nominalRatePh: 'decimal, e.g. 0.06',
-      commenceDate: 'Commence date',
-      firstRentDate: 'First rent date',
+      commenceDate: 'Commencement date',
+      firstRentDate: 'First rent payment date',
       periods: 'Periods',
       currency: 'Currency',
       currencyPh: 'ISO-4217, e.g. CNY',
       frequency: 'Payment frequency',
       timing: 'Payment timing',
-      dayCountCode: 'Day count',
-      dateRollCode: 'Date roll',
+      dayCountCode: 'Day count convention',
+      dateRollCode: 'Business day convention',
       rateChangePolicy: 'Rate change policy',
       method: 'Repayment method',
     },
@@ -71,7 +71,9 @@ const enUS: typeof zhCN = {
         remove: 'Remove',
         add: '+ Add fee',
       },
-      residualValue: 'Residual value',
+      // R91: §9.6 semantics — the amount is the purchase-option price under
+      // SEPARATE and the balloon residual under BALLOON_IN_RENT.
+      residualValue: 'Residual value / Purchase price',
       residualHandling: 'Residual handling',
       deposit: 'Deposit',
       vatRate: 'VAT rate',
@@ -83,13 +85,13 @@ const enUS: typeof zhCN = {
     validation: {
       principal: 'Please enter the lease principal',
       nominalRate: 'Please enter the nominal annual rate',
-      commenceDate: 'Please select the commence date',
-      firstRentDate: 'Please select the first rent date',
+      commenceDate: 'Please select the commencement date',
+      firstRentDate: 'Please select the first rent payment date',
       periods: 'Please enter the number of periods',
       frequency: 'Please select the payment frequency',
       timing: 'Please select the payment timing',
       dayCountCode: 'Please select the day count convention',
-      dateRollCode: 'Please select the date roll convention',
+      dateRollCode: 'Please select the business day convention',
       method: 'Please select the repayment method',
     },
   },
@@ -117,7 +119,7 @@ const enUS: typeof zhCN = {
       ACT_ACT: 'ACT/ACT',
     },
     dateRoll: {
-      NONE: 'No roll',
+      NONE: 'No adjustment',
       FOLLOWING: 'Following',
       MODIFIED_FOLLOWING: 'Modified following',
       PRECEDING: 'Preceding',
@@ -125,8 +127,8 @@ const enUS: typeof zhCN = {
       END_OF_MONTH: 'End of month',
     },
     residualHandling: {
-      SEPARATE: 'Paid separately at end',
-      BALLOON_IN_RENT: 'Amortized into rent',
+      SEPARATE: 'Paid separately at end (purchase price)',
+      BALLOON_IN_RENT: 'Amortized into rent (balloon)',
     },
     rateChangePolicy: {
       RESOLVE: 'Re-solve from change date',

@@ -39,7 +39,7 @@ import { nextRuleId } from './ruleIds'
 
 const { t } = useI18n()
 
-/** 天数口径：六个已注册的 DayCountConvention code（calc-domain/support/daycount）。 */
+/** 计息基准（Day Count Convention）：六个已注册的 DayCountConvention code（calc-domain/support/daycount）。 */
 const DAY_COUNT_VALUES = [
   'THIRTY_360',
   'THIRTY_E_360',
@@ -49,7 +49,7 @@ const DAY_COUNT_VALUES = [
   'ACT_ACT',
 ] as const
 
-/** 日期滚动：六个已注册的 DateRollConvention code（calc-domain/support/dateroll）。 */
+/** 日期调整（Business Day Convention）：六个已注册的 DateRollConvention code（calc-domain/support/dateroll）。 */
 const DATE_ROLL_VALUES = [
   'NONE',
   'FOLLOWING',
@@ -86,7 +86,7 @@ const RATE_CHANGE_POLICY_VALUES = ['RESOLVE', 'FIXED_RENT', 'DRIFT'] as const
 
 /**
  * R89：枚举选项标签走 i18n（主文本为本地化名称，内部 code 不再出现在标签中），
- * 随语言切换响应式更新。天数口径为行业标准斜杠记法（ACT/360 等），
+ * 随语言切换响应式更新。计息基准为行业标准斜杠记法（ACT/360 等），
  * code 作为次要小字仅出现在下拉项内（触发器只显示主文本，对账用）。
  */
 const dayCountOptions = computed(() =>
@@ -301,7 +301,7 @@ async function onFinish(): Promise<void> {
           class="compact-form"
           @finish="onFinish"
         >
-          <!-- 大块 1：基础要素（基础字段 + 口径 + 还款方式）。 -->
+          <!-- 大块 1：租赁要素（基础字段 + 口径 + 还款方式）。 -->
           <Card
             :title="t('form.basic.title')"
             size="small"
@@ -600,7 +600,7 @@ async function onFinish(): Promise<void> {
   padding-bottom: 4px;
 }
 
-/* R89：天数口径下拉项内的原码次要小字（仅下拉项内，触发器不显示）。 */
+/* R89：计息基准下拉项内的原码次要小字（仅下拉项内，触发器不显示）。 */
 .day-count-option-code {
   margin-left: 8px;
   font-size: 12px;
