@@ -40,6 +40,79 @@ class LeaseElementTest {
         assertThat(PaymentFrequency.MONTHLY.monthsPerPeriod()).isEqualTo(1);
     }
 
+    @Test
+    void explicit_rent_requires_rents() {
+        assertThatThrownBy(() -> baseBuilder().method(RepaymentMethodId.EXPLICIT_RENT).build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1008");
+    }
+
+    @Test
+    void explicit_rent_rejects_wrong_rent_count() {
+        assertThatThrownBy(() -> baseBuilder()
+                .method(RepaymentMethodId.EXPLICIT_RENT)
+                .explicitRents(twelveRents().subList(0, 11))
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1008");
+    }
+
+    @Test
+    void explicit_rent_irregular_rejects_wrong_rent_count() {
+        assertThatThrownBy(() -> baseBuilder()
+                .method(RepaymentMethodId.EXPLICIT_RENT)
+                .frequency(PaymentFrequency.IRREGULAR)
+                .explicitPeriods(java.util.Arrays.asList(
+                        PeriodDate.builder().startDate(LocalDate.of(2024, 1, 1))
+                                .endDate(LocalDate.of(2024, 2, 1)).build(),
+                        PeriodDate.builder().startDate(LocalDate.of(2024, 2, 1))
+                                .endDate(LocalDate.of(2024, 3, 1)).build()))
+                .explicitRents(twelveRents())
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1008");
+    }
+
+    @Test
+    void explicit_rent_rejects_non_positive_rent() {
+        java.util.List<BigDecimal> rents = twelveRents();
+        rents.set(3, BigDecimal.ZERO);
+        assertThatThrownBy(() -> baseBuilder()
+                .method(RepaymentMethodId.EXPLICIT_RENT)
+                .explicitRents(rents)
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1009");
+    }
+
+    @Test
+    void non_explicit_method_rejects_explicit_rents() {
+        assertThatThrownBy(() -> baseBuilder().explicitRents(twelveRents()).build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1008");
+    }
+
+    @Test
+    void explicit_rent_happy_path_builds_unmodifiable_rents() {
+        LeaseElement element = baseBuilder()
+                .method(RepaymentMethodId.EXPLICIT_RENT)
+                .explicitRents(twelveRents())
+                .build();
+        assertThat(element.explicitRents()).hasSize(12);
+        assertThat(element.explicitRents())
+                .isUnmodifiable()
+                .containsExactlyElementsOf(twelveRents());
+        assertThat(element.toBuilder().build().explicitRents()).hasSize(12);
+    }
+
+    private static java.util.List<BigDecimal> twelveRents() {
+        java.util.List<BigDecimal> rents = new java.util.ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            rents.add(new BigDecimal("90000"));
+        }
+        return rents;
+    }
+
     private LeaseElement.Builder baseBuilder() {
         return LeaseElement.builder()
                 .principal(new BigDecimal("1000000"))

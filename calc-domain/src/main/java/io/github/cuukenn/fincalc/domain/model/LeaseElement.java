@@ -36,6 +36,7 @@ public final class LeaseElement {
     private final ResidualHandling residualHandling;
     private final BigDecimal deposit;
     private final List<FeeItem> fees;
+    private final List<BigDecimal> explicitRents;
     private final BigDecimal vatRate;
     private final RepaymentMethodId method;
     private final GracePeriod gracePeriod;
@@ -58,6 +59,7 @@ public final class LeaseElement {
         this.residualHandling = builder.residualHandling;
         this.deposit = builder.deposit;
         this.fees = Collections.unmodifiableList(new ArrayList<>(builder.fees));
+        this.explicitRents = Collections.unmodifiableList(new ArrayList<>(builder.explicitRents));
         this.vatRate = builder.vatRate;
         this.method = builder.method;
         this.gracePeriod = builder.gracePeriod;
@@ -98,6 +100,7 @@ public final class LeaseElement {
         if (residualHandling == ResidualHandling.BALLOON_IN_RENT) {
             validateBalloonResidual();
         }
+        validateExplicitRents();
         requireField(frequency, "frequency");
         requireField(timing, "timing");
         requireField(dayCountCode, "dayCountCode");
@@ -129,6 +132,29 @@ public final class LeaseElement {
                 || residualValue.compareTo(MoneyUtils.ZERO) < 0
                 || residualValue.compareTo(principal) >= 0) {
             throw new BusinessException(DomainErrorCode.BALLOON_RESIDUAL_OUT_OF_RANGE, residualValue);
+        }
+    }
+
+    /**
+     * {@link RepaymentMethodId#EXPLICIT_RENT} requires one strictly positive rent per period; any
+     * other method must not carry explicit rents (fail loud instead of silently ignoring them).
+     */
+    private void validateExplicitRents() {
+        if (method == RepaymentMethodId.EXPLICIT_RENT) {
+            int expected = frequency == PaymentFrequency.IRREGULAR
+                    ? explicitPeriods.size()
+                    : periods;
+            if (explicitRents.isEmpty() || explicitRents.size() != expected) {
+                throw new BusinessException(DomainErrorCode.EXPLICIT_RENTS_INVALID, explicitRents.size());
+            }
+            for (BigDecimal rent : explicitRents) {
+                if (rent == null || rent.compareTo(MoneyUtils.ZERO) <= 0) {
+                    throw new BusinessException(DomainErrorCode.EXPLICIT_RENTS_MUST_BE_POSITIVE, rent);
+                }
+            }
+        } else if (!explicitRents.isEmpty()) {
+            throw new BusinessException(DomainErrorCode.EXPLICIT_RENTS_INVALID,
+                    "非显式租金方式不得携带 explicitRents");
         }
     }
 
@@ -228,6 +254,14 @@ public final class LeaseElement {
         return fees;
     }
 
+    /**
+     * Explicit per-period rents, used only when the method is
+     * {@link RepaymentMethodId#EXPLICIT_RENT}; unmodifiable, empty when unused.
+     */
+    public List<BigDecimal> explicitRents() {
+        return explicitRents;
+    }
+
     /** VAT rate; {@code null} means prices include tax. */
     public BigDecimal vatRate() {
         return vatRate;
@@ -271,6 +305,7 @@ public final class LeaseElement {
         private ResidualHandling residualHandling;
         private BigDecimal deposit;
         private List<FeeItem> fees = Collections.emptyList();
+        private List<BigDecimal> explicitRents = Collections.emptyList();
         private BigDecimal vatRate;
         private RepaymentMethodId method;
         private GracePeriod gracePeriod;
@@ -296,6 +331,7 @@ public final class LeaseElement {
             this.residualHandling = source.residualHandling;
             this.deposit = source.deposit;
             this.fees = source.fees;
+            this.explicitRents = source.explicitRents;
             this.vatRate = source.vatRate;
             this.method = source.method;
             this.gracePeriod = source.gracePeriod;
@@ -377,6 +413,16 @@ public final class LeaseElement {
         /** A {@code null} list is treated as empty. */
         public Builder fees(List<FeeItem> fees) {
             this.fees = fees == null ? Collections.emptyList() : fees;
+            return this;
+        }
+
+        /**
+         * Explicit per-period rents for {@link RepaymentMethodId#EXPLICIT_RENT}; a {@code null}
+         * list is treated as empty. Rejected at build time when the method is not
+         * {@code EXPLICIT_RENT}.
+         */
+        public Builder explicitRents(List<BigDecimal> explicitRents) {
+            this.explicitRents = explicitRents == null ? Collections.emptyList() : explicitRents;
             return this;
         }
 

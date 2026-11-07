@@ -25,6 +25,12 @@ public enum DomainErrorCode implements ErrorCode {
     BALLOON_RESIDUAL_OUT_OF_RANGE("FCS-DOM-1007",
             "FCS-DOM-1007: BALLOON_IN_RENT 模式下残值必须满足 0 <= 残值 < 本金: %s"),
 
+    EXPLICIT_RENTS_INVALID("FCS-DOM-1008",
+            "FCS-DOM-1008: 显式租金为空或长度与期数不符: %s"),
+
+    EXPLICIT_RENTS_MUST_BE_POSITIVE("FCS-DOM-1009",
+            "FCS-DOM-1009: 显式租金必须为正: %s"),
+
     PERIOD_SEQUENCE_INVALID("FCS-DOM-2001",
             "FCS-DOM-2001: 期次日期必须严格递增且 start < end: 第 %s 期 [%s, %s]"),
 

@@ -18,5 +18,8 @@ public enum RepaymentMethodId {
     PRINCIPAL_FIRST,
 
     /** Schedule driven by a compiled rule set rather than a fixed formula. */
-    RULE_DRIVEN
+    RULE_DRIVEN,
+
+    /** 显式逐期租金（04_现金流模式）— 租金给定，引擎反推本息拆分. */
+    EXPLICIT_RENT
 }
