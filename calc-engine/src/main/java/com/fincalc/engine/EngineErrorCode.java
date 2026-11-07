@@ -20,11 +20,16 @@ import com.fincalc.common.error.ErrorCode;
  *       {@link CalculationFacade#defaultsWithScripts} when the external script directory cannot be
  *       read; script syntax errors keep the loader's own {@code FCS-RULE-*} codes;</li>
  *   <li>{@link #IRR_ROOT_AMBIGUOUS} — WARN-level {@code ValidationIssue} code raised by
- *       {@link CalculationFacade#calculate} when the event-table flow set changes sign more than
- *       once, so the solved IRR root is ambiguous (ledger ruling R30 posture);</li>
+ *       {@link CalculationFacade#calculate} when the event-table flow set does not change sign
+ *       exactly once, so the IRR root is ambiguous or absent (ledger ruling R30 posture);</li>
  *   <li>{@link #RULE_FALLBACK_PERIOD} — WARN-level {@code ValidationIssue} code raised by
  *       {@link CalculationFacade#calculate} for each period that fell back to the built-in
- *       behaviour under {@code allowPartialRuleSet}.</li>
+ *       behaviour under {@code allowPartialRuleSet};</li>
+ *   <li>{@link #METRIC_COMPUTATION_FAILED} — WARN-level {@code ValidationIssue} code raised by
+ *       {@link CalculationFacade#calculate} for each §9.5 metric that threw during the metric
+ *       run (final-review fix wave; R57 — the code enters with the path that raises it, instead
+ *       of borrowing {@code FCS-CALC-3003}, whose registered template means IRR
+ *       non-convergence).</li>
  * </ul>
  */
 public enum EngineErrorCode implements ErrorCode {
@@ -57,14 +62,15 @@ public enum EngineErrorCode implements ErrorCode {
     FUNCTION_SCRIPT_DIR_LOAD_FAILED("FCS-ENG-1004", "FCS-ENG-1004: 外部函数脚本目录加载失败: %s"),
 
     /**
-     * Multi-root ambiguity marker (ledger ruling R30 posture) of
-     * {@link CalculationFacade#calculate} step 6: the event-table flow set changes sign more than
-     * once, so several rates zero its NPV and the single root the solver returned is ambiguous.
-     * v1 keeps {@link com.fincalc.domain.support.IrrCalculator#hasSingleSignChange} as the signal
-     * and reports the ambiguity instead of pretending the tie-break「取最接近名义利率的最小正根」
+     * IRR-ambiguity marker (ledger ruling R30 posture) of {@link CalculationFacade#calculate}
+     * step 6: the event-table flow set does not change sign exactly once — more than once means
+     * several rates zero its NPV and the root the solver returned is ambiguous; zero means no
+     * rate does and the solver has no root at all. v1 keeps
+     * {@link com.fincalc.domain.support.IrrCalculator#hasSingleSignChange} as the signal and
+     * reports the ambiguity instead of pretending the tie-break「取最接近名义利率的最小正根」
      * was applied.
      */
-    IRR_ROOT_AMBIGUOUS("FCS-ENG-1005", "FCS-ENG-1005: 现金流存在多个符号变化, IRR 结果存在多根歧义"),
+    IRR_ROOT_AMBIGUOUS("FCS-ENG-1005", "FCS-ENG-1005: 现金流符号变化不唯一或不存在, IRR 结果不唯一"),
 
     /**
      * Partial-rule-set fallback marker of {@link CalculationFacade#calculate} step 6: a period no
@@ -72,7 +78,15 @@ public enum EngineErrorCode implements ErrorCode {
      * ({@link com.fincalc.rule.generator.RuleDrivenGenerator#FALLBACK_MEMO}) and is surfaced as a
      * WARN issue so the schedule carries its own provenance.
      */
-    RULE_FALLBACK_PERIOD("FCS-ENG-1006", "FCS-ENG-1006: 第 %s 期未被规则集覆盖, 已回落内置等额本金");
+    RULE_FALLBACK_PERIOD("FCS-ENG-1006", "FCS-ENG-1006: 第 %s 期未被规则集覆盖, 已回落内置等额本金"),
+
+    /**
+     * Metric-failure marker of {@link CalculationFacade#calculate} step 6 (final-review fix
+     * wave): a §9.5 metric threw during {@code computeAll} and is recorded as not computable.
+     * Own code per R57 — {@code FCS-CALC-3003}'s registered template means the §9.7 table's IRR
+     * non-convergence, a different failure.
+     */
+    METRIC_COMPUTATION_FAILED("FCS-ENG-1007", "FCS-ENG-1007: 指标 %s 计算失败, 记为不可计算");
 
     private final String code;
     private final String message;

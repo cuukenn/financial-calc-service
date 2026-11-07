@@ -77,8 +77,8 @@ import java.util.stream.Stream;
  *   <li><b>Step 6</b> — {@link ValidatorChain#validate} plus the engine's own diagnostics: every
  *       finding is appended to the schedule's issues (the schedule is immutable — the enriched
  *       schedule is rebuilt once with the combined list). The engine emits WARN issues for
- *       metrics that threw ({@code FCS-CALC-3003}), for a multi-sign-change flow set whose IRR
- *       root is therefore ambiguous ({@code FCS-ENG-1005}, ruling R30 posture) and for
+ *       metrics that threw ({@code FCS-ENG-1007}), for a flow set whose IRR root is therefore
+ *       ambiguous or absent ({@code FCS-ENG-1005}, ruling R30 posture) and for
  *       partial-rule-set fallback periods ({@code FCS-ENG-1006}).</li>
  *   <li><b>Step 7</b> — the §9.7 effective-interest table; see the rate decision below. A missing
  *       rate or a table that cannot be built answers {@code null} with a WARN issue — never an
@@ -240,8 +240,10 @@ public final class CalculationFacade {
         List<ValidationIssue> engineIssues = new ArrayList<>();
         schedule = validators.validate(schedule, element);
         for (String code : failedMetrics) {
-            engineIssues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED
-                    .code(), "FCS-CALC-3003: 指标 " + code + " 计算失败, 记为不可计算", null));
+            engineIssues.add(new ValidationIssue(IssueLevel.WARN,
+                    EngineErrorCode.METRIC_COMPUTATION_FAILED.code(),
+                    String.format(EngineErrorCode.METRIC_COMPUTATION_FAILED.message(), code),
+                    null));
         }
         if (!IrrCalculator.hasSingleSignChange(flows)) {
             engineIssues.add(new ValidationIssue(IssueLevel.WARN,
@@ -340,7 +342,7 @@ public final class CalculationFacade {
         try {
             return registry.require(code);
         } catch (BusinessException ex) {
-            throw new BusinessException(EngineErrorCode.CALCULATION_CONTEXT_INVALID,
+            throw new BusinessException(EngineErrorCode.CALCULATION_CONTEXT_INVALID, ex,
                     kind + "=" + code);
         }
     }

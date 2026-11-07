@@ -136,6 +136,16 @@ class FunctionScriptLoaderTest {
         assertThat(System.nanoTime() - start).isLessThan(TimeUnit.SECONDS.toNanos(10));
     }
 
+    // ---- UTF-8 BOM tolerance (final-review fix wave) ----
+
+    @Test
+    void bom_prefixed_script_loads() {
+        // A script saved by a Windows editor commonly opens with a UTF-8 BOM; the loader must
+        // strip it before the VERSION check instead of failing with a syntax error.
+        FunctionRegistry reg = load("\uFEFFVERSION 1\nDEFINE F(X) = X + 1\n");
+        assertThat(eval("F(1)", reg).asNumber()).isEqualByComparingTo("2");
+    }
+
     // ---- Classpath loading (Task 29 startup wiring) ----
 
     @Test

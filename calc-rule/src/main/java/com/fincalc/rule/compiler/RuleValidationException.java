@@ -16,7 +16,7 @@ import java.util.StringJoiner;
  * <p>Disclosed choice of the exception's own {@code ErrorCode}: per-issue stable codes live in
  * {@link #issues()} ({@code FCS-RULE-2001..2006} and the expression codes
  * {@code FCS-RULE-3001/3004/3009}); the exception itself reuses the existing
- * {@link CommonErrorCode#INVALID_ARGUMENT} ("参数 %s 非法: %s") with the rule set named as the
+ * {@link CommonErrorCode#INVALID_ARGUMENT} ("FCS-COM-0001: 参数 %s 非法: %s") with the rule set named as the
  * invalid argument and the issue summary as the reason. No new {@code RuleErrorCode} constant is
  * invented for the exception envelope, because R57 forbids codes without a distinct raising check
  * — every distinct check here already has its own code on its issue.

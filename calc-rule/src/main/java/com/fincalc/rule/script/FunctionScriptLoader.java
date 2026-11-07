@@ -137,9 +137,18 @@ public final class FunctionScriptLoader {
 
     private static String read(Path file) {
         try {
-            return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+            return stripBom(new String(Files.readAllBytes(file), StandardCharsets.UTF_8));
         } catch (IOException ex) {
             throw new UncheckedIOException("函数脚本文件读取失败: " + file, ex);
         }
+    }
+
+    /**
+     * Strips a leading UTF-8 BOM ({@code U+FEFF}, final-review fix wave): a script saved by a
+     * Windows editor commonly carries one, and read as a character it would break the VERSION
+     * check with a wrong-sounding syntax error instead of being the invisible marker it is.
+     */
+    private static String stripBom(String text) {
+        return text.startsWith("\uFEFF") ? text.substring(1) : text;
     }
 }

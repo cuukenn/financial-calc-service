@@ -34,6 +34,22 @@ public class BusinessException extends RuntimeException {
         this.args = args == null ? new Object[0] : args.clone();
     }
 
+    /**
+     * Creates a business exception carrying the failure it replaces as its cause (final-review
+     * fix wave, the Task 4 deferred note): translation sites that catch a {@code BusinessException}
+     * and re-raise with their own code chain the original so the causal stack survives.
+     *
+     * @param errorCode stable error code; never {@code null}
+     * @param cause     the original failure; becomes {@link #getCause()}
+     * @param args      values for the {@code String.format} placeholders of
+     *                  {@link ErrorCode#message()}
+     */
+    public BusinessException(ErrorCode errorCode, Throwable cause, Object... args) {
+        super(format(errorCode, args), cause);
+        this.errorCode = errorCode;
+        this.args = args == null ? new Object[0] : args.clone();
+    }
+
     /** The stable error code this failure was raised with. */
     public ErrorCode errorCode() {
         return errorCode;

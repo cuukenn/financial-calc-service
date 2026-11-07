@@ -58,6 +58,19 @@ class BusinessExceptionTest {
     }
 
     @Test
+    void cause_carrying_constructor_chains_the_original_failure() {
+        BusinessException original = new BusinessException(CommonErrorCode.NOT_FOUND, "THIRTY_360");
+
+        BusinessException translated = new BusinessException(
+                CommonErrorCode.STATE_CONFLICT, original, "dayCount", "THIRTY_360");
+
+        assertThat(translated.getCause()).isSameAs(original);
+        assertThat(translated.errorCode()).isEqualTo(CommonErrorCode.STATE_CONFLICT);
+        assertThat(translated.getMessage()).contains("dayCount").contains("THIRTY_360");
+        assertThat(translated.args()).containsExactly("dayCount", "THIRTY_360");
+    }
+
+    @Test
     void system_exception_preserves_message_and_cause() {
         IllegalStateException cause = new IllegalStateException("boom");
 
