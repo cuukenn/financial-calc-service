@@ -81,6 +81,14 @@ async function submit(wrapper: ReturnType<typeof mount>): Promise<void> {
   await flushPromises()
 }
 
+/** 结果区 Tabs 懒渲染：先点激活目标 Tab，再断言其内容。 */
+async function activateResultTab(wrapper: ReturnType<typeof mount>, tabLabel: string): Promise<void> {
+  const tab = wrapper.findAll('.ant-tabs-tab').find((t) => t.text() === tabLabel)
+  expect(tab, `结果 Tab 「${tabLabel}」 应存在`).toBeTruthy()
+  await tab!.trigger('click')
+  await flushPromises()
+}
+
 describe('CalculationForm', () => {
   beforeEach(() => {
     vi.mocked(calculate).mockResolvedValue(goldenResult())
@@ -151,15 +159,53 @@ describe('CalculationForm', () => {
     const wrapper = mount(CalculationForm)
     await submit(wrapper)
 
-    // Task 3：指标升级为 Statistic 卡（金额字符串原样直显）。
+    // Task 3：指标升级为 Statistic 卡（金额字符串原样直显，位于默认「指标」Tab）。
     const cards = wrapper.findAll('[data-test="metric-card"]')
     expect(cards.length).toBeGreaterThanOrEqual(1)
     expect(wrapper.find('[data-test="metric-TOTAL_RENT"]').text()).toContain('1032797.15')
 
+    // Plan 4 Task 1：摊销计划移入同名 Tab（懒渲染，须先激活）。
+    await activateResultTab(wrapper, '摊销计划')
     const rows = wrapper.find('[data-test="installments-table"]').findAll('.ant-table-row')
     expect(rows.length).toBeGreaterThanOrEqual(1)
     expect(rows[0].text()).toContain('84271.24')
     expect(wrapper.find('[data-test="has-errors-alert"]').exists()).toBe(false)
+  })
+
+  it('groups the form fields into the three compact block cards (R84)', () => {
+    const wrapper = mount(CalculationForm)
+
+    // 三个大块卡片均存在。
+    const titles = wrapper.findAll('.ant-card-head-title').map((t) => t.text())
+    expect(titles).toContain('基础要素')
+    expect(titles).toContain('租金结构')
+    expect(titles).toContain('费用与其他')
+
+    // 基础要素：基础字段 + 口径 + 方式 radio。
+    const basic = wrapper.find('[data-test="card-basic"]')
+    expect(basic.find('[data-test="principal"]').exists()).toBe(true)
+    expect(basic.find('[data-test="day-count-code"]').exists()).toBe(true)
+    expect(basic.find('input[value="EQUAL_INSTALLMENT"]').exists()).toBe(true)
+
+    // 租金结构：规则行 + 宽限期（显式租金按方式联动出现）。
+    const rentStructure = wrapper.find('[data-test="card-rent-structure"]')
+    expect(rentStructure.find('[data-test="rule-rows-editor"]').exists()).toBe(true)
+    expect(rentStructure.find('[data-test="interest-only-periods"]').exists()).toBe(true)
+    expect(rentStructure.find('[data-test="rents-editor"]').exists()).toBe(false)
+
+    // 费用与其他：费用编辑器 + 残值/保证金/税率。
+    const feesOther = wrapper.find('[data-test="card-fees-other"]')
+    expect(feesOther.find('[data-test="fee-add"]').exists()).toBe(true)
+    expect(feesOther.find('[data-test="residual-value"]').exists()).toBe(true)
+    expect(feesOther.find('[data-test="vat-rate"]').exists()).toBe(true)
+  })
+
+  it('shows the cash-flow tab as a placeholder after a successful calculation', async () => {
+    const wrapper = mount(CalculationForm)
+    await submit(wrapper)
+
+    await activateResultTab(wrapper, '现金流')
+    expect(wrapper.find('[data-test="cashflow-empty"]').exists()).toBe(true)
   })
 
   it('lists issues and shows the warning alert when the schedule hasErrors', async () => {

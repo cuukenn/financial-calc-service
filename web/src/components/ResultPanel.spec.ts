@@ -1,4 +1,5 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
+import type { VueWrapper } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { CalculationResult, Installment } from '@/api/types'
@@ -67,6 +68,16 @@ describe('ResultPanel', () => {
     vi.clearAllMocks()
   })
 
+  /** Tabs 懒渲染：先点激活目标 Tab，再断言其内容。 */
+  async function activateTab(wrapper: VueWrapper, tabLabel: string): Promise<void> {
+    const tab = wrapper
+      .findAll('.ant-tabs-tab')
+      .find((t) => t.text() === tabLabel)
+    expect(tab, `tab 「${tabLabel}」 应存在`).toBeTruthy()
+    await tab!.trigger('click')
+    await flushPromises()
+  }
+
   it('renders metric cards verbatim and shows 「—」 for null metrics', () => {
     const wrapper = mount(ResultPanel, { props: { result: result() } })
 
@@ -78,6 +89,49 @@ describe('ResultPanel', () => {
     const xirr = wrapper.find('[data-test="metric-XIRR"]')
     expect(xirr.text()).toContain('XIRR')
     expect(xirr.text()).toContain('—')
+  })
+
+  it('renders the four tabs (指标/摊销计划/现金流/实际利率法) with a cash-flow placeholder', async () => {
+    const wrapper = mount(ResultPanel, { props: { result: result() } })
+
+    const tabs = wrapper.findAll('.ant-tabs-tab')
+    expect(tabs.map((t) => t.text())).toEqual(['指标', '摊销计划', '现金流', '实际利率法'])
+
+    // 现金流 Tab 本任务仅占位（Task 3 填充内容）。
+    await activateTab(wrapper, '现金流')
+    expect(wrapper.find('[data-test="cashflow-empty"]').exists()).toBe(true)
+  })
+
+  it('renders the effective-interest table when data exists and a placeholder when null', async () => {
+    const withEir = result()
+    withEir.effectiveInterest = {
+      rows: [
+        {
+          periodNo: 1,
+          openingNetInvestment: '1000000.00',
+          interestIncome: '5100.00',
+          cashReceived: '84271.24',
+          principalRecovery: '79171.24',
+          closingNetInvestment: '920828.76',
+        },
+      ],
+      eir: '0.0051',
+      totalInterestDifference: '1200.00',
+    }
+    const wrapper = mount(ResultPanel, { props: { result: withEir } })
+
+    await activateTab(wrapper, '实际利率法')
+    const table = wrapper.find('[data-test="effective-interest-table"]')
+    expect(table.exists()).toBe(true)
+    // EIR 摘要行与摊销表同 Tab 展示。
+    expect(wrapper.find('[data-test="result-tabs"]').text()).toContain('实际利率（EIR）：0.0051')
+    expect(table.find('.ant-table-row').text()).toContain('920828.76')
+
+    // 无数据（IRR 未收敛等）时占位而非空表。
+    const nullWrapper = mount(ResultPanel, { props: { result: result() } })
+    await activateTab(nullWrapper, '实际利率法')
+    expect(nullWrapper.find('[data-test="eir-empty"]').exists()).toBe(true)
+    expect(nullWrapper.find('[data-test="effective-interest-table"]').exists()).toBe(false)
   })
 
   it('colors issue levels: ERROR red / WARN orange / INFO grey', () => {
@@ -100,10 +154,13 @@ describe('ResultPanel', () => {
     expect(tags[2].attributes('class')).not.toContain('orange')
   })
 
-  it('renders both charts (composition + balance) fed from the installments', () => {
+  it('renders both charts (composition + balance) fed from the installments', async () => {
     const wrapper = mount(ResultPanel, { props: { result: result() } })
 
+    // 图表位于「摊销计划」Tab 内（懒渲染，须先激活）。
+    await activateTab(wrapper, '摊销计划')
     expect(wrapper.find('[data-test="composition-chart"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="balance-chart"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="installments-table"]').exists()).toBe(true)
   })
 })

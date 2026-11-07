@@ -3,14 +3,15 @@ import {
   Alert,
   Button,
   Card,
+  Col,
   DatePicker,
-  Divider,
   Form,
   FormItem,
   Input,
   InputNumber,
   Radio,
   RadioGroup,
+  Row,
   Select,
   Space,
   Typography,
@@ -328,240 +329,317 @@ async function onFinish(): Promise<void> {
 </script>
 
 <template>
-  <Card title="测算表单" data-test="calc-form-card">
-    <Form :model="form" :rules="rules" layout="vertical" @finish="onFinish">
-      <Card type="inner" title="基础要素">
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px">
-          <FormItem label="租赁本金" name="principal">
-            <Input v-model:value="form.principal" data-test="principal" placeholder="如 1000000" />
-          </FormItem>
-          <FormItem label="名义年利率（小数）" name="nominalRate">
-            <Input v-model:value="form.nominalRate" data-test="nominal-rate" placeholder="如 0.06" />
-          </FormItem>
-          <FormItem label="起租日" name="commenceDate">
-            <span data-test="commence-date" style="display: block">
-              <DatePicker
-                v-model:value="form.commenceDate"
-                value-format="YYYY-MM-DD"
-                style="width: 100%"
-              />
-            </span>
-          </FormItem>
-          <FormItem label="首期租金日" name="firstRentDate">
-            <span data-test="first-rent-date" style="display: block">
-              <DatePicker
-                v-model:value="form.firstRentDate"
-                value-format="YYYY-MM-DD"
-                style="width: 100%"
-              />
-            </span>
-          </FormItem>
-          <FormItem label="期数" name="periods">
-            <InputNumber
-              v-model:value="form.periods"
-              :min="1"
-              style="width: 100%"
-              data-test="periods"
-            />
-          </FormItem>
-          <FormItem label="还款频率" name="frequency">
-            <Select v-model:value="form.frequency" :options="FREQUENCIES" data-test="frequency" />
-          </FormItem>
-          <FormItem label="付款时点" name="timing">
-            <Select v-model:value="form.timing" :options="TIMINGS" data-test="timing" />
-          </FormItem>
-          <FormItem label="币种" name="currency">
-            <Input v-model:value="form.currency" data-test="currency" placeholder="ISO-4217，如 CNY" />
-          </FormItem>
-        </div>
-      </Card>
-
-      <Divider type="horizontal" />
-      <Card type="inner" title="口径">
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px">
-          <FormItem label="天数口径" name="dayCountCode">
-            <Select
-              v-model:value="form.dayCountCode"
-              :options="DAY_COUNT_CODES"
-              data-test="day-count-code"
-            />
-          </FormItem>
-          <FormItem label="日期滚动" name="dateRollCode">
-            <Select
-              v-model:value="form.dateRollCode"
-              :options="DATE_ROLL_CODES"
-              data-test="date-roll-code"
-            />
-          </FormItem>
-          <FormItem label="利率变更策略" name="rateChangePolicy">
-            <Select
-              v-model:value="form.rateChangePolicy"
-              :options="RATE_CHANGE_POLICIES"
-              data-test="rate-change-policy"
-            />
-          </FormItem>
-        </div>
-      </Card>
-
-      <Divider type="horizontal" />
-      <Card type="inner" title="方式">
-        <FormItem label="还款方式" name="method">
-          <RadioGroup v-model:value="form.method" data-test="method-group">
-            <Radio v-for="m in METHODS" :key="m.value" :value="m.value">{{ m.label }}</Radio>
-          </RadioGroup>
-        </FormItem>
-
-        <!-- EXPLICIT_RENT 联动：显式逐期租金编辑器（长度与期数对齐）。 -->
-        <div v-if="form.method === 'EXPLICIT_RENT'" data-test="rents-editor" style="margin-bottom: 12px">
-          <Typography.Text type="secondary">
-            逐期租金（共 {{ form.periods ?? 0 }} 期，每期须大于 0）
-          </Typography.Text>
-          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px">
-            <Input
-              v-for="(_, idx) in explicitRents"
-              :key="idx"
-              v-model:value="explicitRents[idx]"
-              :placeholder="`第 ${idx + 1} 期`"
-              style="width: 120px"
-              data-test="rent-input"
-            />
-          </div>
-        </div>
-      </Card>
-
-      <Divider type="horizontal" />
-      <Card type="inner" title="规则行（可选：分段利率）" data-test="rule-rows-editor">
-        <Typography.Text type="secondary">
-          对全部方式开放：携带规则行即启用分段利率（RULE_DRIVEN 则为必填规则集）
-        </Typography.Text>
-        <div style="margin-top: 8px">
-          <div
-            v-for="(row, idx) in ruleRows"
-            :key="idx"
-            style="display: flex; gap: 8px; margin-bottom: 8px"
-            data-test="rule-row"
-          >
-            <Input v-model:value="row.ruleId" placeholder="规则 ID" style="width: 90px" />
-            <InputNumber
-              v-model:value="row.priority"
-              placeholder="优先级"
-              style="width: 90px"
-            />
-            <InputNumber
-              v-model:value="row.fromPeriod"
-              :min="1"
-              placeholder="起始期"
-              style="width: 100px"
-            />
-            <InputNumber
-              v-model:value="row.toPeriod"
-              :min="1"
-              placeholder="截止期"
-              style="width: 100px"
-            />
-            <Input
-              v-model:value="row.annualRate"
-              placeholder="年利率（如 0.03）"
-              style="width: 150px"
-              data-test="rule-annual-rate"
-            />
-            <Button danger @click="removeRuleRow(idx)">删除</Button>
-          </div>
-        </div>
-        <Space>
-          <Button type="dashed" data-test="rule-add" @click="addRuleRow()">+ 添加规则行</Button>
-          <Button data-test="rule-preset" @click="presetSegmentedRates()">
-            {{ presetLabel }}
-          </Button>
-        </Space>
-      </Card>
-
-      <Divider type="horizontal" />
-      <Card type="inner" title="其他">
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px">
-          <FormItem label="残值金额" name="residualValue">
-            <Input v-model:value="form.residualValue" data-test="residual-value" />
-          </FormItem>
-          <FormItem label="残值处理" name="residualHandling">
-            <Select
-              v-model:value="form.residualHandling"
-              :options="RESIDUAL_HANDLINGS"
-              data-test="residual-handling"
-            />
-          </FormItem>
-          <FormItem label="保证金" name="deposit">
-            <Input v-model:value="form.deposit" data-test="deposit" />
-          </FormItem>
-          <FormItem label="增值税率（小数）" name="vatRate">
-            <Input v-model:value="form.vatRate" data-test="vat-rate" />
-          </FormItem>
-          <FormItem label="宽限期：只付息期数" name="interestOnlyPeriods">
-            <InputNumber
-              v-model:value="form.interestOnlyPeriods"
-              :min="0"
-              style="width: 100%"
-              data-test="interest-only-periods"
-            />
-          </FormItem>
-          <FormItem label="宽限期：全免期数" name="fullGracePeriods">
-            <InputNumber
-              v-model:value="form.fullGracePeriods"
-              :min="0"
-              style="width: 100%"
-              data-test="full-grace-periods"
-            />
-          </FormItem>
-        </div>
-
-        <Typography.Text type="secondary">费用（可选）</Typography.Text>
-        <div style="margin-top: 8px">
-          <div
-            v-for="(fee, idx) in fees"
-            :key="idx"
-            style="display: flex; gap: 8px; margin-bottom: 8px"
-            data-test="fee-row"
-          >
-            <Input v-model:value="fee.type" placeholder="费用类型" style="width: 160px" />
-            <Input v-model:value="fee.amount" placeholder="金额" style="width: 140px" />
-            <Select v-model:value="fee.chargeMode" :options="CHARGE_MODES" style="width: 220px" />
-            <Button danger @click="removeFee(idx)">删除</Button>
-          </div>
-        </div>
-        <Button type="dashed" data-test="fee-add" @click="addFee()">+ 添加费用</Button>
-      </Card>
-
-      <FormItem style="margin-top: 16px">
-        <Button
-          type="primary"
-          html-type="submit"
-          :loading="loading"
-          size="large"
-          data-test="submit-btn"
+  <!-- R84 整体布局：宽视口表单左（10）/结果右（14）双栏，窄视口纵向堆叠。 -->
+  <Row :gutter="16" data-test="workbench-layout">
+    <Col :xs="24" :lg="10">
+      <Card title="测算表单" data-test="calc-form-card">
+        <Form
+          :model="form"
+          :rules="rules"
+          :label-col="{ style: { width: '92px' } }"
+          class="compact-form"
+          @finish="onFinish"
         >
-          {{ loading ? '测算中…' : '开始测算' }}
-        </Button>
-      </FormItem>
-    </Form>
+          <!-- 大块 1：基础要素（基础字段 + 口径 + 还款方式）。 -->
+          <Card title="基础要素" size="small" data-test="card-basic" class="block-card">
+            <Row :gutter="12">
+              <Col :span="12">
+                <FormItem label="租赁本金" name="principal">
+                  <Input v-model:value="form.principal" data-test="principal" placeholder="如 1000000" />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="名义年利率" name="nominalRate">
+                  <Input v-model:value="form.nominalRate" data-test="nominal-rate" placeholder="小数，如 0.06" />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="起租日" name="commenceDate">
+                  <span data-test="commence-date" style="display: block">
+                    <DatePicker
+                      v-model:value="form.commenceDate"
+                      value-format="YYYY-MM-DD"
+                      style="width: 100%"
+                    />
+                  </span>
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="首期租金日" name="firstRentDate">
+                  <span data-test="first-rent-date" style="display: block">
+                    <DatePicker
+                      v-model:value="form.firstRentDate"
+                      value-format="YYYY-MM-DD"
+                      style="width: 100%"
+                    />
+                  </span>
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="期数" name="periods">
+                  <InputNumber
+                    v-model:value="form.periods"
+                    :min="1"
+                    style="width: 100%"
+                    data-test="periods"
+                  />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="币种" name="currency">
+                  <Input v-model:value="form.currency" data-test="currency" placeholder="ISO-4217，如 CNY" />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="还款频率" name="frequency">
+                  <Select v-model:value="form.frequency" :options="FREQUENCIES" data-test="frequency" />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="付款时点" name="timing">
+                  <Select v-model:value="form.timing" :options="TIMINGS" data-test="timing" />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="天数口径" name="dayCountCode">
+                  <Select
+                    v-model:value="form.dayCountCode"
+                    :options="DAY_COUNT_CODES"
+                    data-test="day-count-code"
+                  />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="日期滚动" name="dateRollCode">
+                  <Select
+                    v-model:value="form.dateRollCode"
+                    :options="DATE_ROLL_CODES"
+                    data-test="date-roll-code"
+                  />
+                </FormItem>
+              </Col>
+              <Col :span="24">
+                <FormItem label="利率变更策略" name="rateChangePolicy">
+                  <Select
+                    v-model:value="form.rateChangePolicy"
+                    :options="RATE_CHANGE_POLICIES"
+                    data-test="rate-change-policy"
+                  />
+                </FormItem>
+              </Col>
+              <Col :span="24">
+                <FormItem label="还款方式" name="method">
+                  <RadioGroup v-model:value="form.method" data-test="method-group">
+                    <Radio v-for="m in METHODS" :key="m.value" :value="m.value">{{ m.label }}</Radio>
+                  </RadioGroup>
+                </FormItem>
+              </Col>
+            </Row>
+          </Card>
 
-    <Alert
-      v-if="localError"
-      type="warning"
-      show-icon
-      :message="localError"
-      data-test="local-error-alert"
-      style="margin-top: 12px"
-    />
-    <!-- FCS code（如 FCS-DOM-1001）原样透出（R77 统一错误体）。 -->
-    <Alert
-      v-if="submitError"
-      type="error"
-      show-icon
-      :message="`测算失败（${submitError.code}）`"
-      :description="submitError.message"
-      data-test="error-alert"
-      style="margin-top: 12px"
-    />
+          <!-- 大块 2：租金结构（规则行 + 显式租金 + 宽限期，按方式联动显隐不变）。 -->
+          <Card title="租金结构" size="small" data-test="card-rent-structure" class="block-card">
+            <Card
+              type="inner"
+              title="规则行（可选：分段利率）"
+              size="small"
+              data-test="rule-rows-editor"
+            >
+              <Typography.Text type="secondary">
+                对全部方式开放：携带规则行即启用分段利率（RULE_DRIVEN 则为必填规则集）
+              </Typography.Text>
+              <div style="margin-top: 8px">
+                <div
+                  v-for="(row, idx) in ruleRows"
+                  :key="idx"
+                  style="display: flex; gap: 8px; margin-bottom: 8px"
+                  data-test="rule-row"
+                >
+                  <Input v-model:value="row.ruleId" placeholder="规则 ID" style="width: 90px" />
+                  <InputNumber
+                    v-model:value="row.priority"
+                    placeholder="优先级"
+                    style="width: 90px"
+                  />
+                  <InputNumber
+                    v-model:value="row.fromPeriod"
+                    :min="1"
+                    placeholder="起始期"
+                    style="width: 100px"
+                  />
+                  <InputNumber
+                    v-model:value="row.toPeriod"
+                    :min="1"
+                    placeholder="截止期"
+                    style="width: 100px"
+                  />
+                  <Input
+                    v-model:value="row.annualRate"
+                    placeholder="年利率（如 0.03）"
+                    style="width: 150px"
+                    data-test="rule-annual-rate"
+                  />
+                  <Button danger @click="removeRuleRow(idx)">删除</Button>
+                </div>
+              </div>
+              <Space>
+                <Button type="dashed" data-test="rule-add" @click="addRuleRow()">+ 添加规则行</Button>
+                <Button data-test="rule-preset" @click="presetSegmentedRates()">
+                  {{ presetLabel }}
+                </Button>
+              </Space>
+            </Card>
 
-    <ResultPanel v-if="result" :result="result" style="margin-top: 12px" />
-  </Card>
+            <!-- EXPLICIT_RENT 联动：显式逐期租金编辑器（长度与期数对齐）。 -->
+            <div
+              v-if="form.method === 'EXPLICIT_RENT'"
+              data-test="rents-editor"
+              style="margin-top: 12px"
+            >
+              <Typography.Text type="secondary">
+                逐期租金（共 {{ form.periods ?? 0 }} 期，每期须大于 0）
+              </Typography.Text>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px">
+                <Input
+                  v-for="(_, idx) in explicitRents"
+                  :key="idx"
+                  v-model:value="explicitRents[idx]"
+                  :placeholder="`第 ${idx + 1} 期`"
+                  style="width: 120px"
+                  data-test="rent-input"
+                />
+              </div>
+            </div>
+
+            <Typography.Text type="secondary" style="display: block; margin-top: 12px">
+              宽限期（可选）
+            </Typography.Text>
+            <Row :gutter="12">
+              <Col :span="12">
+                <FormItem label="只付息期数" name="interestOnlyPeriods">
+                  <InputNumber
+                    v-model:value="form.interestOnlyPeriods"
+                    :min="0"
+                    style="width: 100%"
+                    data-test="interest-only-periods"
+                  />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="全免期数" name="fullGracePeriods">
+                  <InputNumber
+                    v-model:value="form.fullGracePeriods"
+                    :min="0"
+                    style="width: 100%"
+                    data-test="full-grace-periods"
+                  />
+                </FormItem>
+              </Col>
+            </Row>
+          </Card>
+
+          <!-- 大块 3：费用与其他（费用编辑器 + 残值/保证金/税率）。 -->
+          <Card title="费用与其他" size="small" data-test="card-fees-other" class="block-card">
+            <Typography.Text type="secondary">费用（可选）</Typography.Text>
+            <div style="margin-top: 8px">
+              <div
+                v-for="(fee, idx) in fees"
+                :key="idx"
+                style="display: flex; gap: 8px; margin-bottom: 8px"
+                data-test="fee-row"
+              >
+                <Input v-model:value="fee.type" placeholder="费用类型" style="width: 160px" />
+                <Input v-model:value="fee.amount" placeholder="金额" style="width: 140px" />
+                <Select v-model:value="fee.chargeMode" :options="CHARGE_MODES" style="width: 220px" />
+                <Button danger @click="removeFee(idx)">删除</Button>
+              </div>
+            </div>
+            <Button type="dashed" data-test="fee-add" @click="addFee()">+ 添加费用</Button>
+
+            <Row :gutter="12" style="margin-top: 12px">
+              <Col :span="12">
+                <FormItem label="残值金额" name="residualValue">
+                  <Input v-model:value="form.residualValue" data-test="residual-value" />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="残值处理" name="residualHandling">
+                  <Select
+                    v-model:value="form.residualHandling"
+                    :options="RESIDUAL_HANDLINGS"
+                    data-test="residual-handling"
+                  />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="保证金" name="deposit">
+                  <Input v-model:value="form.deposit" data-test="deposit" />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem label="增值税率" name="vatRate">
+                  <Input v-model:value="form.vatRate" data-test="vat-rate" placeholder="小数，如 0.06" />
+                </FormItem>
+              </Col>
+            </Row>
+          </Card>
+
+          <FormItem style="margin-top: 16px">
+            <Button
+              type="primary"
+              html-type="submit"
+              :loading="loading"
+              size="large"
+              data-test="submit-btn"
+            >
+              {{ loading ? '测算中…' : '开始测算' }}
+            </Button>
+          </FormItem>
+        </Form>
+
+        <Alert
+          v-if="localError"
+          type="warning"
+          show-icon
+          :message="localError"
+          data-test="local-error-alert"
+          style="margin-top: 12px"
+        />
+        <!-- FCS code（如 FCS-DOM-1001）原样透出（R77 统一错误体）。 -->
+        <Alert
+          v-if="submitError"
+          type="error"
+          show-icon
+          :message="`测算失败（${submitError.code}）`"
+          :description="submitError.message"
+          data-test="error-alert"
+          style="margin-top: 12px"
+        />
+      </Card>
+    </Col>
+
+    <Col :xs="24" :lg="14">
+      <ResultPanel v-if="result" :result="result" />
+    </Col>
+  </Row>
 </template>
+
+<style scoped>
+/* 紧凑栅格：压低表单项纵向间距与大块卡片间距。 */
+.compact-form :deep(.ant-form-item) {
+  margin-bottom: 12px;
+}
+.block-card {
+  margin-bottom: 12px;
+}
+.block-card :deep(.ant-card-head) {
+  min-height: 36px;
+}
+.block-card :deep(.ant-card-head-title) {
+  font-size: 14px;
+}
+.block-card :deep(.ant-card-body) {
+  padding-top: 12px;
+  padding-bottom: 4px;
+}
+</style>

@@ -1,15 +1,27 @@
 <script setup lang="ts">
-import { Alert, Card, Descriptions, Statistic, Table, Tag, Typography } from 'ant-design-vue'
+import {
+  Alert,
+  Card,
+  Descriptions,
+  Empty,
+  Statistic,
+  Table,
+  TabPane,
+  Tabs,
+  Tag,
+  Typography,
+} from 'ant-design-vue'
 import { computed } from 'vue'
 
-import type { CalculationResult, Installment, Issue } from '@/api/types'
+import type { CalculationResult, EffectiveInterestRow, Installment, Issue } from '@/api/types'
 
 import EChart from './charts/EChart.vue'
 import { buildBalanceOption, buildCompositionOption } from './charts/options'
 
 /**
- * Task 3 结果区块：指标 Statistic 卡（金额字符串原样直显，null → 「—」）+
- * 分级问题列表 + 摊销计划 16 列表格 + ECharts 构成/余额曲线（仅金额入轴时 parse）。
+ * Task 1（Plan 4）结果区 Tabs 化：指标 / 摊销计划（图表 + 16 列表格，行为不变）/
+ * 现金流占位（Task 3 填充）/ 实际利率法（有数据即渲染 6 列摊销表，否则 Empty 占位）。
+ * 指标 Statistic 卡金额字符串原样直显，null → 「—」。
  */
 const props = defineProps<{ result: CalculationResult }>()
 
@@ -67,6 +79,23 @@ const installmentColumns: {
   { title: '备注', dataIndex: 'memo', width: 160 },
 ]
 
+/** §9.7 实际利率法摊销表六列（金额均为字符串原样）。 */
+const eirColumns: {
+  title: string
+  dataIndex: keyof EffectiveInterestRow
+  width: number
+  align?: 'right' | 'left'
+}[] = [
+  { title: '期次', dataIndex: 'periodNo', width: 60 },
+  { title: '期初净投资', dataIndex: 'openingNetInvestment', width: 130, align: 'right' },
+  { title: '利息收入', dataIndex: 'interestIncome', width: 110, align: 'right' },
+  { title: '现金流入', dataIndex: 'cashReceived', width: 110, align: 'right' },
+  { title: '本金回收', dataIndex: 'principalRecovery', width: 110, align: 'right' },
+  { title: '期末净投资', dataIndex: 'closingNetInvestment', width: 130, align: 'right' },
+]
+
+const effectiveInterest = computed(() => props.result.effectiveInterest)
+
 const compositionOption = computed(() => buildCompositionOption(props.result.schedule.installments))
 const balanceOption = computed(() => buildBalanceOption(props.result.schedule.installments))
 
@@ -89,61 +118,98 @@ function issueKey(issue: Issue, index: number): string {
       style="margin-top: 8px"
     />
 
-    <Typography.Title :level="5" style="margin-top: 12px">指标</Typography.Title>
-    <div
-      data-test="metric-cards"
-      style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px"
-    >
-      <Card v-for="card in metricCards" :key="card.code" size="small" data-test="metric-card">
-        <!-- 自定义 formatter：金额字符串原样直显，绕开 Statistic 内置的千分位重排版。 -->
-        <Statistic
-          :title="card.label"
-          :value="card.value ?? '—'"
-          :data-test="`metric-${card.code}`"
-          :value-style="card.value === null ? { color: 'rgba(0,0,0,0.45)' } : undefined"
+    <Tabs data-test="result-tabs">
+      <!-- Tab 1：指标（Statistic 卡 + 全量指标 + 问题列表）。 -->
+      <TabPane key="metrics" tab="指标">
+        <div
+          data-test="metric-cards"
+          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px"
         >
-          <template #formatter>{{ card.value ?? '—' }}</template>
-        </Statistic>
-      </Card>
-    </div>
-    <Descriptions
-      v-if="otherMetrics.length > 0"
-      bordered
-      size="small"
-      :column="3"
-      data-test="metrics-list"
-      style="margin-top: 12px"
-    >
-      <Descriptions.Item v-for="[code, value] in otherMetrics" :key="code" :label="code">
-        {{ value ?? '—' }}
-      </Descriptions.Item>
-    </Descriptions>
+          <Card v-for="card in metricCards" :key="card.code" size="small" data-test="metric-card">
+            <!-- 自定义 formatter：金额字符串原样直显，绕开 Statistic 内置的千分位重排版。 -->
+            <Statistic
+              :title="card.label"
+              :value="card.value ?? '—'"
+              :data-test="`metric-${card.code}`"
+              :value-style="card.value === null ? { color: 'rgba(0,0,0,0.45)' } : undefined"
+            >
+              <template #formatter>{{ card.value ?? '—' }}</template>
+            </Statistic>
+          </Card>
+        </div>
+        <Descriptions
+          v-if="otherMetrics.length > 0"
+          bordered
+          size="small"
+          :column="3"
+          data-test="metrics-list"
+          style="margin-top: 12px"
+        >
+          <Descriptions.Item v-for="[code, value] in otherMetrics" :key="code" :label="code">
+            {{ value ?? '—' }}
+          </Descriptions.Item>
+        </Descriptions>
 
-    <template v-if="result.schedule.issues.length > 0">
-      <Typography.Title :level="5" style="margin-top: 12px">问题列表</Typography.Title>
-      <ul data-test="issues-list" style="padding-left: 20px; margin: 0">
-        <li v-for="(issue, idx) in result.schedule.issues" :key="issueKey(issue, idx)">
-          <Tag :color="issueColor(issue.level)" data-test="issue-level">{{ issue.level }}</Tag>
-          {{ issue.code }} {{ issue.message }}
-          <template v-if="issue.periodNo !== null">（第 {{ issue.periodNo }} 期）</template>
-        </li>
-      </ul>
-    </template>
+        <template v-if="result.schedule.issues.length > 0">
+          <Typography.Title :level="5" style="margin-top: 12px">问题列表</Typography.Title>
+          <ul data-test="issues-list" style="padding-left: 20px; margin: 0">
+            <li v-for="(issue, idx) in result.schedule.issues" :key="issueKey(issue, idx)">
+              <Tag :color="issueColor(issue.level)" data-test="issue-level">{{ issue.level }}</Tag>
+              {{ issue.code }} {{ issue.message }}
+              <template v-if="issue.periodNo !== null">（第 {{ issue.periodNo }} 期）</template>
+            </li>
+          </ul>
+        </template>
+      </TabPane>
 
-    <Typography.Title :level="5" style="margin-top: 12px">构成（本金 vs 利息）</Typography.Title>
-    <EChart :option="compositionOption" data-test="composition-chart" />
-    <Typography.Title :level="5" style="margin-top: 12px">余额曲线</Typography.Title>
-    <EChart :option="balanceOption" data-test="balance-chart" />
+      <!-- Tab 2：摊销计划（构成/余额图表在上，16 列表格在下，行为不变）。 -->
+      <TabPane key="schedule" tab="摊销计划">
+        <Typography.Title :level="5" style="margin-top: 4px">构成（本金 vs 利息）</Typography.Title>
+        <EChart :option="compositionOption" data-test="composition-chart" />
+        <Typography.Title :level="5" style="margin-top: 12px">余额曲线</Typography.Title>
+        <EChart :option="balanceOption" data-test="balance-chart" />
 
-    <Typography.Title :level="5" style="margin-top: 12px">摊销计划</Typography.Title>
-    <Table
-      :columns="installmentColumns"
-      :data-source="result.schedule.installments"
-      :pagination="false"
-      size="small"
-      row-key="periodNo"
-      :scroll="{ x: 1870 }"
-      data-test="installments-table"
-    />
+        <Typography.Title :level="5" style="margin-top: 12px">摊销计划</Typography.Title>
+        <Table
+          :columns="installmentColumns"
+          :data-source="result.schedule.installments"
+          :pagination="false"
+          size="small"
+          row-key="periodNo"
+          :scroll="{ x: 1870 }"
+          data-test="installments-table"
+        />
+      </TabPane>
+
+      <!-- Tab 3：现金流占位（Task 3 填充现金流表 + 累计回收曲线）。 -->
+      <TabPane key="cashflow" tab="现金流">
+        <Empty description="现金流表与累计回收曲线将在后续任务中提供" data-test="cashflow-empty" />
+      </TabPane>
+
+      <!-- Tab 4：实际利率法（§9.7 六列摊销表；IRR 未收敛/不可建表时占位）。 -->
+      <TabPane key="eir" tab="实际利率法">
+        <template v-if="effectiveInterest">
+          <Typography.Text type="secondary" style="display: block; margin-bottom: 8px">
+            实际利率（EIR）：{{ effectiveInterest.eir }} · 利息总额调整差：{{
+              effectiveInterest.totalInterestDifference
+            }}
+          </Typography.Text>
+          <Table
+            :columns="eirColumns"
+            :data-source="effectiveInterest.rows"
+            :pagination="false"
+            size="small"
+            row-key="periodNo"
+            :scroll="{ x: 650 }"
+            data-test="effective-interest-table"
+          />
+        </template>
+        <Empty
+          v-else
+          description="IRR 未收敛或不可建表，暂无实际利率法摊销表"
+          data-test="eir-empty"
+        />
+      </TabPane>
+    </Tabs>
   </Card>
 </template>
