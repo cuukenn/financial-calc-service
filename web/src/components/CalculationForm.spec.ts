@@ -1,0 +1,263 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { ApiError } from '@/api/client'
+import type { CalculationRequest, CalculationResult } from '@/api/types'
+import CalculationForm from './CalculationForm.vue'
+
+vi.mock('@/api/client', () => ({
+  ApiError: class ApiError extends Error {
+    code: string
+    status: number
+    constructor(code: string, message: string, status: number) {
+      super(message)
+      this.code = code
+      this.status = status
+    }
+  },
+  calculate: vi.fn(),
+}))
+
+import { calculate } from '@/api/client'
+
+/** 与后端 CalculationApiTest 黄金结构同源的最小响应（金额均为字符串）。 */
+function goldenResult(): CalculationResult {
+  return {
+    runId: 'a'.repeat(32),
+    schedule: {
+      header: {
+        periods: 12,
+        firstDate: '2024-02-01',
+        lastDate: '2025-01-01',
+        solver: 'EQUAL_INSTALLMENT',
+        metrics: { TOTAL_RENT: '1032797.15', TOTAL_INTEREST: '392797.15' },
+        roundingDifference: null,
+      },
+      installments: [
+        {
+          periodNo: 1,
+          startDate: '2024-01-01',
+          endDate: '2024-02-01',
+          days: 30,
+          openingBalance: '1000000.00',
+          principalDue: '78971.24',
+          interestAccrued: '5000.00',
+          interestPaid: '5000.00',
+          fee: '0.00',
+          tax: '300.00',
+          rentDue: '84271.24',
+          closingBalance: '921028.76',
+          cumulativePrincipal: '78971.24',
+          cumulativeInterest: '5000.00',
+          appliedRate: '0.005',
+          memo: null,
+        },
+      ],
+      cashFlows: [],
+      issues: [],
+      hasErrors: false,
+    },
+    effectiveInterest: null,
+  }
+}
+
+function resultWithIssues(hasErrors: boolean): CalculationResult {
+  const base = goldenResult()
+  base.schedule.hasErrors = hasErrors
+  base.schedule.issues = [
+    { level: 'WARNING', code: 'FCS-CHK-2001', message: '尾差超过阈值', periodNo: 12 },
+  ]
+  return base
+}
+
+async function submit(wrapper: ReturnType<typeof mount>): Promise<void> {
+  await wrapper.find('form').trigger('submit')
+  await flushPromises()
+  await flushPromises()
+}
+
+describe('CalculationForm', () => {
+  beforeEach(() => {
+    vi.mocked(calculate).mockResolvedValue(goldenResult())
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('renders the form pre-filled with the golden fixture defaults', () => {
+    const wrapper = mount(CalculationForm)
+
+    expect((wrapper.find('[data-test="principal"]').element as HTMLInputElement).value).toBe('1000000')
+    expect((wrapper.find('[data-test="nominal-rate"]').element as HTMLInputElement).value).toBe('0.06')
+    expect((wrapper.find('[data-test="periods"]').element as HTMLInputElement).value).toBe('12')
+    expect((wrapper.find('[data-test="commence-date"] input').element as HTMLInputElement).value).toBe('2024-01-01')
+    expect((wrapper.find('[data-test="first-rent-date"] input').element as HTMLInputElement).value).toBe('2024-02-01')
+    // 后端必填的口径/方式字段始终有值（Task 1 评审发现）。
+    expect(wrapper.find('[data-test="day-count-code"]').text()).toContain('THIRTY_360')
+    expect(wrapper.find('[data-test="date-roll-code"]').text()).toContain('NONE')
+    const methodRadio = wrapper.find('input[value="EQUAL_INSTALLMENT"]')
+    expect((methodRadio.element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('submits a correctly-shaped CalculationRequest on golden defaults', async () => {
+    const wrapper = mount(CalculationForm)
+    await submit(wrapper)
+
+    expect(calculate).toHaveBeenCalledTimes(1)
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.principal).toBe('1000000')
+    expect(req.nominalRate).toBe('0.06')
+    expect(req.commenceDate).toBe('2024-01-01')
+    expect(req.firstRentDate).toBe('2024-02-01')
+    expect(req.periods).toBe(12)
+    expect(req.frequency).toBe('MONTHLY')
+    expect(req.timing).toBe('IN_ARREARS')
+    expect(req.currency).toBe('CNY')
+    expect(req.dayCountCode).toBe('THIRTY_360')
+    expect(req.dateRollCode).toBe('NONE')
+    expect(req.rateChangePolicy).toBe('RESOLVE')
+    expect(req.method).toBe('EQUAL_INSTALLMENT')
+    expect(req.residualValue).toBe('0')
+    expect(req.residualHandling).toBe('SEPARATE')
+    expect(req.deposit).toBe('0')
+    expect(req.vatRate).toBe('0.06')
+    expect(req).not.toHaveProperty('ruleRows')
+    expect(req).not.toHaveProperty('explicitRents')
+    expect(req).not.toHaveProperty('gracePeriod')
+    expect(req).not.toHaveProperty('fees')
+  })
+
+  it('surfaces the backend FCS code verbatim in an error alert', async () => {
+    vi.mocked(calculate).mockRejectedValue(
+      new ApiError('FCS-DOM-1001', '租赁本金必须为正数', 400),
+    )
+    const wrapper = mount(CalculationForm)
+    await submit(wrapper)
+
+    const alert = wrapper.find('[data-test="error-alert"]')
+    expect(alert.exists()).toBe(true)
+    expect(alert.text()).toContain('FCS-DOM-1001')
+    expect(alert.text()).toContain('租赁本金必须为正数')
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
+  })
+
+  it('renders header metrics, installments and hides the error alert on success', async () => {
+    const wrapper = mount(CalculationForm)
+    await submit(wrapper)
+
+    const metrics = wrapper.find('[data-test="metrics-list"]')
+    expect(metrics.exists()).toBe(true)
+    expect(metrics.text()).toContain('TOTAL_RENT')
+    expect(metrics.text()).toContain('1032797.15')
+
+    const rows = wrapper.find('[data-test="installments-table"]').findAll('.ant-table-row')
+    expect(rows.length).toBeGreaterThanOrEqual(1)
+    expect(rows[0].text()).toContain('84271.24')
+    expect(wrapper.find('[data-test="has-errors-alert"]').exists()).toBe(false)
+  })
+
+  it('lists issues and shows the warning alert when the schedule hasErrors', async () => {
+    vi.mocked(calculate).mockResolvedValue(resultWithIssues(true))
+    const wrapper = mount(CalculationForm)
+    await submit(wrapper)
+
+    expect(wrapper.find('[data-test="has-errors-alert"]').exists()).toBe(true)
+    const issues = wrapper.find('[data-test="issues-list"]')
+    expect(issues.text()).toContain('FCS-CHK-2001')
+    expect(issues.text()).toContain('尾差超过阈值')
+  })
+
+  it('gates the submit when a required field is cleared', async () => {
+    const wrapper = mount(CalculationForm)
+    await wrapper.find('[data-test="principal"]').setValue('')
+    await submit(wrapper)
+
+    expect(calculate).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('请输入租赁本金')
+  })
+
+  it('shows the explicit rents editor sized by periods when EXPLICIT_RENT is selected', async () => {
+    const wrapper = mount(CalculationForm)
+    await wrapper.find('input[value="EXPLICIT_RENT"]').setValue()
+    await flushPromises()
+
+    const editor = wrapper.find('[data-test="rents-editor"]')
+    expect(editor.exists()).toBe(true)
+    expect(wrapper.findAll('[data-test="rent-input"]')).toHaveLength(12)
+  })
+
+  it('resizes the explicit rents list when periods changes', async () => {
+    const wrapper = mount(CalculationForm)
+    await wrapper.find('input[value="EXPLICIT_RENT"]').setValue()
+    await wrapper.find('[data-test="periods"]').setValue('3')
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-test="rent-input"]')).toHaveLength(3)
+  })
+
+  it('fills the segmented-rate preset rows when the preset button is clicked', async () => {
+    const wrapper = mount(CalculationForm)
+    await wrapper.find('[data-test="rule-preset"]').trigger('click')
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-test="rule-row"]')
+    expect(rows).toHaveLength(2)
+    const rates = wrapper.findAll('[data-test="rule-annual-rate"]').map(
+      (input) => (input.element as HTMLInputElement).value,
+    )
+    expect(rates).toEqual(['0.03', '0.06'])
+  })
+
+  it('sends the rule rows on submit when present (built-in method + segmented rates)', async () => {
+    const wrapper = mount(CalculationForm)
+    await wrapper.find('[data-test="rule-preset"]').trigger('click')
+    await submit(wrapper)
+
+    expect(calculate).toHaveBeenCalledTimes(1)
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.ruleRows).toEqual([
+      {
+        ruleId: 'R1',
+        priority: 10,
+        fromPeriod: 1,
+        toPeriod: 6,
+        annualRate: '0.03',
+        principalPlan: 'INHERIT',
+        interestTreatment: 'PAY_AS_INCURRED',
+        paymentTiming: 'IN_ARREARS',
+        specialAction: 'NONE',
+      },
+      {
+        ruleId: 'R2',
+        priority: 20,
+        fromPeriod: 7,
+        toPeriod: 12,
+        annualRate: '0.06',
+        principalPlan: 'INHERIT',
+        interestTreatment: 'PAY_AS_INCURRED',
+        paymentTiming: 'IN_ARREARS',
+        specialAction: 'NONE',
+      },
+    ])
+  })
+
+  it('keeps the optional rule-rows editor available for built-in methods', () => {
+    const wrapper = mount(CalculationForm)
+
+    const editor = wrapper.find('[data-test="rule-rows-editor"]')
+    expect(editor.exists()).toBe(true)
+    expect(editor.text()).toContain('可选：分段利率')
+    const methodRadio = wrapper.find('input[value="EQUAL_INSTALLMENT"]')
+    expect((methodRadio.element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('shows the rule-rows editor as the primary editor for RULE_DRIVEN', async () => {
+    const wrapper = mount(CalculationForm)
+    await wrapper.find('input[value="RULE_DRIVEN"]').setValue()
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="rule-rows-editor"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="rents-editor"]').exists()).toBe(false)
+  })
+})

@@ -58,7 +58,7 @@ export interface FeeInput {
   type: string
   /** 费用金额。 */
   amount: string
-  /** UPFRONT（期初一次性）/ DEDUCT_FROM_PRINCIPAL。 */
+  /** UPFRONT（期初一次性）/ DEDUCT_FROM_PRINCIPAL（抵减本金）/ AMORTIZED（摊入租金）。 */
   chargeMode: string
   /** 该笔费用的增值税率，小数形式。 */
   vatRate?: string

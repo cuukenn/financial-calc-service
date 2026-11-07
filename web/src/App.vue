@@ -2,6 +2,7 @@
 import { ConfigProvider, Layout, Space, Typography, theme } from 'ant-design-vue'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 
+import CalculationForm from '@/components/CalculationForm.vue'
 import EngineStatus from '@/components/EngineStatus.vue'
 
 // R82: 最小 v1 单页形态（无 Router / Pinia）；Task 2/3 的表单与结果区块将挂在此处。
@@ -18,6 +19,7 @@ const { Header, Content, Footer } = Layout
       <Content style="padding: 24px">
         <Space direction="vertical" size="large" style="width: 100%">
           <EngineStatus />
+          <CalculationForm />
         </Space>
       </Content>
       <Footer style="text-align: center">financial-calc-service · 可视化测算前端（Plan 3）</Footer>
