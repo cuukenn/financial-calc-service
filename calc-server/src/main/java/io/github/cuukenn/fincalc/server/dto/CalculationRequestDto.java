@@ -114,7 +114,7 @@ public final class CalculationRequestDto {
 
     @Schema(description = "还款方式 code（RepaymentMethodId 枚举名，可选值见 GET /api/v1/algorithms）："
             + "EQUAL_INSTALLMENT / EQUAL_PRINCIPAL / INTEREST_FIRST / PRINCIPAL_FIRST / "
-            + "RULE_DRIVEN / EXPLICIT_RENT；未知 code → FCS-ENG-1002（HTTP 400）；"
+            + "BULLET_LOAN / RULE_DRIVEN / EXPLICIT_RENT；未知 code → FCS-ENG-1002（HTTP 400）；"
             + "RULE_DRIVEN 必须携带 ruleRows（否则 FCS-ENG-1003）",
             example = "EQUAL_INSTALLMENT", requiredMode = Schema.RequiredMode.REQUIRED)
     private final String method;

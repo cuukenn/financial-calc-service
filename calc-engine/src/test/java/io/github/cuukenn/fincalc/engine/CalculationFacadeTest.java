@@ -7,6 +7,7 @@ import io.github.cuukenn.fincalc.common.error.BusinessException;
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetrics;
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
 import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
+import io.github.cuukenn.fincalc.domain.model.CashFlowType;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
 import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
@@ -76,6 +77,29 @@ class CalculationFacadeTest {
                 assertThat(r.schedule().header().metrics().codes()).isEqualTo(expected);
             }
         }
+    }
+
+    @Test
+    void bullet_loan_defers_everything_to_maturity_and_passes_the_validators() {
+        CalculationResult r = CalculationFacade.defaults().calculate(
+                new CalculationRequest(baseElement().toBuilder()
+                        .method(RepaymentMethodId.BULLET_LOAN).build(), null,
+                        CalculationOptions.defaults()));
+
+        assertThat(r.schedule().installments()).hasSize(12);
+        assertThat(r.schedule().issues()).noneMatch(i -> i.level() == IssueLevel.ERROR);
+        // Zero-amount legs are dropped, so the schedule emits exactly one rent event.
+        assertThat(r.schedule().cashFlows())
+                .filteredOn(flow -> flow.type() == CashFlowType.RENT)
+                .hasSize(1);
+        assertThat(r.schedule().installments().get(11).principalDue())
+                .isEqualByComparingTo("1000000.00");
+        assertThat(r.schedule().installments().get(11).interestPaid())
+                .isEqualByComparingTo("60000.00");
+        assertThat(r.effectiveInterest()).isNotNull();
+        assertThat(r.effectiveInterest().rows()).hasSize(12);
+        assertThat(r.effectiveInterest().rows().get(11).closingNetInvestment())
+                .isEqualByComparingTo("0.00");
     }
 
     @Test

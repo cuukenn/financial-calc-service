@@ -17,6 +17,9 @@ public enum RepaymentMethodId {
     /** Principal paid first (先本后息). */
     PRINCIPAL_FIRST,
 
+    /** 到期一次还本付息：本金与累计利息均在到期日一次性结清（bullet loan）。 */
+    BULLET_LOAN,
+
     /** Schedule driven by a compiled rule set rather than a fixed formula. */
     RULE_DRIVEN,
 

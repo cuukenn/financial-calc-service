@@ -4,6 +4,7 @@ import io.github.cuukenn.fincalc.common.error.BusinessException;
 import io.github.cuukenn.fincalc.common.spi.ExtensionRegistry;
 import io.github.cuukenn.fincalc.domain.port.ScheduleGenerator;
 import io.github.cuukenn.fincalc.domain.port.RuleSetView;
+import io.github.cuukenn.fincalc.domain.support.algo.BulletLoanGenerator;
 import io.github.cuukenn.fincalc.domain.support.algo.EqualInstallmentGenerator;
 import io.github.cuukenn.fincalc.domain.support.algo.EqualPrincipalGenerator;
 import io.github.cuukenn.fincalc.domain.support.algo.ExplicitRentGenerator;
@@ -17,10 +18,10 @@ import java.util.Objects;
  * {@link ScheduleGenerator#code()} — which matches the {@code RepaymentMethodId} name for the
  * built-in algorithms and {@code RULE_DRIVEN} for the rule-driven generator.
  *
- * <p>{@link #defaults()} registers the five built-in amortization algorithms. The rule-driven
+ * <p>{@link #defaults()} registers the six built-in amortization algorithms. The rule-driven
  * generator is deliberately absent from it: {@link RuleDrivenGenerator} is bound to one compiled
  * rule set at construction, so it cannot be a shared singleton. A run that needs it obtains a
- * private registry through {@link #withRuleDriven(RuleSetView)}, which carries the five built-ins
+ * private registry through {@link #withRuleDriven(RuleSetView)}, which carries the six built-ins
  * plus a rule-driven generator bound to that run's set — the registry the facade routes a
  * {@code RULE_DRIVEN} request through (orchestration step 2).
  *
@@ -42,9 +43,9 @@ public final class GeneratorRegistry {
     }
 
     /**
-     * The five built-in amortization algorithms: equal installment, equal principal, interest
-     * first, principal first and explicit rent. The rule-driven generator is not among them —
-     * see the class javadoc.
+     * The six built-in amortization algorithms: equal installment, equal principal, interest
+     * first, principal first, bullet loan and explicit rent. The rule-driven generator is not among
+     * them — see the class javadoc.
      *
      * @return a fresh registry with the built-ins registered
      */
@@ -54,6 +55,7 @@ public final class GeneratorRegistry {
         registry.extensions.register(new EqualPrincipalGenerator());
         registry.extensions.register(new InterestFirstGenerator());
         registry.extensions.register(new PrincipalFirstGenerator());
+        registry.extensions.register(new BulletLoanGenerator());
         registry.extensions.register(new ExplicitRentGenerator());
         return registry;
     }
@@ -70,7 +72,7 @@ public final class GeneratorRegistry {
     }
 
     /**
-     * A registry carrying the five built-ins (or whatever this registry holds) plus a
+     * A registry carrying the six built-ins (or whatever this registry holds) plus a
      * {@link RuleDrivenGenerator} bound to {@code ruleSet}. The receiver is not mutated: rule
      * sets differ per run, so each RULE_DRIVEN run gets its own registry view.
      *
