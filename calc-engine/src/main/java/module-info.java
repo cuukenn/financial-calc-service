@@ -1,10 +1,10 @@
 /**
  * Use-case orchestration over the domain and rule modules.
  */
-module com.fincalc.engine {
-    requires com.fincalc.common;
-    requires com.fincalc.domain;
-    requires com.fincalc.rule;
+module io.github.cuukenn.fincalc.engine {
+    requires io.github.cuukenn.fincalc.common;
+    requires io.github.cuukenn.fincalc.domain;
+    requires io.github.cuukenn.fincalc.rule;
 
-    exports com.fincalc.engine;
+    exports io.github.cuukenn.fincalc.engine;
 }

@@ -2,15 +2,15 @@
  * Rule engine: expression parsing/evaluation, rule compilation and
  * script inlining, on top of the domain module.
  */
-module com.fincalc.rule {
-    requires com.fincalc.common;
-    requires com.fincalc.domain;
+module io.github.cuukenn.fincalc.rule {
+    requires io.github.cuukenn.fincalc.common;
+    requires io.github.cuukenn.fincalc.domain;
 
-    exports com.fincalc.rule;
-    exports com.fincalc.rule.compiler;
-    exports com.fincalc.rule.generator;
-    exports com.fincalc.rule.expression;
-    exports com.fincalc.rule.function;
-    exports com.fincalc.rule.model;
-    exports com.fincalc.rule.script;
+    exports io.github.cuukenn.fincalc.rule;
+    exports io.github.cuukenn.fincalc.rule.compiler;
+    exports io.github.cuukenn.fincalc.rule.generator;
+    exports io.github.cuukenn.fincalc.rule.expression;
+    exports io.github.cuukenn.fincalc.rule.function;
+    exports io.github.cuukenn.fincalc.rule.model;
+    exports io.github.cuukenn.fincalc.rule.script;
 }

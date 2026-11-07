@@ -2,14 +2,14 @@
  * Domain model, ports and supporting algorithms for financial
  * calculations. Built on top of the shared primitives module.
  */
-module com.fincalc.domain {
-    requires com.fincalc.common;
+module io.github.cuukenn.fincalc.domain {
+    requires io.github.cuukenn.fincalc.common;
 
-    exports com.fincalc.domain.calc;
-    exports com.fincalc.domain.metric;
-    exports com.fincalc.domain.model;
-    exports com.fincalc.domain.port;
-    exports com.fincalc.domain.support;
-    exports com.fincalc.domain.support.algo;
-    exports com.fincalc.domain.support.cashflow;
+    exports io.github.cuukenn.fincalc.domain.calc;
+    exports io.github.cuukenn.fincalc.domain.metric;
+    exports io.github.cuukenn.fincalc.domain.model;
+    exports io.github.cuukenn.fincalc.domain.port;
+    exports io.github.cuukenn.fincalc.domain.support;
+    exports io.github.cuukenn.fincalc.domain.support.algo;
+    exports io.github.cuukenn.fincalc.domain.support.cashflow;
 }

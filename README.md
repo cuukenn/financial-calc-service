@@ -14,18 +14,18 @@
 | 模块 | JPMS 模块名 | 职责 |
 |---|---|---|
 | `calc-bom` | — | 依赖版本管理（BOM），无代码 |
-| `calc-common` | `com.fincalc.common` | 共享原语：金额/日期时间、错误码、扩展点 SPI（`ExtensionRegistry`） |
-| `calc-domain` | `com.fincalc.domain` | 领域模型（`LeaseElement`/`Schedule` 等）、端口（`ScheduleGenerator`、`DayCountConvention`…）、四种内置算法、现金流、指标 SPI 与内置指标 |
-| `calc-rule` | `com.fincalc.rule` | 规则引擎：表达式解析求值、规则编译、`.fcs` 函数脚本、80 个 Excel 兼容函数 |
-| `calc-engine` | `com.fincalc.engine` | 编排门面 `CalculationFacade`：校验 → 生成 → 现金流 → 指标 → 实际利率表 |
+| `calc-common` | `io.github.cuukenn.fincalc.common` | 共享原语：金额/日期时间、错误码、扩展点 SPI（`ExtensionRegistry`） |
+| `calc-domain` | `io.github.cuukenn.fincalc.domain` | 领域模型（`LeaseElement`/`Schedule` 等）、端口（`ScheduleGenerator`、`DayCountConvention`…）、四种内置算法、现金流、指标 SPI 与内置指标 |
+| `calc-rule` | `io.github.cuukenn.fincalc.rule` | 规则引擎：表达式解析求值、规则编译、`.fcs` 函数脚本、80 个 Excel 兼容函数 |
+| `calc-engine` | `io.github.cuukenn.fincalc.engine` | 编排门面 `CalculationFacade`：校验 → 生成 → 现金流 → 指标 → 实际利率表 |
 | `calc-testkit` | — | 测试工具：黄金参考表 `ReferenceTables` 与测试夹具 `Fixtures` |
 
 作为 JPMS 消费方，在你的 `module-info.java` 中声明：
 
 ```java
 module your.app {
-    requires com.fincalc.engine;
-    requires com.fincalc.domain;   // API 类型（LeaseElement、Schedule…）在 domain 模块
+    requires io.github.cuukenn.fincalc.engine;
+    requires io.github.cuukenn.fincalc.domain;   // API 类型（LeaseElement、Schedule…）在 domain 模块
 }
 ```
 
@@ -81,7 +81,7 @@ EffectiveInterestTable eir = r.effectiveInterest();     // §9.7 实际利率法
 ## 黄金基线（对账参考）
 
 Task-30 固化的租金表与指标黄金基线位于 `calc-testkit` 的
-`com.fincalc.testkit.ReferenceTables`（如标准租约：本金 1 000 000、6% 名义年利率、
+`io.github.cuukenn.fincalc.testkit.ReferenceTables`（如标准租约：本金 1 000 000、6% 名义年利率、
 THIRTY_360、12 期月付期末付，`TOTAL_RENT = 1 032 797.15`）。改动算法或舍入逻辑前先跑
 `calc-testkit` 的黄金测试，防止基线无意识漂移。
 
