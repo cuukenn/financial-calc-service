@@ -1280,7 +1280,7 @@ financial-calc-service/
 | R76 DTO 边界（Plan 2，2026-11-07） | 核心模块零 Jackson/Swagger 注解；JSON 绑定、手写映射与 `@Schema` 文档全部由 calc-server 的 DTO 层承担，`RepaymentMethodId` 等领域类型不加任何注解 |
 | R77 异常映射（Plan 2，2026-11-07） | `BusinessException` → HTTP 400、`SystemException`/未捕获异常 → HTTP 500，错误体统一 `{code, message}`（§B 之外新增 `FCS-SRV-1001` 请求体非法 / `FCS-SRV-1002` 系统内部错误）；`FCS-ENG-1002/1003` 等请求性错误按 400 处理 |
 | R79 资源限制（Plan 2，2026-11-07） | §15 资源限制按最小执行：Tomcat form/multipart 上限配 1MB；纯 JSON 请求体的严格 1MB 过滤器未实现（calc-server `application.yml` 内已注明），待真实消费方出现再补 |
-| §15 单次 ≤ 10000 期上限 | 未实现；Plan 3 随资源限制（认证/限流）补齐（R79） |
+| §15 单次 ≤ 10000 期上限 | 由 1200 期硬上限取代（Plan 5 R104/R112，2026-11-08）：`LeaseElement.MAX_PERIODS = 1200`（月频 100 年）在 `LeaseElement.validate()` 对有效期数（`periods`；`IRREGULAR` 时为 `explicitPeriods.size()`）强制校验，超限抛 `FCS-DOM-1010` |
 | R77 路由性错误并入统一错误体（Plan 2 终审修正，2026-11-07） | 405（`FCS-SRV-1003` 方法不支持）/ 415（`FCS-SRV-1004` 媒体类型不支持）/ 404（`FCS-SRV-1005` 请求路径不存在，需 `spring.mvc.throw-exception-if-no-handler-found: true` + `spring.web.resources.add-mappings: false`）均由 `ApiExceptionHandler` 以统一 `{code, message}` 体返回，不再落入兜底 500 或 Boot 默认 `/error` 形态 |
 | Plan 3 持久化/版本链、Excel 适配及关联优化 | 暂时移出计划（用户指令，2026-11-07）；待真实需求出现再立项。前端方向改为 Vue3 + Ant Design UI 可视化测算，经 REST API 消费引擎 |
 | R80 技术栈与位置（Plan 3，2026-11-07） | 前端置于仓库内 `web/`（独立 package.json，`node_modules/`、`dist/` 进 .gitignore）；Vite + Vue 3 + TypeScript + Ant Design Vue 4.x；后端与核心模块零改动 |
