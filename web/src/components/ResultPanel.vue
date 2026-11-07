@@ -15,16 +15,22 @@ import {
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import type { CalculationResult, EffectiveInterestRow, Installment, Issue } from '@/api/types'
+import type { CalculationResult, CashFlowEvent, EffectiveInterestRow, Installment, Issue } from '@/api/types'
 import type { AppLocale } from '@/i18n'
 import { metricLabel, metricTooltip } from '@/i18n/metricCatalog'
 
 import EChart from './charts/EChart.vue'
-import { buildBalanceOption, buildCompositionOption, type ChartLabels } from './charts/options'
+import {
+  buildBalanceOption,
+  buildCompositionOption,
+  buildCumulativeCashflowOption,
+  type ChartLabels,
+} from './charts/options'
 
 /**
  * Task 1（Plan 4）结果区 Tabs 化：指标 / 摊销计划（图表 + 16 列表格，行为不变）/
- * 现金流占位（Task 3 填充）/ 实际利率法（有数据即渲染 6 列摊销表，否则 Empty 占位）。
+ * 现金流（Task 3 / R87 填充：现金流表 + 方向着色 + 累计回收曲线）/
+ * 实际利率法（有数据即渲染 6 列摊销表，否则 Empty 占位）。
  * 指标 Statistic 卡金额字符串原样直显，null → 「—」。
  * Task 2（Plan 4 / R85-R86）：全量文案 i18n；指标卡与指标表 hover 显示指标目录
  * （中文名/公式/说明，来自 §9.5）。
@@ -127,6 +133,45 @@ const eirColumns = computed<
 ])
 
 const effectiveInterest = computed(() => props.result.effectiveInterest)
+
+/** R87：现金流表五列（期次/日期/类型/方向/金额），金额字符串原样直显。 */
+const cashflowColumns = computed<
+  { title: string; dataIndex: keyof CashFlowEvent; width: number; align?: 'right' }[]
+>(() => [
+  { title: t('result.cashflowTab.sequence'), dataIndex: 'sequence', width: 70 },
+  { title: t('result.cashflowTab.date'), dataIndex: 'date', width: 110 },
+  { title: t('result.cashflowTab.type'), dataIndex: 'type', width: 110 },
+  { title: t('result.cashflowTab.direction'), dataIndex: 'direction', width: 100 },
+  { title: t('result.cashflowTab.amount'), dataIndex: 'amount', width: 120, align: 'right' },
+])
+
+const cashFlows = computed(() => props.result.schedule.cashFlows)
+
+/** 现金流类型本地化标签；目录外的枚举名（后端新增）原样透出（同问题级别约定）。 */
+function cashflowTypeLabel(type: string): string {
+  const key = `result.cashflowTab.types.${type}`
+  return te(key) ? t(key) : type
+}
+
+/** 现金流方向本地化标签；目录外的枚举名原样透出。 */
+function cashflowDirectionLabel(direction: string): string {
+  const key = `result.cashflowTab.directions.${direction}`
+  return te(key) ? t(key) : direction
+}
+
+/** 方向着色：INFLOW 绿 / OUTFLOW 红（R87）。 */
+function directionColor(direction: string): string {
+  return direction === 'OUTFLOW' ? 'red' : 'green'
+}
+
+/** R87：回收曲线文案从 locale 组装后传入 option 构造器。 */
+const cumulativeOption = computed(() =>
+  buildCumulativeCashflowOption(cashFlows.value, {
+    cumulative: t('charts.cumulativeCashflow'),
+    dateAxis: t('charts.dateAxis'),
+    amount: t('charts.amount'),
+  }),
+)
 
 /** R85：图表系列名/轴名文案从 locale 组装后传入 option 构造器。 */
 const chartLabels = computed<ChartLabels>(() => ({
@@ -250,9 +295,46 @@ function issueKey(issue: Issue, index: number): string {
         />
       </TabPane>
 
-      <!-- Tab 3：现金流占位（Task 3 填充现金流表 + 累计回收曲线）。 -->
+      <!-- Tab 3：现金流表（R87：类型/方向 i18n 标签，方向着色 Tag）+ 累计回收曲线。 -->
       <TabPane key="cashflow" :tab="t('result.tabs.cashflow')">
-        <Empty :description="t('result.cashflowEmpty')" data-test="cashflow-empty" />
+        <template v-if="cashFlows.length > 0">
+          <Typography.Title :level="5" style="margin-top: 4px">
+            {{ t('result.cashflowTab.tableTitle') }}
+          </Typography.Title>
+          <Table
+            :columns="cashflowColumns"
+            :data-source="cashFlows"
+            :pagination="false"
+            size="small"
+            row-key="sequence"
+            :scroll="{ x: 510 }"
+            data-test="cashflow-table"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.dataIndex === 'type'">
+                {{ cashflowTypeLabel(record.type) }}
+              </template>
+              <template v-else-if="column.dataIndex === 'direction'">
+                <Tag
+                  :color="directionColor(record.direction)"
+                  data-test="cashflow-direction"
+                >
+                  {{ cashflowDirectionLabel(record.direction) }}
+                </Tag>
+              </template>
+            </template>
+          </Table>
+
+          <Typography.Title :level="5" style="margin-top: 12px">
+            {{ t('result.cashflowTab.curveTitle') }}
+          </Typography.Title>
+          <EChart :option="cumulativeOption" data-test="cumulative-cashflow-chart" />
+        </template>
+        <Empty
+          v-else
+          :description="t('result.cashflowTab.empty')"
+          data-test="cashflow-empty"
+        />
       </TabPane>
 
       <!-- Tab 4：实际利率法（§9.7 六列摊销表；IRR 未收敛/不可建表时占位）。 -->

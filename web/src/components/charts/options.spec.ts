@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Installment } from '@/api/types'
+import type { CashFlowEvent, Installment } from '@/api/types'
 
-import { buildBalanceOption, buildCompositionOption, type ChartLabels } from './options'
+import {
+  buildBalanceOption,
+  buildCompositionOption,
+  buildCumulativeCashflowOption,
+  type ChartLabels,
+} from './options'
 
 function installment(partial: Partial<Installment>): Installment {
   return {
@@ -74,5 +79,58 @@ describe('chart option builders', () => {
     expect(option.legend).toMatchObject({ data: ['Principal', 'Interest'] })
     const [principal] = option.series as { name: string }[]
     expect(principal.name).toBe('Principal')
+  })
+})
+
+describe('cumulative cash-flow recovery curve (R87)', () => {
+  function flow(partial: Partial<CashFlowEvent>): CashFlowEvent {
+    return {
+      sequence: 0,
+      date: '2024-01-01',
+      amount: '1000.00',
+      type: 'RENT',
+      direction: 'INFLOW',
+      ...partial,
+    }
+  }
+
+  const curveLabels = { cumulative: '累计现金流', dateAxis: '日期', amount: '金额' }
+
+  it('signs OUTFLOW negative and accumulates per date (same-date events aggregate)', () => {
+    const flows = [
+      flow({ sequence: 0, date: '2024-01-01', amount: '1000000.00', type: 'PRINCIPAL', direction: 'OUTFLOW' }),
+      flow({ sequence: 1, date: '2024-01-01', amount: '5000.00', type: 'FEE', direction: 'OUTFLOW' }),
+      flow({ sequence: 2, date: '2024-02-01', amount: '84271.24', type: 'RENT' }),
+      flow({ sequence: 3, date: '2024-03-01', amount: '84271.24', type: 'RENT' }),
+    ]
+
+    const option = buildCumulativeCashflowOption(flows, curveLabels)
+
+    const line = (option.series as { name: string; type: string; data: number[] }[])[0]
+    expect(line.name).toBe('累计现金流')
+    expect(line.type).toBe('line')
+    // 同日多笔聚合为一格：期初净流出 −1 005 000，随后逐期回收。
+    expect(option.xAxis).toMatchObject({ type: 'category', data: ['2024-01-01', '2024-02-01', '2024-03-01'] })
+    expect(line.data).toEqual([-1005000, -920728.76, -836457.52])
+    expect(option.yAxis).toMatchObject({ name: '金额' })
+  })
+
+  it('crosses zero exactly when cumulative net inflows recover the initial outlay', () => {
+    // 期初流出 1000，随后每期回收 400：第 3 格（0 起）转正——回收点。
+    const flows = [
+      flow({ sequence: 0, date: '2024-01-01', amount: '1000.00', type: 'PRINCIPAL', direction: 'OUTFLOW' }),
+      flow({ sequence: 1, date: '2024-02-01', amount: '400.00', type: 'RENT' }),
+      flow({ sequence: 2, date: '2024-03-01', amount: '400.00', type: 'RENT' }),
+      flow({ sequence: 3, date: '2024-04-01', amount: '400.00', type: 'RENT' }),
+    ]
+
+    const option = buildCumulativeCashflowOption(flows, curveLabels)
+    const data = (option.series as { data: number[] }[])[0].data
+
+    const crossing = data.findIndex((v) => v > 0)
+    expect(crossing).toBe(3)
+    // 交点前的累计值保持为负，交点处转正。
+    expect(data.slice(0, crossing)).toEqual([-1000, -600, -200])
+    expect(data[crossing]).toBe(200)
   })
 })

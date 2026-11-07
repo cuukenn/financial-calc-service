@@ -169,7 +169,27 @@ const zhCN = {
       balanceTitle: '余额曲线',
       tableTitle: '摊销计划',
     },
-    cashflowEmpty: '现金流表与累计回收曲线将在后续任务中提供',
+    cashflowTab: {
+      tableTitle: '现金流表',
+      curveTitle: '累计现金流回收曲线',
+      empty: '暂无现金流数据',
+      sequence: '期次',
+      date: '日期',
+      type: '类型',
+      direction: '方向',
+      amount: '金额',
+      types: {
+        PRINCIPAL: '本金',
+        RENT: '租金',
+        FEE: '费用',
+        RESIDUAL: '残值',
+        DEPOSIT: '保证金',
+      },
+      directions: {
+        INFLOW: '流入',
+        OUTFLOW: '流出',
+      },
+    },
     eir: {
       summary: '实际利率（EIR）：{eir} · 利息总额调整差：{diff}',
       empty: 'IRR 未收敛或不可建表，暂无实际利率法摊销表',
@@ -205,6 +225,8 @@ const zhCN = {
     periodAxis: '期次',
     amount: '金额',
     closingBalance: '期末余额',
+    cumulativeCashflow: '累计现金流',
+    dateAxis: '日期',
   },
 }
 

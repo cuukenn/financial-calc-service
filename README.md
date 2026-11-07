@@ -172,7 +172,9 @@ INCLUDE_DEPOSIT/CONTRACT 待 Plan 3 暴露为请求字段。v1 仅含基础资�
 
 仓库内可视化测算前端：Vue 3 + TypeScript + Ant Design Vue 4 + ECharts 单页应用（R80），
 经 Vite dev server 代理 `/api` → `http://localhost:8080` 消费 calc-server（R81，后端不加 CORS）。
-含测算表单（黄金要素默认值）、指标 Statistic 卡、16 列摊销计划表、构成堆叠柱图与余额曲线。
+含测算表单（黄金要素默认值）、指标 Statistic 卡（悬浮显示指标目录的中文名/公式/说明，R86）、
+16 列摊销计划表、构成堆叠柱图与余额曲线、现金流表（方向着色）与累计现金流回收曲线（R87）、
+实际利率法摊销表；国际化 zh-CN/en-US 双语言，页头语言切换器（R85）。
 启动与测试/构建命令见 `web/README.md`：
 
 ```bash

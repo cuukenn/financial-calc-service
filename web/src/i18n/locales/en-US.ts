@@ -168,7 +168,27 @@ const enUS: typeof zhCN = {
       balanceTitle: 'Balance curve',
       tableTitle: 'Amortization schedule',
     },
-    cashflowEmpty: 'The cash-flow table and cumulative recovery curve will be provided later',
+    cashflowTab: {
+      tableTitle: 'Cash-flow table',
+      curveTitle: 'Cumulative cash-flow recovery curve',
+      empty: 'No cash-flow data',
+      sequence: 'Seq',
+      date: 'Date',
+      type: 'Type',
+      direction: 'Direction',
+      amount: 'Amount',
+      types: {
+        PRINCIPAL: 'Principal',
+        RENT: 'Rent',
+        FEE: 'Fee',
+        RESIDUAL: 'Residual',
+        DEPOSIT: 'Deposit',
+      },
+      directions: {
+        INFLOW: 'Inflow',
+        OUTFLOW: 'Outflow',
+      },
+    },
     eir: {
       summary: 'Effective interest rate (EIR): {eir} · total interest adjustment: {diff}',
       empty: 'IRR did not converge or the table cannot be built; no effective-interest schedule',
@@ -204,6 +224,8 @@ const enUS: typeof zhCN = {
     periodAxis: 'Period',
     amount: 'Amount',
     closingBalance: 'Closing balance',
+    cumulativeCashflow: 'Cumulative cash flow',
+    dateAxis: 'Date',
   },
 }
 

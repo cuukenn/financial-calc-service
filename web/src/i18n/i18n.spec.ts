@@ -5,6 +5,8 @@ import { ConfigProvider } from 'ant-design-vue'
 import App from '@/App.vue'
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 import i18n, { LOCALE_STORAGE_KEY, setLocale } from './index'
+import enUS from './locales/en-US'
+import zhCN from './locales/zh-CN'
 
 vi.mock('@/api/client', () => ({
   ApiError: class ApiError extends Error {
@@ -32,6 +34,23 @@ describe('i18n (R85)', () => {
   afterEach(() => {
     // 恢复默认 locale，避免测试间串扰（模块级单例）。
     setLocale('zh-CN')
+  })
+
+  it('keeps zh-CN and en-US key sets in exact parity (runtime guard for new keys, R85/R87)', () => {
+    function leafPaths(node: unknown, prefix: string): string[] {
+      if (typeof node !== 'object' || node === null) return [prefix]
+      return Object.entries(node as Record<string, unknown>).flatMap(([k, v]) =>
+        leafPaths(v, prefix ? `${prefix}.${k}` : k),
+      )
+    }
+
+    const zhPaths = leafPaths(zhCN, '').sort()
+    const enPaths = leafPaths(enUS, '').sort()
+    expect(enPaths).toEqual(zhPaths)
+    // R87 新键在两种语言中均存在。
+    expect(zhPaths).toContain('result.cashflowTab.tableTitle')
+    expect(zhPaths).toContain('result.cashflowTab.directions.OUTFLOW')
+    expect(zhPaths).toContain('charts.cumulativeCashflow')
   })
 
   it('defaults to zh-CN and persists a switch to localStorage', () => {

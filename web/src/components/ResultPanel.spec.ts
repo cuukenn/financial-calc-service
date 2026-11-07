@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Tooltip } from 'ant-design-vue'
 
-import type { CalculationResult, Installment } from '@/api/types'
+import type { CalculationResult, CashFlowEvent, Installment } from '@/api/types'
 import { mountWithI18n } from '@/test-utils/mount'
 import { activateTab } from '@/test-utils/tabs'
 
@@ -30,6 +30,17 @@ function installment(partial: Partial<Installment>): Installment {
     cumulativeInterest: '5000.00',
     appliedRate: '0.005',
     memo: null,
+    ...partial,
+  }
+}
+
+function cashFlow(partial: Partial<CashFlowEvent>): CashFlowEvent {
+  return {
+    sequence: 0,
+    date: '2024-01-01',
+    amount: '1000000.00',
+    type: 'PRINCIPAL',
+    direction: 'OUTFLOW',
     ...partial,
   }
 }
@@ -101,15 +112,57 @@ describe('ResultPanel', () => {
     expect(titles.join('\n')).toContain('净现值')
   })
 
-  it('renders the four tabs with a cash-flow placeholder', async () => {
+  it('renders the four tabs with a cash-flow placeholder when no flows exist', async () => {
     const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 
     const tabs = wrapper.findAll('.ant-tabs-tab')
     expect(tabs.map((t) => t.text())).toEqual(['指标', '摊销计划', '现金流', '实际利率法'])
 
-    // 现金流 Tab 本任务仅占位（Task 3 填充内容）。
+    // 现金流 Tab：无现金流数据时 Empty 占位（R87）。
     await activateTab(wrapper, '现金流')
     expect(wrapper.find('[data-test="cashflow-empty"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="cashflow-table"]').exists()).toBe(false)
+  })
+
+  it('renders the cash-flow table with localized types and colored direction tags (R87)', async () => {
+    const withFlows = result({
+      cashFlows: [
+        cashFlow({ sequence: 0, date: '2024-01-01', amount: '1000000.00', type: 'PRINCIPAL', direction: 'OUTFLOW' }),
+        cashFlow({ sequence: 1, date: '2024-01-01', amount: '5000.00', type: 'FEE', direction: 'OUTFLOW' }),
+        cashFlow({ sequence: 2, date: '2024-02-01', amount: '84271.24', type: 'RENT', direction: 'INFLOW' }),
+        cashFlow({ sequence: 3, date: '2024-12-01', amount: '80000.00', type: 'RESIDUAL', direction: 'INFLOW' }),
+        cashFlow({ sequence: 4, date: '2024-01-01', amount: '50000.00', type: 'DEPOSIT', direction: 'INFLOW' }),
+      ],
+    })
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withFlows } })
+
+    await activateTab(wrapper, '现金流')
+
+    // 现金流表渲染全部事件行；金额字符串原样直显。
+    const table = wrapper.find('[data-test="cashflow-table"]')
+    expect(table.exists()).toBe(true)
+    const rows = table.findAll('.ant-table-row')
+    expect(rows.length).toBe(5)
+    expect(rows[0].text()).toContain('1000000.00')
+    expect(rows[2].text()).toContain('84271.24')
+
+    // 类型标签走 i18n（zh-CN：本金/费用/租金/残值/保证金）。
+    const rowText = rows.map((r) => r.text())
+    expect(rowText[0]).toContain('本金')
+    expect(rowText[1]).toContain('费用')
+    expect(rowText[2]).toContain('租金')
+    expect(rowText[3]).toContain('残值')
+    expect(rowText[4]).toContain('保证金')
+
+    // 方向标签走 i18n 且着色：INFLOW 绿 / OUTFLOW 红。
+    const tags = wrapper.findAll('[data-test="cashflow-direction"]')
+    expect(tags.map((tag) => tag.text())).toEqual(['流出', '流出', '流入', '流入', '流入'])
+    expect(tags[0].attributes('class')).toContain('red')
+    expect(tags[2].attributes('class')).toContain('green')
+
+    // 累计回收曲线图占位随表一同渲染。
+    expect(wrapper.find('[data-test="cumulative-cashflow-chart"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="result-tabs"]').text()).toContain('累计现金流回收曲线')
   })
 
   it('renders the effective-interest table when data exists and a placeholder when null', async () => {

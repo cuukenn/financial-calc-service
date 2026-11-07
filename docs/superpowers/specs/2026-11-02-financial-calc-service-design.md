@@ -1287,3 +1287,7 @@ financial-calc-service/
 | R81 跨域（Plan 3，2026-11-07） | Vite dev server 代理 `/api` → `http://localhost:8080`，后端不加 CORS；生产部署形态延后 |
 | R82 最小 v1 形态（Plan 3，2026-11-07） | 单页应用（无 Router、无 Pinia）；原生 fetch 封装 API client；表单 + 结果两区块；ECharts 仅用于构成堆叠柱图（本金 vs 利息）与余额曲线，图表坐标轴 parse 金额字符串为 Number、展示文本原样直显 |
 | R83 质量门（Plan 3，2026-11-07） | vitest + @vue/test-utils 组件测试；`npm run build`（vue-tsc + vite）必须成功；沿用脚手架默认 ESLint；每任务 `npm run test` + `npm run build` 双绿 |
+| R84 布局（Plan 4，2026-11-07） | 测算表单改 AntD Card 大块分组 + Row/Col 栅格压缩（每行 2-4 字段）；结果区改 Tabs（指标 / 摊销计划 / 现金流 / 实际利率法），既有表格/图表行为不变 |
+| R85 i18n（Plan 4，2026-11-07） | vue-i18n v9 接入，zh-CN 默认 + en-US（`typeof zhCN` 编译期键位对齐 + 运行时 parity 测试）；全部 UI 文案入 locale 目录；后端 FCS 消息原样透出不入目录；语言切换器入页头，选择持久化 localStorage |
+| R86 指标解释（Plan 4，2026-11-07） | 指标目录独立 TS 模块（code → 中文名/英文名/公式/说明，对齐 §9.5 全 21 项）；驱动指标卡 Tooltip 与指标表行头 hover |
+| R87 现金流（Plan 4，2026-11-07） | 现金流 Tab 渲染现金流表（期次/日期/类型/方向/金额五列，金额字符串原样直显；类型/方向 i18n 标签，方向着色 Tag：INFLOW 绿 / OUTFLOW 红）+ 累计现金流回收曲线（按日期聚合带符号现金流逐日累加，与零轴交点对应 PAYBACK_PERIOD 回收点）+ 实际利率法表（§9.7 六列，随 Tabs 渲染） |
