@@ -59,6 +59,33 @@ class AbstractAmortizationGeneratorTest {
         assertThat(s.hasErrors()).isFalse();
     }
 
+    @Test
+    void tail_rounding_difference_keeps_positive_sign() {
+        // 末期少摊 0.006 元本金（小于 0.01 元容差，属可吸收舍入）：差额为正，按 P-09 带符号记录。
+        Schedule s = new TailDeltaStub(new BigDecimal("-0.006")).generate(context(fineElement()));
+
+        assertThat(s.hasErrors()).isFalse();
+        assertThat(s.header().roundingDifference()).isEqualByComparingTo("0.0060");
+    }
+
+    @Test
+    void tail_rounding_difference_keeps_negative_sign() {
+        // 末期多摊 0.006 元本金：差额为负，必须以负号记录（P-09：不得取绝对值后丢弃符号）。
+        Schedule s = new TailDeltaStub(new BigDecimal("0.006")).generate(context(fineElement()));
+
+        assertThat(s.hasErrors()).isFalse();
+        assertThat(s.header().roundingDifference()).isEqualByComparingTo("-0.0060");
+    }
+
+    /** 本金 100 元、4 位小数舍入：让亚分级尾差在 header 中可辨。 */
+    private static LeaseElement fineElement() {
+        return baseElement().toBuilder()
+                .principal(new BigDecimal("100"))
+                .periods(3)
+                .rounding(RoundingPolicy.builder().scale(4).build())
+                .build();
+    }
+
     private static CalculationContext context(LeaseElement element) {
         return new CalculationContext(element, null, new Thirty360(), new NoRoll(),
                 SystemClockProvider.INSTANCE, CalculationOptions.defaults());
@@ -111,7 +138,6 @@ class AbstractAmortizationGeneratorTest {
 
     /** Test double: fixed principal per period, remainder in the last period. */
     private static final class FixedPrincipalStub extends AbstractAmortizationGenerator {
-
         @Override
         public String code() {
             return "FIXED_PRINCIPAL_STUB";
@@ -127,6 +153,38 @@ class AbstractAmortizationGeneratorTest {
             BigDecimal principal = input.lastPeriod()
                     ? input.remainingPrincipal()
                     : new BigDecimal("83333.33");
+            return new Allocation(principal, input.accruedInterest());
+        }
+    }
+
+    /**
+     * Test double: pays 33.3333 of principal per period and shifts the final period's principal
+     * (and therefore the tail balance) by {@code tailDelta} — a sub-tolerance, sub-cent drift
+     * whose sign the header must preserve.
+     */
+    private static final class TailDeltaStub extends AbstractAmortizationGenerator {
+
+        private final BigDecimal tailDelta;
+
+        TailDeltaStub(BigDecimal tailDelta) {
+            this.tailDelta = tailDelta;
+        }
+
+        @Override
+        public String code() {
+            return "TAIL_DELTA_STUB";
+        }
+
+        @Override
+        public boolean supports(CalculationContext context) {
+            return true;
+        }
+
+        @Override
+        protected Allocation allocate(AllocationInput input, AmortizationState state) {
+            BigDecimal principal = input.lastPeriod()
+                    ? input.remainingPrincipal().add(tailDelta)
+                    : new BigDecimal("33.3333");
             return new Allocation(principal, input.accruedInterest());
         }
     }

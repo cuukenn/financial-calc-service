@@ -21,6 +21,7 @@ import io.github.cuukenn.fincalc.domain.model.ValidationIssue;
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetrics;
 import io.github.cuukenn.fincalc.domain.support.algo.EqualInstallmentGenerator;
 import io.github.cuukenn.fincalc.domain.support.algo.EqualPrincipalGenerator;
+import io.github.cuukenn.fincalc.domain.support.algo.ExplicitRentGenerator;
 import io.github.cuukenn.fincalc.domain.support.daycount.Thirty360;
 import io.github.cuukenn.fincalc.domain.support.dateroll.NoRoll;
 import java.math.BigDecimal;
@@ -116,9 +117,102 @@ class ValidatorChainTest {
     }
 
     @Test
-    void registers_the_three_default_validators() {
-        assertThat(ValidatorChain.defaults().codes())
-                .contains("PRINCIPAL_CONSERVATION", "TAIL_BALANCE", "DATE_MONOTONIC");
+    void registers_the_default_validators_in_code_number_order() {
+        // AGENTS.md §3.4: 3001 本金守恒 → 3002 末期余额 → 3008 逐期恒等式 → 3009 租金构成 →
+        // 3004 日期单调殿后。
+        assertThat(ValidatorChain.defaults().codes()).containsExactly(
+                "PRINCIPAL_CONSERVATION", "TAIL_BALANCE", "PERIOD_IDENTITY",
+                "RENT_COMPOSITION", "DATE_MONOTONIC");
+    }
+
+    @Test
+    void detects_broken_period_identity() {
+        // 第 2 期期末余额被篡改多 0.05 元：期初 − 本金 ≠ 期末，误差 0.05 ≥ 0.01 元容差。
+        Schedule broken = scheduleWithTamperedClosing(1, new BigDecimal("0.05"));
+
+        List<ValidationIssue> issues = ValidatorChain.defaults().validateAll(broken, baseElement());
+
+        assertThat(issues).anySatisfy(issue -> {
+            assertThat(issue.code()).isEqualTo("FCS-CALC-3008");
+            assertThat(issue.level()).isEqualTo(IssueLevel.ERROR);
+            assertThat(issue.periodNo()).isEqualTo(2);
+        });
+    }
+
+    @Test
+    void period_identity_within_tolerance_passes() {
+        // 第 2 期期末余额多 0.004 元：小于 0.01 元容差，按吸收舍入处理，不报错。
+        Schedule ok = scheduleWithTamperedClosing(1, new BigDecimal("0.004"));
+
+        assertThat(ValidatorChain.defaults().validateAll(ok, baseElement()))
+                .noneMatch(issue -> issue.code().equals("FCS-CALC-3008"));
+    }
+
+    @Test
+    void detects_broken_rent_composition() {
+        // 第 3 期租金被篡改多 0.05 元：Σ租金 ≠ Σ本金 + Σ利息 + Σ费用 + Σ税。
+        Schedule broken = scheduleWithTamperedRent(2, new BigDecimal("0.05"));
+
+        List<ValidationIssue> issues = ValidatorChain.defaults().validateAll(broken, baseElement());
+
+        assertThat(issues).anySatisfy(issue -> {
+            assertThat(issue.code()).isEqualTo("FCS-CALC-3009");
+            assertThat(issue.level()).isEqualTo(IssueLevel.ERROR);
+        });
+    }
+
+    @Test
+    void rent_composition_within_tolerance_passes() {
+        Schedule ok = scheduleWithTamperedRent(2, new BigDecimal("0.004"));
+
+        assertThat(ValidatorChain.defaults().validateAll(ok, baseElement()))
+                .noneMatch(issue -> issue.code().equals("FCS-CALC-3009"));
+    }
+
+    @Test
+    void period_identity_and_rent_composition_accept_balloon_residual() {
+        LeaseElement balloon = baseElement().toBuilder()
+                .residualValue(new BigDecimal("100000"))
+                .residualHandling(ResidualHandling.BALLOON_IN_RENT)
+                .build();
+        Schedule schedule = new EqualInstallmentGenerator().generate(context(balloon));
+
+        assertThat(ValidatorChain.defaults().validateAll(schedule, balloon))
+                .noneMatch(issue -> issue.code().equals("FCS-CALC-3008"))
+                .noneMatch(issue -> issue.code().equals("FCS-CALC-3009"));
+    }
+
+    @Test
+    void period_identity_and_rent_composition_accept_explicit_rent_schedule() {
+        LeaseElement element = LeaseElement.builder()
+                .principal(new BigDecimal("90000"))
+                .nominalRate(new BigDecimal("0.06"))
+                .commenceDate(LocalDate.of(2024, 1, 1))
+                .firstRentDate(LocalDate.of(2024, 2, 1))
+                .periods(3)
+                .frequency(PaymentFrequency.MONTHLY)
+                .timing(PaymentTiming.IN_ARREARS)
+                .dayCountCode("THIRTY_360")
+                .dateRollCode("NONE")
+                .rounding(RoundingPolicy.defaults())
+                .residualValue(BigDecimal.ZERO)
+                .residualHandling(ResidualHandling.SEPARATE)
+                .deposit(BigDecimal.ZERO)
+                .vatRate(new BigDecimal("0.06"))
+                .method(RepaymentMethodId.EXPLICIT_RENT)
+                .explicitRents(List.of(
+                        new BigDecimal("30200.00"), new BigDecimal("30200.00"),
+                        new BigDecimal("30503.01")))
+                .gracePeriod(GracePeriod.none())
+                .currency("CNY")
+                .rateChangePolicy(RateChangePolicy.RESOLVE)
+                .build();
+        Schedule schedule = new ExplicitRentGenerator().generate(context(element));
+
+        assertThat(schedule.hasErrors()).isFalse();
+        assertThat(ValidatorChain.defaults().validateAll(schedule, element))
+                .noneMatch(issue -> issue.code().equals("FCS-CALC-3008"))
+                .noneMatch(issue -> issue.code().equals("FCS-CALC-3009"));
     }
 
     @Test
@@ -210,6 +304,32 @@ class ValidatorChainTest {
                 last.endDate().toString(), last.days(), last.openingBalance().toString(),
                 last.openingBalance().subtract(new BigDecimal(closing)).toString(),
                 closing));
+        return schedule(rows);
+    }
+
+    /** 把第 {@code index} 期（0 起）的期末余额抬高 {@code delta}，其余不变。 */
+    private static Schedule scheduleWithTamperedClosing(int index, BigDecimal delta) {
+        List<Installment> rows = amortizingRows();
+        Installment tampered = rows.get(index);
+        rows.set(index, new Installment(tampered.periodNo(), tampered.startDate(),
+                tampered.endDate(), tampered.days(), tampered.openingBalance(),
+                tampered.principalDue(), tampered.interestAccrued(), tampered.interestPaid(),
+                tampered.fee(), tampered.tax(), tampered.rentDue(),
+                tampered.closingBalance().add(delta), tampered.cumulativePrincipal(),
+                tampered.cumulativeInterest(), tampered.appliedRate(), tampered.memo()));
+        return schedule(rows);
+    }
+
+    /** 把第 {@code index} 期（0 起）的租金抬高 {@code delta}，其余不变。 */
+    private static Schedule scheduleWithTamperedRent(int index, BigDecimal delta) {
+        List<Installment> rows = amortizingRows();
+        Installment tampered = rows.get(index);
+        rows.set(index, new Installment(tampered.periodNo(), tampered.startDate(),
+                tampered.endDate(), tampered.days(), tampered.openingBalance(),
+                tampered.principalDue(), tampered.interestAccrued(), tampered.interestPaid(),
+                tampered.fee(), tampered.tax(), tampered.rentDue().add(delta),
+                tampered.closingBalance(), tampered.cumulativePrincipal(),
+                tampered.cumulativeInterest(), tampered.appliedRate(), tampered.memo()));
         return schedule(rows);
     }
 

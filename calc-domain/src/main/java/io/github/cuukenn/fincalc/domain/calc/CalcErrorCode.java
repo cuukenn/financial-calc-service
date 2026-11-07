@@ -5,7 +5,9 @@ import io.github.cuukenn.fincalc.common.error.ErrorCode;
 /**
  * Error codes raised by the calculation orchestration, following the {@code FCS-CALC-<4 digits>}
  * convention. The codes assigned to schedule validation (3001, 3002, 3004) live in the validators
- * themselves; this enum carries the codes raised while assembling inputs and outputs.
+ * themselves; this enum carries the codes raised while assembling inputs and outputs, plus the
+ * codes of the §3.4 identity validators (3008, 3009): those validators raise through
+ * {@code ValidationIssue}s and reference the constants registered here.
  */
 public enum CalcErrorCode implements ErrorCode {
 
@@ -31,7 +33,22 @@ public enum CalcErrorCode implements ErrorCode {
      * table, so an illegal rate gets its own code instead of borrowing it.
      */
     EFFECTIVE_INTEREST_RATE_INVALID("FCS-CALC-3007",
-            "FCS-CALC-3007: 实际利率法要求合法实际利率: %s");
+            "FCS-CALC-3007: 实际利率法要求合法实际利率: %s"),
+
+    /**
+     * AGENTS.md §3.4 校验三：逐期恒等式「期初余额 − 本期本金 = 期末余额」在某期被破坏，误差
+     * ≥ 0.01 元（补充口径规则 2 的比较容差）。Raised per period by
+     * {@code PeriodIdentityValidator}.
+     */
+    PERIOD_IDENTITY_BROKEN("FCS-CALC-3008",
+            "FCS-CALC-3008: 逐期恒等式不成立: 期初余额 − 本期本金 ≠ 期末余额"),
+
+    /**
+     * AGENTS.md §3.4 校验四：Σ租金 = Σ本金 + Σ利息（实付）+ Σ费用 + Σ税 不成立，误差
+     * ≥ 0.01 元（补充口径规则 2 的比较容差）。Raised by {@code RentCompositionValidator}.
+     */
+    RENT_COMPOSITION_BROKEN("FCS-CALC-3009",
+            "FCS-CALC-3009: 租金构成不成立: Σ租金 ≠ Σ本金 + Σ利息 + Σ费用 + Σ税");
 
     private final String code;
     private final String message;

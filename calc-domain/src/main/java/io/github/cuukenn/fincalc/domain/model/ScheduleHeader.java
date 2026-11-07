@@ -49,7 +49,11 @@ public final class ScheduleHeader {
         return solver;
     }
 
-    /** Residual rounding difference absorbed by the tail adjustment. */
+    /**
+     * Rounding difference absorbed by the tail adjustment, signed (P-09: 不得取绝对值后丢弃符号).
+     * Positive means the tail adjustment charged more in the final rent, negative means it
+     * charged less.
+     */
     public BigDecimal roundingDifference() {
         return roundingDifference;
     }

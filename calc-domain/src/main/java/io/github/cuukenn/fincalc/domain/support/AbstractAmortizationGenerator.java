@@ -195,7 +195,10 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
     /**
      * Verifies that principal is conserved and that the schedule ends where the residual policy
-     * says it should. Returns the absorbed rounding difference.
+     * says it should. Returns the absorbed rounding difference, signed (P-09: 不得取绝对值后丢弃
+     * 符号): closing balance minus expected closing, i.e. positive means the tail adjustment
+     * added to the final rent (the schedule left more balance than the residual policy asks for
+     * and the final rent absorbs it by charging more), negative means it reduced it.
      */
     private BigDecimal checkConservation(LeaseElement element, List<Installment> installments,
             BigDecimal closingBalance, RoundingPolicy rounding, List<ValidationIssue> issues) {
@@ -224,7 +227,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
                             + " 与预期 " + expectedClosing.toPlainString() + " 不一致", lastPeriodNo));
             return money(MoneyUtils.ZERO, rounding);
         }
-        return money(difference.abs(), rounding);
+        return money(difference, rounding);
     }
 
     private static BigDecimal money(BigDecimal value, RoundingPolicy rounding) {

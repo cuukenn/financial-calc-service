@@ -6,7 +6,9 @@ import io.github.cuukenn.fincalc.domain.model.Schedule;
 import io.github.cuukenn.fincalc.domain.model.ValidationIssue;
 import io.github.cuukenn.fincalc.domain.port.Validator;
 import io.github.cuukenn.fincalc.domain.support.validate.DateMonotonicValidator;
+import io.github.cuukenn.fincalc.domain.support.validate.PeriodIdentityValidator;
 import io.github.cuukenn.fincalc.domain.support.validate.PrincipalConservationValidator;
+import io.github.cuukenn.fincalc.domain.support.validate.RentCompositionValidator;
 import io.github.cuukenn.fincalc.domain.support.validate.TailBalanceValidator;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,11 +36,17 @@ public final class ValidatorChain {
         this.registry = Objects.requireNonNull(registry, "registry");
     }
 
-    /** The chain every built-in calculation uses: principal, tail balance and period dates. */
+    /**
+     * The chain every built-in calculation uses, in the AGENTS.md §3.4 code-number order:
+     * principal conservation (3001), tail balance (3002), per-period identity (3008), rent
+     * composition (3009) and, last, the period-date monotonicity net (3004).
+     */
     public static ValidatorChain defaults() {
         ExtensionRegistry<Validator> validators = ExtensionRegistry.empty();
         validators.register(new PrincipalConservationValidator());
         validators.register(new TailBalanceValidator());
+        validators.register(new PeriodIdentityValidator());
+        validators.register(new RentCompositionValidator());
         validators.register(new DateMonotonicValidator());
         return new ValidatorChain(validators);
     }
