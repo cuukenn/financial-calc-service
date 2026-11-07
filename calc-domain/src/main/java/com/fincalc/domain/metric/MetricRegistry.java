@@ -132,20 +132,47 @@ public final class MetricRegistry {
      * @return every registered code, in {@code order()} sequence; uncomputable ones present-but-null
      */
     public FinancialMetrics computeAll(MetricContext context) {
+        return computeAll(context, null);
+    }
+
+    /**
+     * {@link #computeAll(MetricContext)} with a diagnostics channel (Task 29 engine wiring).
+     *
+     * <p>The single-argument overload swallows a throwing metric into a present-but-null entry with
+     * no record of <em>which</em> metric failed — the Task 21 gap the engine owns the emission for.
+     * This overload appends the {@link FinancialMetric#code()} of every metric whose
+     * {@code compute} threw to {@code failedCodes} (a metric that merely returns {@code null}
+     * because its inputs are missing is <em>not</em> a failure and is not reported). The engine
+     * turns the collected codes into WARN {@code ValidationIssue}s on the schedule; existing
+     * callers pass {@code null} (or keep using the one-argument overload) and see no change.
+     *
+     * @param context     the run's schedules, flows and rates; never {@code null}
+     * @param failedCodes mutable list the codes of thrown metrics are appended to, in
+     *                    {@code order()} sequence; may be {@code null} for no diagnostics
+     * @return every registered code, in {@code order()} sequence; uncomputable ones present-but-null
+     */
+    public FinancialMetrics computeAll(MetricContext context, List<String> failedCodes) {
         Objects.requireNonNull(context, "context");
         Map<String, BigDecimal> values = new LinkedHashMap<>();
         MetricContext run = context.withRunValues(values);
         for (FinancialMetric metric : extensions.all()) {
-            values.put(metric.code(), valueOf(metric, run));
+            values.put(metric.code(), valueOf(metric, run, failedCodes));
         }
         return FinancialMetrics.of(values);
     }
 
-    /** One metric's value, or {@code null} when it fails; the failure never reaches the caller. */
-    private static BigDecimal valueOf(FinancialMetric metric, MetricContext context) {
+    /**
+     * One metric's value, or {@code null} when it fails; the failure never reaches the caller,
+     * but when {@code failedCodes} is non-null the failed metric's code is recorded there.
+     */
+    private static BigDecimal valueOf(FinancialMetric metric, MetricContext context,
+            List<String> failedCodes) {
         try {
             return metric.compute(context);
         } catch (RuntimeException ex) {
+            if (failedCodes != null) {
+                failedCodes.add(metric.code());
+            }
             return null;
         }
     }

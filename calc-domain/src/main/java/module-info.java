@@ -10,4 +10,6 @@ module com.fincalc.domain {
     exports com.fincalc.domain.model;
     exports com.fincalc.domain.port;
     exports com.fincalc.domain.support;
+    exports com.fincalc.domain.support.algo;
+    exports com.fincalc.domain.support.cashflow;
 }
