@@ -1282,3 +1282,4 @@ financial-calc-service/
 | R79 资源限制（Plan 2，2026-11-07） | §15 资源限制按最小执行：Tomcat form/multipart 上限配 1MB；纯 JSON 请求体的严格 1MB 过滤器未实现（calc-server `application.yml` 内已注明），待真实消费方出现再补 |
 | §15 单次 ≤ 10000 期上限 | 未实现；Plan 3 随资源限制（认证/限流）补齐（R79） |
 | R77 路由性错误并入统一错误体（Plan 2 终审修正，2026-11-07） | 405（`FCS-SRV-1003` 方法不支持）/ 415（`FCS-SRV-1004` 媒体类型不支持）/ 404（`FCS-SRV-1005` 请求路径不存在，需 `spring.mvc.throw-exception-if-no-handler-found: true` + `spring.web.resources.add-mappings: false`）均由 `ApiExceptionHandler` 以统一 `{code, message}` 体返回，不再落入兜底 500 或 Boot 默认 `/error` 形态 |
+| Plan 3 持久化/版本链、Excel 适配及关联优化 | 暂时移出计划（用户指令，2026-11-07）；待真实需求出现再立项。前端方向改为 Vue3 + Ant Design UI 可视化测算，经 REST API 消费引擎 |
