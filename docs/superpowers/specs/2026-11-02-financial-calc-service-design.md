@@ -1274,3 +1274,6 @@ financial-calc-service/
 | 还款方式标识 `RepaymentMethodId` 新增 `EXPLICIT_RENT` 常量（Plan 1.5 R68，2026-11-07） | 封闭枚举立场不变：`EXPLICIT_RENT` 为引擎自有常量，服务于 §8.1 `04_现金流` 显式逐期租金（`LeaseElement.explicitRents` 直传，R69 逐期拆分、不钳制末期），并非开放用户自定义 id；开放自定义标识仍待 Plan 2 裁决 |
 | §7.5 分段利率 `rateChangePolicy`（RESOLVE/FIXED_RENT/DRIFT）此前仅字段无行为（Plan 1.5 R71，2026-11-07） | 三态已实现于等额本息（solver 标注 `SEGMENTED_RESOLVE`/`FIXED_RENT`/`DRIFT`，段初按「段初余额 + 剩余期数 + 段利率」重解 PMT）；其余内置算法本金计划与费率解耦、天然支持规则集分段费率（R70：R17 均匀费率守卫仅在无规则集时生效）；FIXED_RENT 的「全程租金不变」不含末期钳制调整（尾部差额仍按 LAST_PERIOD 吸收） |
 | §7.5 「通过 CalculationOptions.rateChangePolicy 切换」 | 分段策略自 Plan 1 起为 `LeaseElement.rateChangePolicy` 合同条款（如 `residualHandling`）；`CalculationOptions` 上的同名字段已移除（R73） |
+| §11 持久化 / 版本链 / 底稿留存 | 延后至存在真实消费方（如 Web 模块）再随其消费需求设计（用户指令，2026-11-07）；引擎侧编排已预留 PersistencePort 插入点 |
+| §8 Excel 适配（模板/解析/对账） | 延后并待重估：出现真实 Excel 用户或拿到存量模板时按最小适配器重立范围；`04_现金流` → `LeaseElement.explicitRents` 映射点不变（用户指令，2026-11-07） |
+| Plan 2 范围 | 重定位为最小 REST 模块（calc-server：Spring Boot 薄壳，JSON API + 异常映射 + OpenAPI），Excel/持久化剔除 |
