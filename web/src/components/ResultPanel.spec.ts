@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Tooltip } from 'ant-design-vue'
 
 import type { CalculationResult, CashFlowEvent, Installment } from '@/api/types'
+import { setLocale } from '@/i18n'
 import { mountWithI18n } from '@/test-utils/mount'
 import { activateTab } from '@/test-utils/tabs'
 
@@ -81,6 +82,10 @@ describe('ResultPanel', () => {
     vi.clearAllMocks()
   })
 
+  afterEach(() => {
+    setLocale('zh-CN')
+  })
+
   it('renders metric cards from the catalog verbatim and shows 「—」 for null metrics', () => {
     const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 
@@ -106,10 +111,57 @@ describe('ResultPanel', () => {
     // 指标卡：悬浮内容含目录的中文名 + 公式。
     expect(titles.join('\n')).toContain('租金合计｜公式：Σ rentDue')
     expect(titles.join('\n')).toContain('年化 IRR（复利）｜公式：(1 + IRR_PERIOD)^m − 1')
-    // 指标表行头（未入选卡片的指标）同样绑定目录。
+    // 指标表行头（未入选卡片的指标）同样绑定目录；R88 后行头主文本为目录本地化名，
+    // 原码以次要小字随行（对账断言保留）。
     const headers = wrapper.findAll('[data-test="metric-header"]').map((h) => h.text())
-    expect(headers).toContain('NPV')
+    expect(headers).toContain('净现值NPV')
     expect(titles.join('\n')).toContain('净现值')
+  })
+
+  it('renders catalog localized names as primary row text with the raw code as secondary (R88)', () => {
+    // 指标卡精选之外的目录指标（MIRR）也进指标表，与 NPV 一同覆盖。
+    const withMIRR = result()
+    withMIRR.schedule.header.metrics = { ...withMIRR.schedule.header.metrics, MIRR: '0.058' }
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withMIRR } })
+
+    // zh-CN：主文本为目录中文名（§9.5），不再是裸驼峰/下划线原码。
+    const names = wrapper.findAll('[data-test="metric-header-name"]').map((n) => n.text())
+    expect(names).toContain('修正 IRR')
+    expect(names).toContain('净现值')
+
+    // 原码仅作次要小字出现（映射保持可对账），且不再作为主文本。
+    const codes = wrapper.findAll('[data-test="metric-header-code"]').map((c) => c.text())
+    expect(codes).toContain('MIRR')
+    expect(codes).toContain('NPV')
+    expect(names).not.toContain('MIRR')
+    expect(names).not.toContain('NPV')
+  })
+
+  it('renders the English catalog name as the primary row text in en-US (R88)', () => {
+    setLocale('en-US')
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
+
+    const names = wrapper.findAll('[data-test="metric-header-name"]').map((n) => n.text())
+    expect(names).toContain('Net Present Value (NPV)')
+    // 标准缩写可出现在目录英文名内（R88 允许），原码仍以次要小字保留。
+    const codes = wrapper.findAll('[data-test="metric-header-code"]').map((c) => c.text())
+    expect(codes).toContain('NPV')
+  })
+
+  it('passes unknown metric codes through verbatim with no duplicated secondary code (R88)', () => {
+    const withUnknown = result()
+    withUnknown.schedule.header.metrics = {
+      ...withUnknown.schedule.header.metrics,
+      CUSTOM_BALLOON_METRIC: '42.00',
+    }
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withUnknown } })
+
+    // 目录外 code 原样透出为行头主文本（既有透传约定）。
+    const names = wrapper.findAll('[data-test="metric-header-name"]').map((n) => n.text())
+    expect(names).toContain('CUSTOM_BALLOON_METRIC')
+    // 目录外 code 不再重复渲染次要原码。
+    const codes = wrapper.findAll('[data-test="metric-header-code"]').map((c) => c.text())
+    expect(codes).not.toContain('CUSTOM_BALLOON_METRIC')
   })
 
   it('renders the four tabs with a cash-flow placeholder when no flows exist', async () => {

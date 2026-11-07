@@ -84,9 +84,13 @@ const RESIDUAL_HANDLING_VALUES: ResidualHandling[] = ['SEPARATE', 'BALLOON_IN_RE
 /** RateChangePolicy 枚举（分段利率生效策略）。 */
 const RATE_CHANGE_POLICY_VALUES = ['RESOLVE', 'FIXED_RENT', 'DRIFT'] as const
 
-/** 枚举选项标签走 i18n（保留 code、翻译描述后缀），随语言切换响应式更新。 */
+/**
+ * R89：枚举选项标签走 i18n（主文本为本地化名称，内部 code 不再出现在标签中），
+ * 随语言切换响应式更新。天数口径为行业标准斜杠记法（ACT/360 等），
+ * code 作为次要小字仅出现在下拉项内（触发器只显示主文本，对账用）。
+ */
 const dayCountOptions = computed(() =>
-  DAY_COUNT_VALUES.map((value) => ({ value, label: t(`enums.dayCount.${value}`) })),
+  DAY_COUNT_VALUES.map((value) => ({ value, label: t(`enums.dayCount.${value}`), code: value })),
 )
 const dateRollOptions = computed(() =>
   DATE_ROLL_VALUES.map((value) => ({ value, label: t(`enums.dateRoll.${value}`) })),
@@ -369,22 +373,44 @@ async function onFinish(): Promise<void> {
                   <Select
                     v-model:value="form.frequency"
                     :options="frequencyOptions"
+                    :popup-match-select-width="false"
+                    style="width: 100%"
                     data-test="frequency"
                   />
                 </FormItem>
               </Col>
               <Col :span="12">
                 <FormItem :label="t('form.basic.timing')" name="timing">
-                  <Select v-model:value="form.timing" :options="timingOptions" data-test="timing" />
+                  <Select
+                    v-model:value="form.timing"
+                    :options="timingOptions"
+                    :popup-match-select-width="false"
+                    style="width: 100%"
+                    data-test="timing"
+                  />
                 </FormItem>
               </Col>
               <Col :span="12">
                 <FormItem :label="t('form.basic.dayCountCode')" name="dayCountCode">
+                  <!-- R89：触发器只显示斜杠记法主文本；code 以次要小字留在下拉项内（对账用）。 -->
                   <Select
                     v-model:value="form.dayCountCode"
                     :options="dayCountOptions"
+                    option-label-prop="label"
+                    :popup-match-select-width="false"
+                    style="width: 100%"
                     data-test="day-count-code"
-                  />
+                  >
+                    <template #option="{ label, code }">
+                      <span data-test="day-count-option">
+                        <span data-test="day-count-option-name">{{ label }}</span>
+                        <span
+                          data-test="day-count-option-code"
+                          class="day-count-option-code"
+                        >{{ code }}</span>
+                      </span>
+                    </template>
+                  </Select>
                 </FormItem>
               </Col>
               <Col :span="12">
@@ -392,6 +418,8 @@ async function onFinish(): Promise<void> {
                   <Select
                     v-model:value="form.dateRollCode"
                     :options="dateRollOptions"
+                    :popup-match-select-width="false"
+                    style="width: 100%"
                     data-test="date-roll-code"
                   />
                 </FormItem>
@@ -401,6 +429,8 @@ async function onFinish(): Promise<void> {
                   <Select
                     v-model:value="form.rateChangePolicy"
                     :options="rateChangePolicyOptions"
+                    :popup-match-select-width="false"
+                    style="width: 100%"
                     data-test="rate-change-policy"
                   />
                 </FormItem>
@@ -488,6 +518,8 @@ async function onFinish(): Promise<void> {
                   <Select
                     v-model:value="form.residualHandling"
                     :options="residualHandlingOptions"
+                    :popup-match-select-width="false"
+                    style="width: 100%"
                     data-test="residual-handling"
                   />
                 </FormItem>
@@ -566,5 +598,12 @@ async function onFinish(): Promise<void> {
 .block-card :deep(.ant-card-body) {
   padding-top: 12px;
   padding-bottom: 4px;
+}
+
+/* R89：天数口径下拉项内的原码次要小字（仅下拉项内，触发器不显示）。 */
+.day-count-option-code {
+  margin-left: 8px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 </style>

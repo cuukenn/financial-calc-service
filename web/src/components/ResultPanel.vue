@@ -17,7 +17,7 @@ import { useI18n } from 'vue-i18n'
 
 import type { CalculationResult, CashFlowEvent, EffectiveInterestRow, Installment, Issue } from '@/api/types'
 import type { AppLocale } from '@/i18n'
-import { metricLabel, metricTooltip } from '@/i18n/metricCatalog'
+import { METRIC_CATALOG, metricLabel, metricTooltip } from '@/i18n/metricCatalog'
 
 import EChart from './charts/EChart.vue'
 import {
@@ -69,6 +69,19 @@ const otherMetrics = computed(() => {
 
 function otherMetricTooltip(code: string): string {
   return metricTooltip(code, locale.value as AppLocale)
+}
+
+/**
+ * R88：指标表行头主文本为指标目录的本地化名称（同指标卡），
+ * 目录外 code 原样透出（后端新增指标的对账约定）。
+ */
+function otherMetricLabel(code: string): string {
+  return metricLabel(code, locale.value as AppLocale)
+}
+
+/** 目录内 code 以小号灰字在行头附上原码，便于与接口字段对账；目录外不重复显示。 */
+function isCatalogMetric(code: string): boolean {
+  return code in METRIC_CATALOG
 }
 
 /** ERROR 红 / WARN 橙 / INFO 灰（后端 IssueLevel 枚举名）。 */
@@ -243,9 +256,16 @@ function issueKey(issue: Issue, index: number): string {
         >
           <Descriptions.Item v-for="[code, value] in otherMetrics" :key="code">
             <template #label>
-              <!-- R86：指标表行头 hover 同样显示指标目录。 -->
+              <!-- R88：行头主文本为目录本地化名，原码作次要小字（对账用）；R86 hover 不变。 -->
               <Tooltip :title="otherMetricTooltip(code)">
-                <span data-test="metric-header">{{ code }}</span>
+                <span data-test="metric-header">
+                  <span data-test="metric-header-name">{{ otherMetricLabel(code) }}</span>
+                  <span
+                    v-if="isCatalogMetric(code)"
+                    data-test="metric-header-code"
+                    class="metric-header-code"
+                  >{{ code }}</span>
+                </span>
               </Tooltip>
             </template>
             {{ value ?? '—' }}
@@ -367,3 +387,12 @@ function issueKey(issue: Issue, index: number): string {
     </Tabs>
   </Card>
 </template>
+
+<style scoped>
+/* R88：行头原码次要展示（小号灰字），与 null 值占位同色系。 */
+.metric-header-code {
+  display: block;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+</style>

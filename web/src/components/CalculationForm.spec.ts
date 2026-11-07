@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError } from '@/api/client'
 import type { CalculationRequest, CalculationResult } from '@/api/types'
+import { setLocale } from '@/i18n'
 import { mountWithI18n } from '@/test-utils/mount'
 import { activateTab } from '@/test-utils/tabs'
 import CalculationForm from './CalculationForm.vue'
@@ -90,6 +91,7 @@ describe('CalculationForm', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    setLocale('zh-CN')
   })
 
   it('renders the form pre-filled with the golden fixture defaults', () => {
@@ -101,10 +103,61 @@ describe('CalculationForm', () => {
     expect((wrapper.find('[data-test="commence-date"] input').element as HTMLInputElement).value).toBe('2024-01-01')
     expect((wrapper.find('[data-test="first-rent-date"] input').element as HTMLInputElement).value).toBe('2024-02-01')
     // 后端必填的口径/方式字段始终有值（Task 1 评审发现）。
-    expect(wrapper.find('[data-test="day-count-code"]').text()).toContain('THIRTY_360')
-    expect(wrapper.find('[data-test="date-roll-code"]').text()).toContain('NONE')
+    // R89：触发器只显示行业标准斜杠记法，内部下划线 code 不再出现在标签中。
+    const dayCountText = wrapper.find('[data-test="day-count-code"]').text()
+    expect(dayCountText).toContain('30/360')
+    expect(dayCountText).not.toContain('THIRTY_360')
+    expect(wrapper.find('[data-test="date-roll-code"]').text()).toContain('不滚动')
     const methodRadio = wrapper.find('input[value="EQUAL_INSTALLMENT"]')
     expect((methodRadio.element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('renders the day-count dropdown with slash-notation names and the code as secondary (R89)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+
+    await wrapper.find('[data-test="day-count-code"] .ant-select-selector').trigger('mousedown')
+    await flushPromises()
+    await flushPromises()
+
+    // 下拉项主文本为斜杠记法（行业标准），不含下划线内部 code。
+    const names = [...document.querySelectorAll('[data-test="day-count-option-name"]')].map(
+      (el) => el.textContent?.trim(),
+    )
+    expect(names).toContain('30/360')
+    expect(names).toContain('ACT/360（实际/360）')
+    expect(names.every((n) => !n?.includes('_'))).toBe(true)
+
+    // 原码仅作次要小字保留（映射仍可对账）。
+    const codes = [...document.querySelectorAll('[data-test="day-count-option-code"]')].map(
+      (el) => el.textContent?.trim(),
+    )
+    expect(codes).toContain('THIRTY_360')
+    expect(codes).toContain('ACT_360')
+  })
+
+  it('shows pure localized text in the non-day-count dropdowns with no internal codes (R89)', () => {
+    const wrapper = mountWithI18n(CalculationForm)
+
+    // zh-CN 纯中文主文本，内部 code 不再出现。
+    expect(wrapper.find('[data-test="frequency"]').text()).toContain('月')
+    expect(wrapper.find('[data-test="frequency"]').text()).not.toContain('MONTHLY')
+    expect(wrapper.find('[data-test="timing"]').text()).toContain('期末付')
+    expect(wrapper.find('[data-test="timing"]').text()).not.toContain('IN_ARREARS')
+    expect(wrapper.find('[data-test="rate-change-policy"]').text()).toContain('自变更日重算')
+    expect(wrapper.find('[data-test="rate-change-policy"]').text()).not.toContain('RESOLVE')
+    expect(wrapper.find('[data-test="residual-handling"]').text()).toContain('期末单独回收')
+    expect(wrapper.find('[data-test="residual-handling"]').text()).not.toContain('SEPARATE')
+  })
+
+  it('shows the English localized names in en-US (R89)', () => {
+    setLocale('en-US')
+    const wrapper = mountWithI18n(CalculationForm)
+
+    expect(wrapper.find('[data-test="frequency"]').text()).toContain('Monthly')
+    expect(wrapper.find('[data-test="frequency"]').text()).not.toContain('MONTHLY')
+    const dayCountText = wrapper.find('[data-test="day-count-code"]').text()
+    expect(dayCountText).toContain('30/360')
+    expect(dayCountText).not.toContain('THIRTY_360')
   })
 
   it('submits a correctly-shaped CalculationRequest on golden defaults', async () => {

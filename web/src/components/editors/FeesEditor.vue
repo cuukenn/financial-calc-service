@@ -54,6 +54,7 @@ function removeFee(index: number): void {
         <Select
           v-model:value="fee.chargeMode"
           :options="chargeModeOptions"
+          :popup-match-select-width="false"
           style="width: 220px"
         />
         <Button danger @click="removeFee(idx)">
