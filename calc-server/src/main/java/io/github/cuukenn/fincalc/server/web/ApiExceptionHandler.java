@@ -8,9 +8,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 /**
  * The unified R77 exception mapping of the REST API:
@@ -24,7 +27,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  *       {@code RuleValidationException};</li>
  *   <li>{@link SystemException} → HTTP 500 with the same body shape and a server-side
  *       FCS-SRV code that leaks no internals;</li>
- *   <li>malformed JSON / bean validation → HTTP 400 with {@code FCS-SRV-1001} (请求体非法).</li>
+ *   <li>malformed JSON / bean validation → HTTP 400 with {@code FCS-SRV-1001} (请求体非法);</li>
+ *   <li>routing failures → caller-error status codes in the same body shape: HTTP 405
+ *       {@code FCS-SRV-1003} (方法不支持), HTTP 415 {@code FCS-SRV-1004} (媒体类型不支持),
+ *       HTTP 404 {@code FCS-SRV-1005} (请求路径不存在, needs
+ *       {@code spring.mvc.throw-exception-if-no-handler-found} so the DispatcherServlet raises
+ *       {@code NoHandlerFoundException} here instead of Boot's default {@code /error} body).</li>
  * </ul>
  */
 @RestControllerAdvice
@@ -81,5 +89,40 @@ public class ApiExceptionHandler {
                 .body(new ApiError(ServerErrorCode.MALFORMED_REQUEST_BODY.code(),
                         String.format(ServerErrorCode.MALFORMED_REQUEST_BODY.message(),
                                 "请求体校验失败")));
+    }
+
+    /** No handler for the request's HTTP method on a mapped path: 405, FCS-SRV-1003. */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> onMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        log.debug("request method not supported: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(new ApiError(ServerErrorCode.METHOD_NOT_SUPPORTED.code(),
+                        String.format(ServerErrorCode.METHOD_NOT_SUPPORTED.message(),
+                                e.getMethod())));
+    }
+
+    /** Request Content-Type matches no consumable media type: 415, FCS-SRV-1004. */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> onMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
+        log.debug("request media type not supported: {}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(new ApiError(ServerErrorCode.MEDIA_TYPE_NOT_SUPPORTED.code(),
+                        String.format(ServerErrorCode.MEDIA_TYPE_NOT_SUPPORTED.message(),
+                                String.valueOf(e.getContentType()))));
+    }
+
+    /**
+     * No handler for the request path: 404, FCS-SRV-1005. Reaches this advice only under
+     * {@code spring.mvc.throw-exception-if-no-handler-found: true} +
+     * {@code spring.web.resources.add-mappings: false} (application.yml) — otherwise Boot's
+     * default {@code /error} body ({@code {timestamp,status,error,path}}) would leak instead.
+     */
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ApiError> onNoHandlerFound(NoHandlerFoundException e) {
+        log.debug("no handler for request: {}", e.getRequestURL());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiError(ServerErrorCode.NO_HANDLER.code(),
+                        String.format(ServerErrorCode.NO_HANDLER.message(),
+                                e.getRequestURL())));
     }
 }

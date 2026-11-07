@@ -45,7 +45,8 @@ public final class CalculationResponseDto {
         this.effectiveInterest = effectiveInterest;
     }
 
-    @Schema(description = "本次测算的运行标识", example = "b7c9d1e0-4f2a-4c1e-9a5f-0d3b6f8a2c10",
+    @Schema(description = "本次测算的运行标识（32 位十六进制，无连字符）",
+            example = "b7c9d1e04f2a4c1e9a5f0d3b6f8a2c10",
             requiredMode = Schema.RequiredMode.REQUIRED)
     public String getRunId() {
         return runId;

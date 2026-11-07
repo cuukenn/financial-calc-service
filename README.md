@@ -143,6 +143,9 @@ curl -s -X POST http://localhost:8080/api/v1/calculations \
 |---|---|---|
 | 业务失败（领域校验 `FCS-DOM-1xxx`、规则编译 `FCS-RULE-2xxx`/`FCS-COM-0001`、编排 `FCS-ENG-1002` 未知的还款方式 / `FCS-ENG-1003` 规则驱动缺规则集、指标 `FCS-CALC-3xxx`） | 400 | 引擎/领域/规则 FCS 码 |
 | 请求体 JSON 非法或字段绑定失败 | 400 | `FCS-SRV-1001` |
+| 已注册路径上无此 HTTP 方法（如对 `GET /api/v1/calculations`） | 405 | `FCS-SRV-1003`（消息含请求方法） |
+| 请求 Content-Type 无匹配的处理方（如 POST 带 `text/plain`） | 415 | `FCS-SRV-1004`（消息含媒体类型） |
+| 请求路径不存在 | 404 | `FCS-SRV-1005`（消息含请求路径） |
 | `SystemException` 与一切未捕获异常 | 500 | `FCS-SRV-1002`（消息不含内部细节） |
 
 错误码清单以设计文档 **§B 错误码草案** 为基础（`docs/superpowers/specs/2026-11-02-financial-calc-service-design.md`），
@@ -162,7 +165,8 @@ curl -s http://localhost:8080/api/v1/algorithms
 
 Excel 适配与持久化/版本链已延后（设计文档文末「实现偏差记录」勘误，2026-11-07）：出现真实
 Excel 用户或持久化消费方时再按最小适配器立项；`04_现金流` → `LeaseElement.explicitRents`
-映射点不变。v1 仅含基础资源限制（R79），无鉴权体系。
+映射点不变。v1 现金流口径固定为 INCLUDE_FEES（含费用、不含保证金收付）；
+INCLUDE_DEPOSIT/CONTRACT 待 Plan 3 暴露为请求字段。v1 仅含基础资源限制（R79），无鉴权体系。
 
 ## 构建
 

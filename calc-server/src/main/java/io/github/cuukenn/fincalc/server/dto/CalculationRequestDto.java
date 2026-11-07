@@ -43,7 +43,9 @@ import java.util.List;
  */
 @Schema(description = "POST /api/v1/calculations 的请求体：LeaseElement 要素平铺 + 规则行/显式租金。"
         + "金额字段用 JSON 数值或字符串均可（引擎统一转为 BigDecimal 精确运算）；"
-        + "日期为 ISO-8601（yyyy-MM-dd）。字段校验失败以统一错误体 {code,message} 返回 HTTP 400（R77）。")
+        + "日期为 ISO-8601（yyyy-MM-dd）。字段校验失败以统一错误体 {code,message} 返回 HTTP 400（R77）。"
+        + "v1 现金流口径固定为 INCLUDE_FEES（含费用、不含保证金收付）；"
+        + "INCLUDE_DEPOSIT/CONTRACT 待 Plan 3 暴露为请求字段。")
 public final class CalculationRequestDto {
 
     @Schema(description = "租赁本金，必须为正数（FCS-DOM-1001）", example = "1000000",
@@ -80,13 +82,13 @@ public final class CalculationRequestDto {
 
     @Schema(description = "天数口径 code（DayCountConvention 注册名）："
             + "ACT_360 / ACT_365F / ACT_ACT / THIRTY_360 / THIRTY_E_360 / ACT_365_25；"
-            + "未知 code → FCS-COM-0001（HTTP 400）",
+            + "未知 code → FCS-ENG-1001（HTTP 400）",
             example = "THIRTY_360", requiredMode = Schema.RequiredMode.REQUIRED)
     private final String dayCountCode;
 
     @Schema(description = "日期滚动 code（DateRollConvention 注册名）："
             + "NONE / FOLLOWING / MODIFIED_FOLLOWING / PRECEDING / MODIFIED_PRECEDING / END_OF_MONTH；"
-            + "未知 code → FCS-COM-0001（HTTP 400）",
+            + "未知 code → FCS-ENG-1001（HTTP 400）",
             example = "NONE", requiredMode = Schema.RequiredMode.REQUIRED)
     private final String dateRollCode;
 
@@ -334,7 +336,8 @@ public final class CalculationRequestDto {
                 example = "HALF_UP")
         private final RoundingMode mode;
 
-        @Schema(description = "尾差处理：LAST_PERIOD（差额归末期，缺省）/ FIRST_PERIOD（归首期）")
+        @Schema(description = "尾差处理：LAST_PERIOD（差额归末期，缺省）/ FIRST_PERIOD（归首期）/"
+                + "PROPORTIONAL（按期均摊）")
         private final TailAdjustPolicy tailAdjustPolicy;
 
         @JsonCreator
@@ -450,9 +453,10 @@ public final class CalculationRequestDto {
      * {@code cellRef}) default to 0/absent.
      */
     @Schema(description = "一条规则行，列语义见设计文档 §8.2（规则表列定义）。"
-            + "ruleId/priority/fromPeriod/toPeriod/annualRate/principalPlan/interestTreatment/"
-            + "paymentTiming/specialAction 为必填列；缺失 → FCS-COM-0001（HTTP 400）。"
-            + "枚举列为字符串，由装配层 fail-loud 解析。")
+            + "装配层预校验的必填列：ruleId/principalPlan/interestTreatment/paymentTiming/"
+            + "specialAction，缺失 → FCS-COM-0001（HTTP 400）；priority 缺省按 0 处理，"
+            + "annualRate 可为 null，fromPeriod/toPeriod 缺省按 0 处理（区间/范围问题由"
+            + "规则编译的行级校验报错）。枚举列为字符串，由装配层 fail-loud 解析。")
     public static final class RuleRowDto {
 
         @Schema(description = "§8.2 列 A：规则唯一标识，参与审计与错误定位", example = "R1")

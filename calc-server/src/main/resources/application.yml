@@ -13,3 +13,13 @@ server:
 spring:
   application:
     name: calc-server
+  mvc:
+    # Route "no handler found" through the unified error advice (R77/FCS-SRV-1005) instead of
+    # Boot's default /error body ({timestamp,status,error,path}), which would break the
+    # documented single error shape. add-mappings: false stops the resource handler from
+    # consuming unmatched paths, so the DispatcherServlet actually throws
+    # NoHandlerFoundException into ApiExceptionHandler.
+    throw-exception-if-no-handler-found: true
+  web:
+    resources:
+      add-mappings: false

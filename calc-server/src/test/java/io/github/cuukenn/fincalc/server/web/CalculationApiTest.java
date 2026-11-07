@@ -2,6 +2,7 @@ package io.github.cuukenn.fincalc.server.web;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -119,6 +120,37 @@ class CalculationApiTest {
                 .andExpect(jsonPath("$.code").value("FCS-ENG-1003"));
     }
 
+    @Test
+    void get_on_calculations_maps_to_405_fcs_srv_1003() throws Exception {
+        // The path is mapped but GET has no handler: a caller error must answer the unified
+        // body with 405 (FCS-SRV-1003), not the catch-all 500 FCS-SRV-1002.
+        mockMvc.perform(get("/api/v1/calculations"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("FCS-SRV-1003"))
+                .andExpect(jsonPath("$.message").value(containsString("GET")));
+    }
+
+    @Test
+    void post_with_unsupported_content_type_maps_to_415_fcs_srv_1004() throws Exception {
+        mockMvc.perform(post("/api/v1/calculations")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content(happyBody()))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("FCS-SRV-1004"))
+                .andExpect(jsonPath("$.message").value(containsString("text/plain")));
+    }
+
+    @Test
+    void get_unknown_path_maps_to_404_fcs_srv_1005() throws Exception {
+        // throw-exception-if-no-handler-found + add-mappings: false route "no handler" through
+        // the advice; without them Boot's default /error body {timestamp,status,error,path}
+        // would leak — a shape the README contract says never occurs.
+        mockMvc.perform(get("/api/v1/nonexistent"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("FCS-SRV-1005"))
+                .andExpect(jsonPath("$.message").value(containsString("/api/v1/nonexistent")));
+    }
+
     // ---- request bodies (no text blocks: the build targets JDK 11) ----
 
     /** The Task-21 standard lease fixture as a flat JSON request. */
@@ -168,7 +200,7 @@ class CalculationApiTest {
     private static String explicitRentBody() {
         StringBuilder rents = new StringBuilder();
         for (int i = 0; i < 11; i++) {
-            rents.append("86066.43").append(i < 10 ? ", " : ", ");
+            rents.append("86066.43").append(", ");
         }
         rents.append("86066.42");
         return happyBody().replace("\"method\": \"EQUAL_INSTALLMENT\"",

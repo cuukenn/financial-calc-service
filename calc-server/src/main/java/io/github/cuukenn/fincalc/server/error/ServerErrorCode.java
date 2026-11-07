@@ -13,7 +13,16 @@ import io.github.cuukenn.fincalc.common.error.ErrorCode;
  *       (unknown enum value, wrong type); R77 maps this to HTTP 400;</li>
  *   <li>{@link #INTERNAL_ERROR} — raised by {@code ApiExceptionHandler} for unexpected
  *       failures ({@code SystemException} or anything uncaught); R77 maps this to HTTP 500
- *       with a message that leaks no internals.</li>
+ *       with a message that leaks no internals;</li>
+ *   <li>{@link #METHOD_NOT_SUPPORTED} — raised by {@code ApiExceptionHandler} when no handler
+ *       exists for the request's HTTP method on a mapped path (HTTP 405);</li>
+ *   <li>{@link #MEDIA_TYPE_NOT_SUPPORTED} — raised by {@code ApiExceptionHandler} when the
+ *       request's Content-Type matches no consumable media type (HTTP 415);</li>
+ *   <li>{@link #NO_HANDLER} — raised by {@code ApiExceptionHandler} when no handler exists for
+ *       the request path (HTTP 404; needs {@code spring.mvc.throw-exception-if-no-handler-found}
+ *       + {@code spring.web.resources.add-mappings: false} so the DispatcherServlet throws
+ *       {@code NoHandlerFoundException} into the advice instead of Boot's default
+ *       {@code /error} body).</li>
  * </ul>
  */
 public enum ServerErrorCode implements ErrorCode {
@@ -28,7 +37,29 @@ public enum ServerErrorCode implements ErrorCode {
      * Unexpected-failure mapping of {@code ApiExceptionHandler}: anything the API contract does
      * not treat as a caller error is reported as an internal error without internal details.
      */
-    INTERNAL_ERROR("FCS-SRV-1002", "FCS-SRV-1002: 系统内部错误");
+    INTERNAL_ERROR("FCS-SRV-1002", "FCS-SRV-1002: 系统内部错误"),
+
+    /**
+     * HTTP-method check of {@code ApiExceptionHandler}: the path is mapped but the request's
+     * method has no handler ({@code HttpRequestMethodNotSupportedException}); caller error,
+     * HTTP 405, message names the offending method.
+     */
+    METHOD_NOT_SUPPORTED("FCS-SRV-1003", "FCS-SRV-1003: 请求方法不支持: %s"),
+
+    /**
+     * Content-Type check of {@code ApiExceptionHandler}: the request's media type matches no
+     * consumable type of the mapped handler ({@code HttpMediaTypeNotSupportedException});
+     * caller error, HTTP 415, message names the offending media type.
+     */
+    MEDIA_TYPE_NOT_SUPPORTED("FCS-SRV-1004", "FCS-SRV-1004: 请求媒体类型不支持: %s"),
+
+    /**
+     * Routing check of {@code ApiExceptionHandler}: no handler exists for the request path
+     * ({@code NoHandlerFoundException}, thrown by the DispatcherServlet under
+     * {@code spring.mvc.throw-exception-if-no-handler-found: true}); caller error, HTTP 404,
+     * message names the requested path.
+     */
+    NO_HANDLER("FCS-SRV-1005", "FCS-SRV-1005: 请求路径不存在: %s");
 
     private final String code;
     private final String message;

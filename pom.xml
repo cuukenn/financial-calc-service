@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
 
     <name>financial-calc-service</name>
-    <description>Zero-dependency financial calculation library (hexagonal architecture)</description>
+    <description>分段利率/自定义租金金融测算引擎：核心库 + REST 服务 (hexagonal architecture)</description>
 
     <modules>
         <module>calc-bom</module>
