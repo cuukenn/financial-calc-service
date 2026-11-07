@@ -66,8 +66,8 @@ public final class CalculationRequestAssembler {
         CompiledRuleSet ruleSet = null;
         if (dto.ruleRows() != null && !dto.ruleRows().isEmpty()) {
             List<RuleRow> rows = new ArrayList<>(dto.ruleRows().size());
-            for (CalculationRequestDto.RuleRowDto row : dto.ruleRows()) {
-                rows.add(toRuleRow(row));
+            for (int i = 0; i < dto.ruleRows().size(); i++) {
+                rows.add(toRuleRow(dto.ruleRows().get(i), i));
             }
             ruleSet = ruleCompiler.compile(rows, element, allowPartial);
         }
@@ -156,7 +156,16 @@ public final class CalculationRequestAssembler {
         return fees;
     }
 
-    private RuleRow toRuleRow(CalculationRequestDto.RuleRowDto dto) {
+    private RuleRow toRuleRow(CalculationRequestDto.RuleRowDto dto, int index) {
+        // Fail loud BEFORE RuleRow's constructor: ruleId, principalPlan, interestTreatment,
+        // paymentTiming and specialAction are requireNonNull-mandatory there — letting them
+        // through would surface a NullPointerException as a 500 instead of the client's own
+        // 400. The remaining columns are nullable by the model's contract.
+        requireColumn(dto.ruleId(), "ruleId", index);
+        requireColumn(dto.principalPlan(), "principalPlan", index);
+        requireColumn(dto.interestTreatment(), "interestTreatment", index);
+        requireColumn(dto.paymentTiming(), "paymentTiming", index);
+        requireColumn(dto.specialAction(), "specialAction", index);
         return new RuleRow(
                 dto.ruleId(),
                 orZero(dto.priority()),
@@ -177,6 +186,14 @@ public final class CalculationRequestAssembler {
                 dto.memo(),
                 orZero(dto.rowNumber()),
                 dto.cellRef());
+    }
+
+    /** A mandatory rule-row column must be non-blank; otherwise FCS-COM-0001 (HTTP 400). */
+    private static void requireColumn(String value, String column, int index) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new BusinessException(CommonErrorCode.INVALID_ARGUMENT,
+                    "ruleRows[" + index + "]." + column, "缺失");
+        }
     }
 
     private static RepaymentMethodId parseMethod(String raw) {

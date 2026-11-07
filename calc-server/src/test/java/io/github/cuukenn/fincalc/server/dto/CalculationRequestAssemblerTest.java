@@ -122,6 +122,24 @@ class CalculationRequestAssemblerTest {
                 .hasMessageContaining(EngineErrorCode.GENERATOR_NOT_REGISTERED.code());
     }
 
+    @Test
+    void rule_row_missing_mandatory_columns_raise_fcs_com_0001_before_rule_row_construction() {
+        // ruleId et al. are requireNonNull-mandatory in RuleRow; without the pre-check the
+        // constructor NPEs and the API would answer Spring's default 500 body.
+        CalculationRequestDto emptyRow = withRuleRows(baseDto(),
+                Collections.singletonList(emptyRuleRow()));
+
+        assertThatThrownBy(() -> assembler.assemble(emptyRow))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-COM-0001")
+                .hasMessageContaining("ruleRows[0].ruleId");
+    }
+
+    private static CalculationRequestDto.RuleRowDto emptyRuleRow() {
+        return new CalculationRequestDto.RuleRowDto(null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null);
+    }
+
     // ---- fixture helpers ----
 
     private static CalculationRequestDto baseDto() {

@@ -1,5 +1,6 @@
 package io.github.cuukenn.fincalc.server.web;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -91,6 +92,31 @@ class CalculationApiTest {
                         .content("{ not json"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("FCS-SRV-1001"));
+    }
+
+    @Test
+    void rule_row_missing_mandatory_columns_maps_to_400_fcs_com_0001() throws Exception {
+        // "ruleRows": [{}] — ruleId/principalPlan/interestTreatment/paymentTiming/specialAction
+        // are mandatory; the assembler must fail loud with the unified body BEFORE RuleRow's
+        // requireNonNull turns the client mistake into a NullPointerException/500.
+        mockMvc.perform(post("/api/v1/calculations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(happyBody().replace(
+                                "\"rateChangePolicy\": \"RESOLVE\"",
+                                "\"rateChangePolicy\": \"RESOLVE\","
+                                        + "\"ruleRows\": [{}]")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("FCS-COM-0001"))
+                .andExpect(jsonPath("$.message").value(containsString("ruleRows[0].ruleId")));
+    }
+
+    @Test
+    void rule_driven_without_rule_set_maps_to_400_fcs_eng_1003() throws Exception {
+        mockMvc.perform(post("/api/v1/calculations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(happyBody().replace("EQUAL_INSTALLMENT", "RULE_DRIVEN")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("FCS-ENG-1003"));
     }
 
     // ---- request bodies (no text blocks: the build targets JDK 11) ----

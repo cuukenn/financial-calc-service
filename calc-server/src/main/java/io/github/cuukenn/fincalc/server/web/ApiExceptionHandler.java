@@ -43,6 +43,24 @@ public class ApiExceptionHandler {
     @ExceptionHandler(SystemException.class)
     public ResponseEntity<ApiError> onSystemException(SystemException e) {
         log.error("calculation failed with a system error", e);
+        return internalError(e);
+    }
+
+    /**
+     * Catch-all for anything uncaught (R77's unified body must hold for every failure, so no
+     * Spring default {@code /error} body ever leaks): unexpected {@code RuntimeException}s from
+     * deep layers (e.g. an {@code IllegalArgumentException}) and infrastructure faults answer
+     * HTTP 500 with the fixed generic message below — never {@code e.toString()}, which could
+     * carry internal details. The more specific {@code BusinessException}/{@code
+     * SystemException} handlers above keep precedence.
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiError> onUncaught(Exception e) {
+        log.error("calculation failed with an uncaught error", e);
+        return internalError(e);
+    }
+
+    private ResponseEntity<ApiError> internalError(Exception e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiError.of(ServerErrorCode.INTERNAL_ERROR));
     }
