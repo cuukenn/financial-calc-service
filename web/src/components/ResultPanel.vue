@@ -330,7 +330,7 @@ function issueKey(issue: Issue, index: number): string {
           v-if="otherMetrics.length > 0"
           class="metrics-grid"
           data-test="metrics-list"
-          style="margin-top: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))"
+          style="margin-top: 12px; display: grid; grid-template-columns: repeat(3, auto)"
         >
           <div
             v-for="[code, value] in otherMetrics"
@@ -510,16 +510,14 @@ function issueKey(issue: Issue, index: number): string {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
 }
-/* R93-3：3 列指标网格的仿 bordered 描边与单元格排版。
-   数值 nowrap + 省略号（完整原值在 tooltip），行头不折行。 */
+/* R93-3 + 用户反馈：指标值必须完整可见——列宽随内容自适应（repeat(3, auto)），
+   单元格不裁剪；容器 overflow-x 兜底极端长值。数值 nowrap 保持单行。 */
 .metrics-grid {
   overflow-x: auto;
 }
 .metrics-grid-item {
   display: flex;
   align-items: baseline;
-  min-width: 0;
-  overflow: hidden;
   border-right: 1px solid #f0f0f0;
   border-bottom: 1px solid #f0f0f0;
 }
@@ -539,10 +537,7 @@ function issueKey(issue: Issue, index: number): string {
 }
 .metrics-grid-value {
   flex: 1 1 auto;
-  min-width: 0;
   padding: 6px 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 </style>
