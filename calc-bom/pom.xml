@@ -9,7 +9,7 @@
       this BOM, and a BOM owning the parent that imports it would form a model cycle.
       Keep the version here in sync with the root POM version.
     -->
-    <groupId>com.fincalc</groupId>
+    <groupId>io.github.cuukenn</groupId>
     <artifactId>calc-bom</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
@@ -27,27 +27,27 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>com.fincalc</groupId>
+                <groupId>io.github.cuukenn</groupId>
                 <artifactId>calc-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.fincalc</groupId>
+                <groupId>io.github.cuukenn</groupId>
                 <artifactId>calc-domain</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.fincalc</groupId>
+                <groupId>io.github.cuukenn</groupId>
                 <artifactId>calc-rule</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.fincalc</groupId>
+                <groupId>io.github.cuukenn</groupId>
                 <artifactId>calc-engine</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.fincalc</groupId>
+                <groupId>io.github.cuukenn</groupId>
                 <artifactId>calc-testkit</artifactId>
                 <version>${project.version}</version>
             </dependency>
