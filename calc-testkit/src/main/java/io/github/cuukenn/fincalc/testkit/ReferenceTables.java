@@ -8,9 +8,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Literal golden reference tables for the four built-in repayment methods, each under
- * THIRTY_360 and ACT_365F, on the authoritative Task 21 fixture (principal 1 000 000, 6%
- * nominal, 12 monthly periods, IN_ARREARS, no fees/deposit/residual).
+ * Literal golden reference tables for the five built-in repayment methods. Tables 1–8 cover
+ * the four formula-driven methods, each under THIRTY_360 and ACT_365F, on the authoritative
+ * Task 21 fixture (principal 1 000 000, 6% nominal, 12 monthly periods, IN_ARREARS, no
+ * fees/deposit/residual). Table 9 covers {@code EQUAL_INSTALLMENT} × THIRTY_360 under the
+ * segmented rule rates of Plan 1.5 R71/R72 (periods 1–6 at 3% annual, 7–12 at 6% annual,
+ * {@code RESOLVE} policy); Table 10 covers {@code EXPLICIT_RENT} × THIRTY_360 (R69) with the
+ * equal-installment golden rents given verbatim (11 × 86 066.43 + 86 066.42), which must
+ * reproduce the Table 1 schedule exactly.
  *
  * <p>Every money value below is a hand-verified literal, not a computed one. Verification
  * record: 核对人 ZCode（实现代理） / 核对日期 2026-11-07。每张表的前 3 期与末期均按
@@ -19,6 +24,12 @@ import java.util.Map;
  * 逐期算术见 .superpowers/sdd/2026-11-02-core-calculation-engine/task-30-report.md。
  * EQUAL_INSTALLMENT × THIRTY_360 另与 Task 21 权威钉值（86 066.43 / 86 066.42、
  * 1 032 797.15、32 797.15、IRR_ANNUAL 0.061677800455 等）核对一致。
+ * 表 9（Table 9）与表 10（Table 10）为 Plan 1.5 Task 5 新增：核对人 ZCode（实现代理） /
+ * 核对日期 2026-11-07，前 3 期与末期的独立算术链、段初重解 PMT（84 693.70 / 85 432.91、
+ * B7 503 745.25）及 IRR/XIRR/久期的独立复算见
+ * .superpowers/sdd/2026-11-07-segmented-custom-rent/task-5-report.md；表 9 逐期值另与
+ * Task 3 手算金标准（EqualInstallmentGeneratorTest，重解口径独立复核到分）交叉一致，
+ * 表 10 逐期值与表 1（EQUAL_INSTALLMENT × THIRTY_360）逐分一致。
  *
  * <p>Yield/duration expectations are ranges, not points: root finding is allowed 1e-8-level
  * jitter at the last digits, so each range is the implementation value ± 1e-8. Totals are
@@ -159,6 +170,28 @@ public final class ReferenceTables {
         return table("PRINCIPAL_FIRST", dayCountCode);
     }
 
+    /**
+     * Table 9: the {@code EQUAL_INSTALLMENT} × THIRTY_360 table under the segmented rule rates
+     * of Plan 1.5 R71/R72 — periods 1–6 at 3% annual, 7–12 at 6% annual, {@code RESOLVE}
+     * policy ({@code SEGMENTED_RESOLVE} solver). The rent re-prices at the segment boundary;
+     * the last period is the tail clamp. Source: the Task 3 hand-computed golden chain,
+     * independently re-verified to the cent for this table (see the class javadoc).
+     */
+    public static List<ExpectedRow> equalInstallmentSegmented() {
+        return table("EQUAL_INSTALLMENT", "SEGMENTED_THIRTY_360");
+    }
+
+    /**
+     * Table 10: the {@code EXPLICIT_RENT} × THIRTY_360 golden-reproduction table (R69). The
+     * rents are the equal-installment golden rents given verbatim (11 × 86 066.43 plus the
+     * tail-adjusted 86 066.42) at the 6% nominal rate, so the given-rent split must land on
+     * the Table 1 schedule row by row — with no last-period clamp, because the given tail rent
+     * already amortizes the balance exactly.
+     */
+    public static List<ExpectedRow> explicitRent() {
+        return table("EXPLICIT_RENT", "THIRTY_360");
+    }
+
     /** The metric expectations of the given method × day-count combination. */
     public static ExpectedMetrics metricExpectation(String method, String dayCountCode) {
         ExpectedMetrics metrics = METRICS.get(key(method, dayCountCode));
@@ -169,7 +202,11 @@ public final class ReferenceTables {
         return metrics;
     }
 
-    /** All 8 golden combinations as {@code (method, dayCount, rows)} argument triples. */
+    /**
+     * All golden combinations as {@code (method, dayCount, rows)} argument triples: the 8
+     * formula-driven method × day-count tables plus the segmented Table 9 and the
+     * explicit-rent Table 10.
+     */
     public static List<Object[]> all() {
         List<Object[]> arguments = new ArrayList<>();
         for (String method : METHODS) {
@@ -177,10 +214,16 @@ public final class ReferenceTables {
                 arguments.add(new Object[] {method, dayCount, table(method, dayCount)});
             }
         }
+        arguments.add(new Object[] {"EQUAL_INSTALLMENT", "SEGMENTED_THIRTY_360",
+                equalInstallmentSegmented()});
+        arguments.add(new Object[] {"EXPLICIT_RENT", "THIRTY_360", explicitRent()});
         return arguments;
     }
 
-    /** All 8 metric expectation combinations as {@code (method, dayCount, metrics)} triples. */
+    /**
+     * All metric expectation combinations as {@code (method, dayCount, metrics)} triples — the
+     * same 10 combinations as {@link #all()}.
+     */
     public static List<Object[]> metricExpectations() {
         List<Object[]> arguments = new ArrayList<>();
         for (String method : METHODS) {
@@ -189,6 +232,10 @@ public final class ReferenceTables {
                         metricExpectation(method, dayCount)});
             }
         }
+        arguments.add(new Object[] {"EQUAL_INSTALLMENT", "SEGMENTED_THIRTY_360",
+                metricExpectation("EQUAL_INSTALLMENT", "SEGMENTED_THIRTY_360")});
+        arguments.add(new Object[] {"EXPLICIT_RENT", "THIRTY_360",
+                metricExpectation("EXPLICIT_RENT", "THIRTY_360")});
         return arguments;
     }
 
@@ -329,6 +376,40 @@ public final class ReferenceTables {
                 new ExpectedRow(11, "166666.70", "83333.33", "821.92", "83333.33", "83333.37"),
                 new ExpectedRow(12, "83333.37", "83333.37", "424.66", "115853.93", "0.00"))));
 
+        // Table 9: EQUAL_INSTALLMENT x THIRTY_360, segmented rule rates (1-6 @ 3%, 7-12 @ 6%),
+        // RESOLVE policy — segment rents 84 693.70 / 85 432.91 re-solved at the boundary,
+        // B7 = 503 745.25, last period the tail clamp.
+        tables.put(key("EQUAL_INSTALLMENT", "SEGMENTED_THIRTY_360"), unmodifiable(rows(
+                new ExpectedRow(1, "1000000.00", "82193.70", "2500.00", "84693.70", "917806.30"),
+                new ExpectedRow(2, "917806.30", "82399.18", "2294.52", "84693.70", "835407.12"),
+                new ExpectedRow(3, "835407.12", "82605.18", "2088.52", "84693.70", "752801.94"),
+                new ExpectedRow(4, "752801.94", "82811.70", "1882.00", "84693.70", "669990.24"),
+                new ExpectedRow(5, "669990.24", "83018.72", "1674.98", "84693.70", "586971.52"),
+                new ExpectedRow(6, "586971.52", "83226.27", "1467.43", "84693.70", "503745.25"),
+                new ExpectedRow(7, "503745.25", "82914.18", "2518.73", "85432.91", "420831.07"),
+                new ExpectedRow(8, "420831.07", "83328.75", "2104.16", "85432.91", "337502.32"),
+                new ExpectedRow(9, "337502.32", "83745.40", "1687.51", "85432.91", "253756.92"),
+                new ExpectedRow(10, "253756.92", "84164.13", "1268.78", "85432.91", "169592.79"),
+                new ExpectedRow(11, "169592.79", "84584.95", "847.96", "85432.91", "85007.84"),
+                new ExpectedRow(12, "85007.84", "85007.84", "425.04", "85432.88", "0.00"))));
+
+        // Table 10: EXPLICIT_RENT x THIRTY_360, rents given verbatim (11 x 86 066.43 +
+        // 86 066.42) at the 6% nominal rate — reproduces the EQUAL_INSTALLMENT table row by
+        // row; no last-period clamp (the given tail rent amortizes exactly).
+        tables.put(key("EXPLICIT_RENT", "THIRTY_360"), unmodifiable(rows(
+                new ExpectedRow(1, "1000000.00", "81066.43", "5000.00", "86066.43", "918933.57"),
+                new ExpectedRow(2, "918933.57", "81471.76", "4594.67", "86066.43", "837461.81"),
+                new ExpectedRow(3, "837461.81", "81879.12", "4187.31", "86066.43", "755582.69"),
+                new ExpectedRow(4, "755582.69", "82288.52", "3777.91", "86066.43", "673294.17"),
+                new ExpectedRow(5, "673294.17", "82699.96", "3366.47", "86066.43", "590594.21"),
+                new ExpectedRow(6, "590594.21", "83113.46", "2952.97", "86066.43", "507480.75"),
+                new ExpectedRow(7, "507480.75", "83529.03", "2537.40", "86066.43", "423951.72"),
+                new ExpectedRow(8, "423951.72", "83946.67", "2119.76", "86066.43", "340005.05"),
+                new ExpectedRow(9, "340005.05", "84366.40", "1700.03", "86066.43", "255638.65"),
+                new ExpectedRow(10, "255638.65", "84788.24", "1278.19", "86066.43", "170850.41"),
+                new ExpectedRow(11, "170850.41", "85212.18", "854.25", "86066.43", "85638.23"),
+                new ExpectedRow(12, "85638.23", "85638.23", "428.19", "86066.42", "0.00"))));
+
         return tables;
     }
 
@@ -359,6 +440,17 @@ public final class ReferenceTables {
         metrics.put(key("PRINCIPAL_FIRST", "ACT_365F"),
                 new ExpectedMetrics("32520.56", "1032520.56", "0.059512376985",
                         "0.0594679965", "0.2755489362"));
+        // Table 9: segmented totals are exact hand sums (6 x 84 693.70 + 5 x 85 432.91 +
+        // 85 432.88 = 1 020 759.63; interest 20 759.63); the yield/duration centers are the
+        // implementation values, independently re-derived to within 1e-8 (Task 5 report).
+        metrics.put(key("EQUAL_INSTALLMENT", "SEGMENTED_THIRTY_360"),
+                new ExpectedMetrics("20759.63", "1020759.63", "0.038697013290",
+                        "0.0386724536", "0.2698054956"));
+        // Table 10: cash flows identical to EQUAL_INSTALLMENT x THIRTY_360, so the centers are
+        // the Task 21 authoritative pinned values; totals are exact hand sums.
+        metrics.put(key("EXPLICIT_RENT", "THIRTY_360"),
+                new ExpectedMetrics("32797.15", "1032797.15", "0.061677800455",
+                        "0.0616393559", "0.2683570275"));
         return metrics;
     }
 

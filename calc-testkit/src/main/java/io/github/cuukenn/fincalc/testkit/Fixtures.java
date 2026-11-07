@@ -95,4 +95,41 @@ public final class Fixtures {
         rows.add(rateRow);
         return new RuleCompiler(FunctionRegistry.defaults()).compile(rows, element, false);
     }
+
+    /**
+     * The two-segment rate rule set of the Plan 1.5 golden Table 9 (R72): unconditional rate
+     * rows at 3% annual for periods 1–6 and 6% annual for periods 7–12. Segmentation material
+     * for the built-in generators under a {@code RESOLVE} policy.
+     */
+    public static RuleSetView segmentedRateRuleSet(LeaseElement element) {
+        List<RuleRow> rows = new ArrayList<>();
+        rows.add(rateRow("SEG_R1", 10, 1, 6, "0.03"));
+        rows.add(rateRow("SEG_R2", 20, 7, 12, "0.06"));
+        return new RuleCompiler(FunctionRegistry.defaults()).compile(rows, element, false);
+    }
+
+    /** One unconditional rate-only rule row over the given period range. */
+    private static RuleRow rateRow(String ruleId, int priority, int from, int to, String rate) {
+        return new RuleRow(ruleId, priority, from, to, new BigDecimal(rate), null,
+                PrincipalPlanKind.INHERIT, null, null,
+                io.github.cuukenn.fincalc.domain.model.InterestTreatmentKind.PAY_AS_INCURRED,
+                PaymentTiming.IN_ARREARS,
+                io.github.cuukenn.fincalc.domain.model.SpecialActionKind.NONE, null, 0, null,
+                null, 0, null);
+    }
+
+    /**
+     * The equal-installment annuity rents of the Task 21 golden, given verbatim for the
+     * {@code EXPLICIT_RENT} golden Table 10 (R69): eleven rents of 86 066.43 plus the
+     * tail-adjusted 86 066.42 — the sequence that amortizes 1 000 000.00 at 6% THIRTY_360
+     * exactly, so the given-rent split must reproduce the equal-installment schedule.
+     */
+    public static List<BigDecimal> explicitAnnuityRents() {
+        List<BigDecimal> rents = new ArrayList<>();
+        for (int i = 0; i < 11; i++) {
+            rents.add(new BigDecimal("86066.43"));
+        }
+        rents.add(new BigDecimal("86066.42"));
+        return rents;
+    }
 }

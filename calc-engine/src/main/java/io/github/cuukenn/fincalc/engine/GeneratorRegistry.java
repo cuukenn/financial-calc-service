@@ -17,10 +17,10 @@ import java.util.Objects;
  * {@link ScheduleGenerator#code()} — which matches the {@code RepaymentMethodId} name for the
  * built-in algorithms and {@code RULE_DRIVEN} for the rule-driven generator.
  *
- * <p>{@link #defaults()} registers the four built-in amortization algorithms. The rule-driven
+ * <p>{@link #defaults()} registers the five built-in amortization algorithms. The rule-driven
  * generator is deliberately absent from it: {@link RuleDrivenGenerator} is bound to one compiled
  * rule set at construction, so it cannot be a shared singleton. A run that needs it obtains a
- * private registry through {@link #withRuleDriven(RuleSetView)}, which carries the four built-ins
+ * private registry through {@link #withRuleDriven(RuleSetView)}, which carries the five built-ins
  * plus a rule-driven generator bound to that run's set — the registry the facade routes a
  * {@code RULE_DRIVEN} request through (orchestration step 2).
  *
@@ -70,7 +70,7 @@ public final class GeneratorRegistry {
     }
 
     /**
-     * A registry carrying the four built-ins (or whatever this registry holds) plus a
+     * A registry carrying the five built-ins (or whatever this registry holds) plus a
      * {@link RuleDrivenGenerator} bound to {@code ruleSet}. The receiver is not mutated: rule
      * sets differ per run, so each RULE_DRIVEN run gets its own registry view.
      *

@@ -4,7 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetrics;
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
+import io.github.cuukenn.fincalc.domain.model.LeaseElement;
+import io.github.cuukenn.fincalc.domain.model.RepaymentMethodId;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
+import io.github.cuukenn.fincalc.domain.port.RuleSetView;
 import io.github.cuukenn.fincalc.engine.CalculationFacade;
 import io.github.cuukenn.fincalc.engine.CalculationRequest;
 import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
@@ -18,6 +21,12 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Golden tests against the literal reference tables of {@link ReferenceTables}: every built-in
  * method is asserted period by period to the cent, and its summary metrics to the pinned total
  * or the allowed root-jitter range. All fixtures use IN_ARREARS (FCS-DOM-2004 rulings R16/R20).
+ *
+ * <p>Beyond the eight formula-driven method × day-count tables, the source feeds the two Plan
+ * 1.5 tables: {@code EQUAL_INSTALLMENT} × {@code SEGMENTED_THIRTY_360} runs the R72 segmented
+ * rule rates (1–6 @ 3%, 7–12 @ 6%, RESOLVE) through a real rule set, and
+ * {@code EXPLICIT_RENT} × THIRTY_360 carries the equal-installment golden rents verbatim
+ * (R69) — the same per-period loop asserts both.
  */
 class GoldenScheduleTest {
 
@@ -56,8 +65,26 @@ class GoldenScheduleTest {
     }
 
     private static Schedule calculate(String method, String dayCount) {
+        // SEGMENTED_THIRTY_360 is a table label, not a day-count code: the run itself is a
+        // THIRTY_360 element priced through the segmented rule set (R72). EXPLICIT_RENT is
+        // assembled on the plain fixture shape because the builder demands the rent sequence
+        // up front (FCS-DOM-1008) — the method is switched together with the rents.
+        boolean explicit = RepaymentMethodId.EXPLICIT_RENT.name().equals(method);
+        String elementMethod = explicit ? "EQUAL_INSTALLMENT" : method;
+        String dayCountCode = "SEGMENTED_THIRTY_360".equals(dayCount)
+                ? "THIRTY_360" : dayCount;
+        LeaseElement element = Fixtures.leaseElement(elementMethod, dayCountCode);
+        RuleSetView ruleSet = null;
+        if ("SEGMENTED_THIRTY_360".equals(dayCount)) {
+            ruleSet = Fixtures.segmentedRateRuleSet(element);
+        }
+        if (explicit) {
+            element = element.toBuilder()
+                    .method(RepaymentMethodId.EXPLICIT_RENT)
+                    .explicitRents(Fixtures.explicitAnnuityRents())
+                    .build();
+        }
         return CalculationFacade.defaults().calculate(new CalculationRequest(
-                Fixtures.leaseElement(method, dayCount), null, CalculationOptions.defaults()))
-                .schedule();
+                element, ruleSet, CalculationOptions.defaults())).schedule();
     }
 }

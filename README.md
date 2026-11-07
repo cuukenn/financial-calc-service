@@ -1,7 +1,7 @@
 # financial-calc-service
 
 融资租赁/贷款核心计算引擎（Plan 1：核心计算内核）。纯 Java、无框架依赖、JSR-310 时间、
-`BigDecimal` 精确算术，支持四种内置还款算法与规则驱动的租金生成（Rule DSL + Excel 兼容函数库），
+`BigDecimal` 精确算术，支持五种内置还款算法与规则驱动的租金生成（Rule DSL + Excel 兼容函数库），
 并输出设计文档 §9.5 定义的全部 21 项金融指标与 §9.7 实际利率法摊销表。
 
 ## 环境要求
@@ -15,7 +15,7 @@
 |---|---|---|
 | `calc-bom` | — | 依赖版本管理（BOM），无代码 |
 | `calc-common` | `io.github.cuukenn.fincalc.common` | 共享原语：金额/日期时间、错误码、扩展点 SPI（`ExtensionRegistry`） |
-| `calc-domain` | `io.github.cuukenn.fincalc.domain` | 领域模型（`LeaseElement`/`Schedule` 等）、端口（`ScheduleGenerator`、`DayCountConvention`…）、四种内置算法、现金流、指标 SPI 与内置指标 |
+| `calc-domain` | `io.github.cuukenn.fincalc.domain` | 领域模型（`LeaseElement`/`Schedule` 等）、端口（`ScheduleGenerator`、`DayCountConvention`…）、五种内置算法、现金流、指标 SPI 与内置指标 |
 | `calc-rule` | `io.github.cuukenn.fincalc.rule` | 规则引擎：表达式解析求值、规则编译、`.fcs` 函数脚本、80 个 Excel 兼容函数 |
 | `calc-engine` | `io.github.cuukenn.fincalc.engine` | 编排门面 `CalculationFacade`：校验 → 生成 → 现金流 → 指标 → 实际利率表 |
 | `calc-testkit` | — | 测试工具：黄金参考表 `ReferenceTables` 与测试夹具 `Fixtures` |
@@ -52,7 +52,16 @@ EffectiveInterestTable eir = r.effectiveInterest();     // §9.7 实际利率法
 | `EQUAL_PRINCIPAL` | 等额本金 |
 | `INTEREST_FIRST` | 先息后本（前 n−1 期付息，末期还本付息） |
 | `PRINCIPAL_FIRST` | 先本后息（每期还 P/n，利息末期支付） |
+| `EXPLICIT_RENT` | 显式租金（§8.1 `04_现金流` 映射点）：租金给定反推本息——`LeaseElement.explicitRents` 直传逐期租金，利息 = 期初余额 × 期利率，本金 = 租金 − 利息，不钳制末期（不收敛由校验器 3001/3002 报错，R69）；Plan 2 的 `04_现金流` sheet 由此接入 |
 | `RULE_DRIVEN` | 规则驱动：按编译后的规则集逐期解析租金/利率/本金计划（必须携带 ruleSet） |
+
+### 分段利率（rateChangePolicy）
+
+内置算法消费规则集费率：请求携带 `ruleSet` 时，各内置生成器逐期经 `RuleSetView` 解析期利率
+（R70；R17 的均匀费率守卫仅在无规则集时生效）。等额本息受 `rateChangePolicy` 三态控制：
+`RESOLVE`（默认，段初按「段初余额 + 剩余期数 + 段利率」重解 PMT，solver
+`SEGMENTED_RESOLVE`）、`FIXED_RENT`（全程租金不变，费率只改本息拆分）、`DRIFT`（逐期重解）；
+其余算法本金计划与费率解耦，天然支持分段。
 
 ## 扩展点
 

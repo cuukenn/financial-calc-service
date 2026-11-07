@@ -1271,3 +1271,5 @@ financial-calc-service/
 | §8.2 列 D 条件规则的求值接线 | 条件规则的 EvalContext 接线在引擎层完成（Plan 1），`RuleSetView` 端口保持 4 参，条件求值走编译器附加的 `withCondition` 路径 |
 | 还款方式标识 `RepaymentMethodId` | 封闭枚举为 v1 立场，开放自定义标识待 Plan 2 裁定 |
 | 包命名空间 `com.fincalc` | 迁移为 `io.github.cuukenn.fincalc`（用户指令 R67，2026-11-07）；JPMS 模块名同步，Maven artifactId 不变 |
+| 还款方式标识 `RepaymentMethodId` 新增 `EXPLICIT_RENT` 常量（Plan 1.5 R68，2026-11-07） | 封闭枚举立场不变：`EXPLICIT_RENT` 为引擎自有常量，服务于 §8.1 `04_现金流` 显式逐期租金（`LeaseElement.explicitRents` 直传，R69 逐期拆分、不钳制末期），并非开放用户自定义 id；开放自定义标识仍待 Plan 2 裁决 |
+| §7.5 分段利率 `rateChangePolicy`（RESOLVE/FIXED_RENT/DRIFT）此前仅字段无行为（Plan 1.5 R71，2026-11-07） | 三态已实现于等额本息（solver 标注 `SEGMENTED_RESOLVE`/`FIXED_RENT`/`DRIFT`，段初按「段初余额 + 剩余期数 + 段利率」重解 PMT）；其余内置算法本金计划与费率解耦、天然支持规则集分段费率（R70：R17 均匀费率守卫仅在无规则集时生效） |
