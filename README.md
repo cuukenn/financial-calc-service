@@ -16,9 +16,18 @@
 | `calc-bom` | — | 依赖版本管理（BOM），无代码 |
 | `calc-common` | `com.fincalc.common` | 共享原语：金额/日期时间、错误码、扩展点 SPI（`ExtensionRegistry`） |
 | `calc-domain` | `com.fincalc.domain` | 领域模型（`LeaseElement`/`Schedule` 等）、端口（`ScheduleGenerator`、`DayCountConvention`…）、四种内置算法、现金流、指标 SPI 与内置指标 |
-| `calc-rule` | `com.fincalc.rule` | 规则引擎：表达式解析求值、规则编译、`.fcs` 函数脚本、约 70 个 Excel 兼容函数 |
+| `calc-rule` | `com.fincalc.rule` | 规则引擎：表达式解析求值、规则编译、`.fcs` 函数脚本、80 个 Excel 兼容函数 |
 | `calc-engine` | `com.fincalc.engine` | 编排门面 `CalculationFacade`：校验 → 生成 → 现金流 → 指标 → 实际利率表 |
 | `calc-testkit` | — | 测试工具：黄金参考表 `ReferenceTables` 与测试夹具 `Fixtures` |
+
+作为 JPMS 消费方，在你的 `module-info.java` 中声明：
+
+```java
+module your.app {
+    requires com.fincalc.engine;
+    requires com.fincalc.domain;   // API 类型（LeaseElement、Schedule…）在 domain 模块
+}
+```
 
 ## 快速开始
 
@@ -59,8 +68,11 @@ EffectiveInterestTable eir = r.effectiveInterest();     // §9.7 实际利率法
    `validate(...)`、`prepare(...)` 等钩子（参考 `EqualInstallmentGenerator`）；
 2. 注册到引擎使用的注册表：`GeneratorRegistry.defaults().register(new MyGenerator())`
    （或用 `ExtensionRegistry.empty()` 自组一套）。同 code 后注册者覆盖先注册者；
-3. 把 `LeaseElement.method` 指到你的 code（自定义 `RepaymentMethodId` 同名代码），
-   `CalculationFacade` 按 `code()` 路由。
+3. 把 `LeaseElement.method` 指到你的 code，`CalculationFacade` 按 `code()` 路由。
+
+注意：v1 的方法标识 `RepaymentMethodId` 是封闭枚举，自定义生成器只能注册到既有 code
+（覆盖内置实现），或经 `GeneratorRegistry` 显式注册用于测试/内嵌场景；开放自定义 method id
+是 Plan 2 的设计决策。
 
 注册基础设施也支持 `ServiceLoader`（`ExtensionRegistry.load(Class)`，JPMS 下自动
 `Module.addUses` 声明服务依赖），但内置算法一律显式注册；如需走 ServiceLoader，请在
