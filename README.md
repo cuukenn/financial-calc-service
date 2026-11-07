@@ -168,6 +168,17 @@ Excel 用户或持久化消费方时再按最小适配器立项；`04_现金流`
 映射点不变。v1 现金流口径固定为 INCLUDE_FEES（含费用、不含保证金收付）；
 INCLUDE_DEPOSIT/CONTRACT 待 Plan 3 暴露为请求字段。v1 仅含基础资源限制（R79），无鉴权体系。
 
+## 前端（web/）
+
+仓库内可视化测算前端：Vue 3 + TypeScript + Ant Design Vue 4 + ECharts 单页应用（R80），
+经 Vite dev server 代理 `/api` → `http://localhost:8080` 消费 calc-server（R81，后端不加 CORS）。
+含测算表单（黄金要素默认值）、指标 Statistic 卡、16 列摊销计划表、构成堆叠柱图与余额曲线。
+启动与测试/构建命令见 `web/README.md`：
+
+```bash
+cd web && npm install && npm run dev    # 前置：calc-server 运行于 8080
+```
+
 ## 构建
 
 ```bash

@@ -18,6 +18,11 @@ vi.mock('@/api/client', () => ({
   calculate: vi.fn(),
 }))
 
+// jsdom 无 canvas：ECharts 仅需在挂载时不炸即可，渲染细节由 options 纯函数测试覆盖。
+vi.mock('echarts', () => ({
+  init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
+}))
+
 import { calculate } from '@/api/client'
 
 /** 与后端 CalculationApiTest 黄金结构同源的最小响应（金额均为字符串）。 */
@@ -146,10 +151,10 @@ describe('CalculationForm', () => {
     const wrapper = mount(CalculationForm)
     await submit(wrapper)
 
-    const metrics = wrapper.find('[data-test="metrics-list"]')
-    expect(metrics.exists()).toBe(true)
-    expect(metrics.text()).toContain('TOTAL_RENT')
-    expect(metrics.text()).toContain('1032797.15')
+    // Task 3：指标升级为 Statistic 卡（金额字符串原样直显）。
+    const cards = wrapper.findAll('[data-test="metric-card"]')
+    expect(cards.length).toBeGreaterThanOrEqual(1)
+    expect(wrapper.find('[data-test="metric-TOTAL_RENT"]').text()).toContain('1032797.15')
 
     const rows = wrapper.find('[data-test="installments-table"]').findAll('.ant-table-row')
     expect(rows.length).toBeGreaterThanOrEqual(1)
@@ -259,5 +264,34 @@ describe('CalculationForm', () => {
 
     expect(wrapper.find('[data-test="rule-rows-editor"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="rents-editor"]').exists()).toBe(false)
+  })
+
+  it('derives the preset button label from the actual periods (10 → 1-5/6-10)', async () => {
+    const wrapper = mount(CalculationForm)
+    expect(wrapper.find('[data-test="rule-preset"]').text()).toContain(
+      '1-6 期 @3%，7-12 期 @6%',
+    )
+
+    await wrapper.find('[data-test="periods"]').setValue('10')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="rule-preset"]').text()).toContain('1-5 期 @3%，6-10 期 @6%')
+  })
+
+  it('assigns unique ruleIds when adding rows after a removal', async () => {
+    const wrapper = mount(CalculationForm)
+
+    await wrapper.find('[data-test="rule-add"]').trigger('click')
+    await wrapper.find('[data-test="rule-add"]').trigger('click')
+    // 删除第一行（R1），保留 R2。
+    await wrapper.findAll('[data-test="rule-row"] button')[0].trigger('click')
+    await wrapper.find('[data-test="rule-add"]').trigger('click')
+    await flushPromises()
+
+    const ids = wrapper
+      .findAll('[data-test="rule-row"] input')
+      .filter((input) => (input.element as HTMLInputElement).placeholder === '规则 ID')
+      .map((input) => (input.element as HTMLInputElement).value)
+    expect(ids).toEqual(['R2', 'R3'])
   })
 })

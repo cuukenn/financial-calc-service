@@ -1283,3 +1283,7 @@ financial-calc-service/
 | §15 单次 ≤ 10000 期上限 | 未实现；Plan 3 随资源限制（认证/限流）补齐（R79） |
 | R77 路由性错误并入统一错误体（Plan 2 终审修正，2026-11-07） | 405（`FCS-SRV-1003` 方法不支持）/ 415（`FCS-SRV-1004` 媒体类型不支持）/ 404（`FCS-SRV-1005` 请求路径不存在，需 `spring.mvc.throw-exception-if-no-handler-found: true` + `spring.web.resources.add-mappings: false`）均由 `ApiExceptionHandler` 以统一 `{code, message}` 体返回，不再落入兜底 500 或 Boot 默认 `/error` 形态 |
 | Plan 3 持久化/版本链、Excel 适配及关联优化 | 暂时移出计划（用户指令，2026-11-07）；待真实需求出现再立项。前端方向改为 Vue3 + Ant Design UI 可视化测算，经 REST API 消费引擎 |
+| R80 技术栈与位置（Plan 3，2026-11-07） | 前端置于仓库内 `web/`（独立 package.json，`node_modules/`、`dist/` 进 .gitignore）；Vite + Vue 3 + TypeScript + Ant Design Vue 4.x；后端与核心模块零改动 |
+| R81 跨域（Plan 3，2026-11-07） | Vite dev server 代理 `/api` → `http://localhost:8080`，后端不加 CORS；生产部署形态延后 |
+| R82 最小 v1 形态（Plan 3，2026-11-07） | 单页应用（无 Router、无 Pinia）；原生 fetch 封装 API client；表单 + 结果两区块；ECharts 仅用于构成堆叠柱图（本金 vs 利息）与余额曲线，图表坐标轴 parse 金额字符串为 Number、展示文本原样直显 |
+| R83 质量门（Plan 3，2026-11-07） | vitest + @vue/test-utils 组件测试；`npm run build`（vue-tsc + vite）必须成功；沿用脚手架默认 ESLint；每任务 `npm run test` + `npm run build` 双绿 |

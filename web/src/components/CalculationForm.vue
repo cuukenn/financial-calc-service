@@ -16,7 +16,7 @@ import {
   Typography,
 } from 'ant-design-vue'
 import type { Rule } from 'ant-design-vue/es/form'
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 import { ApiError, calculate } from '@/api/client'
 import type {
@@ -30,6 +30,7 @@ import type {
 } from '@/api/types'
 
 import ResultPanel from './ResultPanel.vue'
+import { nextRuleId } from './ruleIds'
 
 interface Option {
   label: string
@@ -198,8 +199,9 @@ const submitError = ref<ApiError | null>(null)
 const localError = ref<string | null>(null)
 
 function addRuleRow(): void {
+  const id = nextRuleId(ruleRows.value.map((row) => row.ruleId))
   ruleRows.value.push({
-    ruleId: `R${ruleRows.value.length + 1}`,
+    ruleId: id,
     priority: (ruleRows.value.length + 1) * 10,
     annualRate: '',
   })
@@ -208,6 +210,14 @@ function addRuleRow(): void {
 function removeRuleRow(index: number): void {
   ruleRows.value.splice(index, 1)
 }
+
+
+/** 预设按钮文案由实际计算派生（Task 3 修正：不再硬编码 1-6/7-12）。 */
+const presetLabel = computed(() => {
+  const total = form.periods ?? 0
+  const half = Math.floor(total / 2)
+  return `分段费率预设（1-${half} 期 @3%，${half + 1}-${total} 期 @6%）`
+})
 
 /** 预设：1 ~ 半程 @3%、半程+1 ~ 期末 @6%（期数 12 时即黄金分段 1-6 / 7-12）。 */
 function presetSegmentedRates(): void {
@@ -229,7 +239,10 @@ function removeFee(index: number): void {
 
 function mapRuleRows(): RuleRow[] {
   return ruleRows.value.map((row, index) => ({
-    ruleId: row.ruleId.trim() || `R${index + 1}`,
+    // 留空时同样派生不重复的 ID（排除自身后取最大序号后继）。
+    ruleId:
+      row.ruleId.trim() ||
+      nextRuleId(ruleRows.value.filter((_, i) => i !== index).map((r) => r.ruleId)),
     priority: row.priority ?? (index + 1) * 10,
     fromPeriod: row.fromPeriod ?? undefined,
     toPeriod: row.toPeriod ?? undefined,
@@ -458,7 +471,7 @@ async function onFinish(): Promise<void> {
         <Space>
           <Button type="dashed" data-test="rule-add" @click="addRuleRow()">+ 添加规则行</Button>
           <Button data-test="rule-preset" @click="presetSegmentedRates()">
-            分段费率预设（1-6 期 @3%，7-12 期 @6%）
+            {{ presetLabel }}
           </Button>
         </Space>
       </Card>
