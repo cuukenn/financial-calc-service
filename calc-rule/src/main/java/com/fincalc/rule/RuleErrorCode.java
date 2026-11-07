@@ -24,9 +24,18 @@ import com.fincalc.common.error.ErrorCode;
  * <p>The Excel error mapping ({@code FCS-RULE-3005..3009}, design §8.5) is not enumerated here:
  * those errors surface as {@link com.fincalc.rule.expression.FormulaError} data carried inside
  * {@code ERROR} values (never thrown by evaluation), so they need no exception code until a task
- * raises them as exceptions. Tasks 23/25/26 add their own codes at their own raise sites.
+ * raises them as exceptions. Task 23 (the rule metamodel) added its own code at its raise site:
+ * {@link #INVALID_ROW_RANGE}, raised by the {@link com.fincalc.rule.model.RuleRow} constructor's
+ * row-range check. Tasks 25/26 add their own codes at their own raise sites.
  */
 public enum RuleErrorCode implements ErrorCode {
+
+    /**
+     * Row-range check in the {@link com.fincalc.rule.model.RuleRow} constructor (Task 23): a rule
+     * row must cover {@code fromPeriod >= 1} and {@code fromPeriod <= toPeriod}.
+     */
+    INVALID_ROW_RANGE("FCS-RULE-2001",
+            "FCS-RULE-2001: 规则行期间区间无效，要求 fromPeriod >= 1 且 fromPeriod <= toPeriod: %s"),
 
     /** Parse-time whitelist check: the identifier is not one of the nine period variables. */
     UNKNOWN_VARIABLE("FCS-RULE-3001", "FCS-RULE-3001: 未知变量: %s"),
