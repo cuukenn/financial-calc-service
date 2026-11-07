@@ -91,6 +91,11 @@ public interface AstNode {
             this.name = Objects.requireNonNull(name, "name");
         }
 
+        /** The referenced identifier, upper-cased. */
+        public String name() {
+            return name;
+        }
+
         @Override
         public Value eval(EvalContext context) {
             return context.variable(name);
@@ -106,6 +111,16 @@ public interface AstNode {
         public UnaryNode(Op op, AstNode operand) {
             this.op = Objects.requireNonNull(op, "op");
             this.operand = Objects.requireNonNull(operand, "operand");
+        }
+
+        /** The unary operator. */
+        public Op op() {
+            return op;
+        }
+
+        /** The operand subtree. */
+        public AstNode operand() {
+            return operand;
         }
 
         @Override
@@ -166,6 +181,21 @@ public interface AstNode {
             this.op = Objects.requireNonNull(op, "op");
             this.left = Objects.requireNonNull(left, "left");
             this.right = Objects.requireNonNull(right, "right");
+        }
+
+        /** The binary operator. */
+        public Op op() {
+            return op;
+        }
+
+        /** The left operand subtree. */
+        public AstNode left() {
+            return left;
+        }
+
+        /** The right operand subtree. */
+        public AstNode right() {
+            return right;
         }
 
         @Override
@@ -332,6 +362,16 @@ public interface AstNode {
         public CallNode(String code, List<AstNode> args) {
             this.code = Objects.requireNonNull(code, "code");
             this.args = List.copyOf(Objects.requireNonNull(args, "args"));
+        }
+
+        /** The called function's code, upper-cased. */
+        public String code() {
+            return code;
+        }
+
+        /** The argument subtrees, in source order; immutable. */
+        public List<AstNode> args() {
+            return args;
         }
 
         @Override

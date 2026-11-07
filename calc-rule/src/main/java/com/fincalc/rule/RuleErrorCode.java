@@ -28,7 +28,10 @@ import com.fincalc.common.error.ErrorCode;
  * {@link #INVALID_ROW_RANGE}, raised by the {@link com.fincalc.rule.model.RuleRow} constructor's
  * row-range check. Task 26 (the rule compiler) raises its V1–V8 checks: V1/V3 reuse
  * {@link #INVALID_ROW_RANGE}, and the remaining checks each carry their own constant below.
- * Tasks 25/26 add their own codes at their own raise sites.
+ * Tasks 25/26 add their own codes at their own raise sites. Task 27 (external function scripts)
+ * adds {@code FCS-RULE-3010}/{@code FCS-RULE-3011} at the loader's override and recursion checks;
+ * script-line syntax errors and the post-inlining depth cap reuse {@link #EXPRESSION_SYNTAX_ERROR}
+ * (3004), and unknown/mis-arity references inside a script body reuse {@link #UNKNOWN_FUNCTION}.
  */
 public enum RuleErrorCode implements ErrorCode {
 
@@ -89,7 +92,24 @@ public enum RuleErrorCode implements ErrorCode {
      * Parse-time registry check: unknown function name, or argument count outside
      * {@code [minArity, maxArity]}.
      */
-    UNKNOWN_FUNCTION("FCS-RULE-3009", "FCS-RULE-3009: 未知函数或参数个数不匹配: %s");
+    UNKNOWN_FUNCTION("FCS-RULE-3009", "FCS-RULE-3009: 未知函数或参数个数不匹配: %s"),
+
+    /**
+     * Script loader check (Task 27): a {@code DEFINE} in a {@code .fcs} external function script
+     * names a function that already exists in the base registry as a non-script (built-in)
+     * function, and the definition line does not carry the {@code OVERRIDE} keyword. Overriding a
+     * script function loaded from an earlier file is allowed without the keyword — that is the
+     * loader's later-file-wins merge rule.
+     */
+    SCRIPT_OVERRIDE_BUILTIN("FCS-RULE-3010",
+            "FCS-RULE-3010: 脚本定义不允许覆盖内置函数, 需要 OVERRIDE 关键字: %s"),
+
+    /**
+     * Script loader check (Task 27): the call graph of the {@code .fcs} definitions contains a
+     * direct or indirect cycle; the message names the recursive call chain and the definition
+     * location ({@code 文件 行}).
+     */
+    SCRIPT_RECURSION("FCS-RULE-3011", "FCS-RULE-3011: 函数定义禁止递归: %s");
 
     private final String code;
     private final String message;

@@ -32,7 +32,14 @@ final class Lexer {
         this.source = Objects.requireNonNull(source, "source");
     }
 
-    /** Tokenizes the whole source, ending with a {@link Type#EOF} token. */
+    /**
+     * Tokenizes the whole source, ending with a {@link Type#EOF} token.
+     *
+     * <p>Identifiers may additionally carry non-ASCII letters (Task 27): external function script
+     * names such as {@code 含税金额} must lex as one identifier both inside {@code .fcs} bodies
+     * and inside rule expressions that call script functions. ASCII keywords and the
+     * {@code TRUE}/{@code FALSE}/{@code BLANK} literals are unaffected.
+     */
     List<Token> tokenize() {
         List<Token> tokens = new ArrayList<>();
         while (true) {
@@ -91,6 +98,10 @@ final class Lexer {
             case '|':
                 return doubled(Type.OR, startLine, startCol);
             default:
+                // Non-ASCII letters (e.g. CJK script function names) start identifiers too.
+                if (isIdentStart(c)) {
+                    return word(startLine, startCol);
+                }
                 throw syntax(startLine, startCol, "不允许的字符 '" + c + "'");
         }
     }
@@ -237,8 +248,14 @@ final class Lexer {
         return c >= '0' && c <= '9';
     }
 
+    /** ASCII letters, the underscore, or any non-ASCII letter (CJK function names, Task 27). */
+    private static boolean isIdentStart(char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_'
+                || (c > 127 && Character.isLetter(c));
+    }
+
     private static boolean isIdentPart(char c) {
-        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_' || isDigit(c);
+        return isIdentStart(c) || isDigit(c);
     }
 
     /** Syntax error pointing at the 1-based position where the problem was found. */

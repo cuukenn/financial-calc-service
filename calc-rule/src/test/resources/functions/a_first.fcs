@@ -1,0 +1,2 @@
+VERSION 1
+DEFINE F(X) = X + 1

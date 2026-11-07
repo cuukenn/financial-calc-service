@@ -3,6 +3,7 @@ package com.fincalc.rule.expression;
 import com.fincalc.rule.function.FunctionRegistry;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Entry point of the expression engine: compiles an expression source string into a reusable
@@ -42,5 +43,31 @@ public final class ExpressionParser {
         List<Token> tokens = new Lexer(expr).tokenize();
         AstNode root = new Parser(tokens, functions).parse();
         return root::eval;
+    }
+
+    /**
+     * Compiles an expression to its raw {@link AstNode} tree (Task 27), additionally accepting
+     * {@code additionalVariables} as local variable references — used by the external function
+     * script pipeline, whose definition bodies read their formal parameters. All parse-time
+     * checks of {@link #parse(String, FunctionRegistry)} apply unchanged (whitelist, registry
+     * resolution, arity, depth cap).
+     *
+     * @param expr                expression source; blank or {@code null} yields the
+     *                            {@link Value#blank() BLANK} literal
+     * @param functions           registry the body's function calls resolve against (built-ins
+     *                            plus placeholders for every script-defined name)
+     * @param additionalVariables the formal parameter names of the surrounding definition,
+     *                            matched upper-cased; never {@code null}
+     * @return the parsed tree, for the script inliner to expand
+     */
+    public static AstNode parseAst(String expr, FunctionRegistry functions,
+            Set<String> additionalVariables) {
+        Objects.requireNonNull(functions, "functions");
+        Objects.requireNonNull(additionalVariables, "additionalVariables");
+        if (expr == null || expr.trim().isEmpty()) {
+            return new AstNode.LiteralNode(Value.blank());
+        }
+        List<Token> tokens = new Lexer(expr).tokenize();
+        return new Parser(tokens, functions, additionalVariables).parse();
     }
 }

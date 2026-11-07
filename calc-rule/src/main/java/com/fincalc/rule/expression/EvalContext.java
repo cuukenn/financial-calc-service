@@ -53,6 +53,30 @@ public final class EvalContext {
     }
 
     /**
+     * Returns a context of this one with the given bindings overlaid on top of the existing
+     * variables (Task 27): a script function's invoke binds its formal parameters to the call's
+     * argument values while every other variable keeps resolving against the caller's context.
+     * Keys are matched case-insensitively; an overlay key that collides with an existing variable
+     * wins (formal parameters shadow period variables), and values must be non-null.
+     *
+     * @param overlay parameter bindings to layer over this context's variables; never
+     *                {@code null}; copied, never retained
+     * @return a new immutable context; {@code this} when the overlay is empty
+     */
+    public EvalContext withVariables(Map<String, Value> overlay) {
+        Objects.requireNonNull(overlay, "overlay");
+        if (overlay.isEmpty()) {
+            return this;
+        }
+        Map<String, Value> merged = new LinkedHashMap<>(this.variables);
+        for (Map.Entry<String, Value> entry : overlay.entrySet()) {
+            merged.put(upper(entry.getKey()), Objects.requireNonNull(entry.getValue(),
+                    "overlay[" + entry.getKey() + "]"));
+        }
+        return new EvalContext(merged, functions);
+    }
+
+    /**
      * The value of a variable, or {@link Value#blank()} when the context does not carry it (see
      * the class javadoc for why this is a deliberate empty-cell reading, not an error).
      *

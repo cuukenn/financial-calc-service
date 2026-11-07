@@ -47,12 +47,28 @@ final class Parser {
 
     private final List<Token> tokens;
     private final FunctionRegistry functions;
+    /** Extra identifiers accepted beside the whitelist: a script body's formal parameters. */
+    private final Set<String> extraVariables;
     private int pos;
     private int depth;
 
     Parser(List<Token> tokens, FunctionRegistry functions) {
+        this(tokens, functions, Set.of());
+    }
+
+    /**
+     * Parser variant for external function script bodies (Task 27): {@code additionalVariables}
+     * are the definition's formal parameters, accepted as local variable references beside the
+     * nine whitelisted period variables. Names are matched upper-cased.
+     */
+    Parser(List<Token> tokens, FunctionRegistry functions, Set<String> additionalVariables) {
         this.tokens = tokens;
         this.functions = functions;
+        Set<String> upper = new java.util.HashSet<>();
+        for (String name : additionalVariables) {
+            upper.add(name.toUpperCase(java.util.Locale.ROOT));
+        }
+        this.extraVariables = upper;
     }
 
     /** Parses the whole token list into one tree; rejects trailing tokens. */
@@ -221,12 +237,12 @@ final class Parser {
         }
     }
 
-    /** A whitelisted variable reference or a registry-validated function call. */
+    /** A whitelisted variable reference (or a script formal parameter) or a validated call. */
     private AstNode parseIdentifier() {
         Token nameToken = advance();
         if (peek().type() != Type.LPAREN) {
             String name = nameToken.text();
-            if (!VARIABLES.contains(name)) {
+            if (!VARIABLES.contains(name) && !extraVariables.contains(name)) {
                 throw new BusinessException(RuleErrorCode.UNKNOWN_VARIABLE, name);
             }
             return new AstNode.VarNode(name);
