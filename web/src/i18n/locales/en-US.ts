@@ -115,9 +115,9 @@ const enUS: typeof zhCN = {
     },
     dateRoll: {
       NONE: 'NONE (no roll)',
-      FOLLOWING: 'FOLLOWING',
+      FOLLOWING: 'FOLLOWING (forward)',
       MODIFIED_FOLLOWING: 'MODIFIED_FOLLOWING (modified following)',
-      PRECEDING: 'PRECEDING',
+      PRECEDING: 'PRECEDING (preceding)',
       MODIFIED_PRECEDING: 'MODIFIED_PRECEDING (modified preceding)',
       END_OF_MONTH: 'END_OF_MONTH (end of month)',
     },

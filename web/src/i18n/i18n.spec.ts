@@ -2,7 +2,6 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ConfigProvider } from 'ant-design-vue'
-
 import App from '@/App.vue'
 import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 import i18n, { LOCALE_STORAGE_KEY, setLocale } from './index'
@@ -27,7 +26,6 @@ vi.mock('echarts', () => ({
   init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
 }))
 
-import { Dropdown } from 'ant-design-vue'
 import { mountWithI18n } from '@/test-utils/mount'
 
 describe('i18n (R85)', () => {
@@ -73,20 +71,27 @@ describe('i18n (R85)', () => {
     expect(provider.props('locale')).toMatchObject({ locale: 'zh-cn' })
   })
 
-  it('wires the language switcher: a menu click switches locale and persists', async () => {
+  it('switches locale via a real dropdown menu item click (overlay wired to Menu)', async () => {
     const wrapper = mountWithI18n(LanguageSwitcher)
 
-    const dropdown = wrapper.findComponent(Dropdown)
-    expect(dropdown.exists()).toBe(true)
-    const menu = dropdown.props('menu') as { items: { key: string; label: string }[] }
-    expect(menu.items.map((item) => item.key)).toEqual(['zh-CN', 'en-US'])
+    // 回归防线（评审 Critical 1）：Dropdown 只消费 overlay 插槽且自身不发 click；
+    // 必须真实打开下拉、点真实菜单项，断言 locale 真正切换。
+    await wrapper.find('[data-test="language-switcher-btn"]').trigger('click')
+    await flushPromises()
 
-    // 触发 Dropdown 的 click 事件（父组件 onMenuClick 处理）。
-    dropdown.vm.$emit('click', { key: 'en-US' })
+    const items = [...document.querySelectorAll('.ant-dropdown-menu-item')]
+    expect(items.length).toBe(2)
+    expect(items.map((item) => item.textContent?.trim())).toEqual(['简体中文', 'English'])
+
+    const english = items.find((item) => item.textContent?.includes('English'))
+    expect(english, 'English menu item should be rendered in the overlay').toBeTruthy()
+    english!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
     await flushPromises()
 
     expect(i18n.global.locale.value).toBe('en-US')
     expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe('en-US')
+    // 切换后触发按钮文案同步为当前语言。
     expect(wrapper.find('[data-test="language-switcher-btn"]').text()).toContain('English')
   })
 })
