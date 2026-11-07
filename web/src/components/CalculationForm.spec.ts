@@ -206,16 +206,17 @@ describe('CalculationForm', () => {
     const wrapper = mountWithI18n(CalculationForm)
     await submit(wrapper)
 
-    // Task 3：指标升级为 Statistic 卡（金额字符串原样直显，位于默认「指标」Tab）。
+    // Task 3：指标升级为 Statistic 卡（R90a：#,##0.0000 显示，原值随 tooltip 透出）。
     const cards = wrapper.findAll('[data-test="metric-card"]')
     expect(cards.length).toBeGreaterThanOrEqual(1)
-    expect(wrapper.find('[data-test="metric-TOTAL_RENT"]').text()).toContain('1032797.15')
+    expect(wrapper.find('[data-test="metric-TOTAL_RENT"]').text()).toContain('1,032,797.1500')
 
     // Plan 4 Task 1：摊销计划移入同名 Tab（懒渲染，须先激活）。
     await activateTab(wrapper, '摊销计划')
     const rows = wrapper.find('[data-test="installments-table"]').findAll('.ant-table-row')
     expect(rows.length).toBeGreaterThanOrEqual(1)
-    expect(rows[0].text()).toContain('84271.24')
+    // R90a：金额列千分位 + 固定 4 位小数。
+    expect(rows[0].text()).toContain('84,271.2400')
     expect(wrapper.find('[data-test="has-errors-alert"]').exists()).toBe(false)
   })
 

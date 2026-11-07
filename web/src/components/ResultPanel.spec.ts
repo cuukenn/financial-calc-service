@@ -92,13 +92,17 @@ describe('ResultPanel', () => {
     const rent = wrapper.find('[data-test="metric-TOTAL_RENT"]')
     // R86：指标卡标签来自指标目录（§9.5 中文名），不再是 UI 内的别名。
     expect(rent.text()).toContain('租金合计')
-    // 金额字符串原样直显（不重排版、不加千分位）。
-    expect(rent.text()).toContain('1032797.15')
+    // R90a：金额显示千分位 + 固定 4 位小数（原值随 tooltip 透出）。
+    expect(rent.text()).toContain('1,032,797.1500')
 
     const xirr = wrapper.find('[data-test="metric-XIRR"]')
     // 目录名（§9.5）：实际日期 IRR；null 值渲染「—」。
     expect(xirr.text()).toContain('实际日期 IRR')
     expect(xirr.text()).toContain('—')
+
+    // R90b：利率类指标显示为百分比（×100 固定 4 位小数）。
+    const irr = wrapper.find('[data-test="metric-IRR_ANNUAL"]')
+    expect(irr.text()).toContain('6.1700%')
   })
 
   it('wires the metric catalog into tooltips on cards and table row headers (R86)', () => {
@@ -164,6 +168,29 @@ describe('ResultPanel', () => {
     expect(codes).not.toContain('CUSTOM_BALLOON_METRIC')
   })
 
+  it('formats metric values per class (R90a/R90b) and keeps the raw string in the tooltip', () => {
+    const withClasses = result()
+    withClasses.schedule.header.metrics = {
+      ...withClasses.schedule.header.metrics,
+      MIRR: '0.058',
+      PAYBACK_PERIOD: '0.26841',
+    }
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withClasses } })
+
+    // 指标表数值按类别格式化：利率 → 百分比；年数 → 4 位小数；null → 「—」。
+    const values = wrapper.findAll('[data-test="metric-value"]').map((v) => v.text())
+    expect(values).toContain('5.8000%')
+    expect(values).toContain('0.2684')
+    expect(values).toContain('—')
+
+    // 原始后端字符串不丢：tooltip 透出原值（对账不丢精度）。
+    const tooltips = wrapper.findAllComponents(Tooltip).map((tp) => tp.props('title') as string)
+    expect(tooltips.join('\n')).toContain('原值：0.058')
+    expect(tooltips.join('\n')).toContain('原值：0.26841')
+    // 指标卡 tooltip 同样附原值。
+    expect(tooltips.join('\n')).toContain('原值：1032797.15')
+  })
+
   it('renders the four tabs with a cash-flow placeholder when no flows exist', async () => {
     const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 
@@ -190,13 +217,13 @@ describe('ResultPanel', () => {
 
     await activateTab(wrapper, '现金流')
 
-    // 现金流表渲染全部事件行；金额字符串原样直显。
+    // 现金流表渲染全部事件行；R90a：金额列千分位 + 固定 4 位小数。
     const table = wrapper.find('[data-test="cashflow-table"]')
     expect(table.exists()).toBe(true)
     const rows = table.findAll('.ant-table-row')
     expect(rows.length).toBe(5)
-    expect(rows[0].text()).toContain('1000000.00')
-    expect(rows[2].text()).toContain('84271.24')
+    expect(rows[0].text()).toContain('1,000,000.0000')
+    expect(rows[2].text()).toContain('84,271.2400')
 
     // 类型标签走 i18n（zh-CN：本金/费用/租金/残值/保证金）。
     const rowText = rows.map((r) => r.text())
@@ -238,9 +265,9 @@ describe('ResultPanel', () => {
     await activateTab(wrapper, '实际利率法')
     const table = wrapper.find('[data-test="effective-interest-table"]')
     expect(table.exists()).toBe(true)
-    // EIR 摘要行与摊销表同 Tab 展示。
-    expect(wrapper.find('[data-test="result-tabs"]').text()).toContain('实际利率（EIR）：0.0051')
-    expect(table.find('.ant-table-row').text()).toContain('920828.76')
+    // EIR 摘要行与摊销表同 Tab 展示（R90a/R90b：EIR 百分比、金额 #,##0.0000）。
+    expect(wrapper.find('[data-test="result-tabs"]').text()).toContain('实际利率（EIR）：0.5100%')
+    expect(table.find('.ant-table-row').text()).toContain('920,828.7600')
 
     // 无数据（IRR 未收敛等）时占位而非空表。
     const nullWrapper = mountWithI18n(ResultPanel, { props: { result: result() } })

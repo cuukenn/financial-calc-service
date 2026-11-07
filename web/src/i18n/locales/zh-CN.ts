@@ -150,6 +150,8 @@ const zhCN = {
   result: {
     cardTitle: '测算结果',
     runId: 'runId：{runId}',
+    // R90a/R90b：数值显示格式化后，原始终端字符串随 hover tooltip 透出（对账不丢精度）。
+    raw: '原值：{value}',
     hasErrors: '测算结果包含 ERROR 级问题，请检查下方问题列表',
     tabs: {
       metrics: '指标',

@@ -150,6 +150,9 @@ const enUS: typeof zhCN = {
   result: {
     cardTitle: 'Calculation Result',
     runId: 'runId: {runId}',
+    // R90a/R90b: after display formatting, the original backend string stays
+    // available in the hover tooltip (no precision lost for reconciliation).
+    raw: 'Raw: {value}',
     hasErrors: 'The result contains ERROR-level issues, see the issue list below',
     tabs: {
       metrics: 'Metrics',
