@@ -1268,3 +1268,4 @@ financial-calc-service/
 | Task 27 简报测试 2 断言 `94.34` | 系算术错误：脚本实际计算 `100×(1−0.06)=94.00`，断言从脚本（R62） |
 | §9.7「末期净投资必须归零」 | 仅对 fully-amortizing/BALLOON 场景强制（R52 接线）；SEPARATE 残值末期等于残值 |
 | 标准租约 `TOTAL_RENT = 1 032 797.16` | 更正为 `1 032 797.15`（11×86 066.43 + 末期调整 86 066.42，Task 21） |
+| §8.2 列 D 条件规则的求值接线 | 条件规则的 EvalContext 接线在引擎层完成（Plan 1），`RuleSetView` 端口保持 4 参，条件求值走编译器附加的 `withCondition` 路径 |

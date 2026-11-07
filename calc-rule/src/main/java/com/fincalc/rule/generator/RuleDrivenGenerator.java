@@ -23,6 +23,8 @@ import com.fincalc.domain.model.SpecialActionKind;
 import com.fincalc.domain.port.RuleSetView;
 import com.fincalc.domain.support.AbstractAmortizationGenerator;
 import com.fincalc.rule.RuleErrorCode;
+import com.fincalc.rule.expression.EvalContext;
+import com.fincalc.rule.expression.Value;
 import com.fincalc.rule.model.CompiledRule;
 import com.fincalc.rule.model.CompiledRuleSet;
 import com.fincalc.rule.model.RuleRow;
@@ -64,6 +66,11 @@ import com.fincalc.rule.model.RuleRow;
  *   <li><strong>R17 backstop</strong> — a plan that would push the balance negative (or repay
  *       more than the opening balance) raises {@code FCS-DOM-2003} instead of emitting a
  *       corrupt schedule; the compiled set is trusted but never at the cost of conservation.</li>
+ *   <li><strong>Conditions (design §8.2 column D)</strong> — when the bound set is a
+ *       {@link CompiledRuleSet}, each period's nine whitelisted variables are built into an
+ *       {@link com.fincalc.rule.expression.EvalContext} and the rows' compiled conditions are
+ *       evaluated (see {@link PlannedRuleSet#resolve}); a period whose only covering rows fail
+ *       their conditions is an uncovered period and follows the R15 rule above.</li>
  * </ul>
  *
  * <p>Generators are stateless: all per-run state (the remaining principal pool, the open
@@ -237,15 +244,58 @@ public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
             return index;
         }
 
+        /**
+         * Resolves the period through the bound set, evaluating the rows' compiled conditions
+         * when the delegate is a {@link CompiledRuleSet} (final-review fix wave, design §8.2
+         * column D): the nine whitelisted period variables are built from the loop state into an
+         * {@link EvalContext} and the context-accepting resolve evaluates range AND condition.
+         * The {@code RuleSetView} port keeps the 4-arg signature; conditions flow through the
+         * compiler-attached {@code withCondition} path, never through the port.
+         *
+         * <p>{@code RATE} carries {@code defaultAnnualRate} — the element's nominal rate as the
+         * template loop passes it — because the matched rule's own rate is only known after the
+         * condition evaluates; a condition compares against the fallback rate.
+         */
         @Override
         public RuleOutcome resolve(int periodNo, BigDecimal openingBalance, int days,
                 BigDecimal defaultAnnualRate) {
-            RuleOutcome outcome = delegate.resolve(periodNo, openingBalance, days,
-                    defaultAnnualRate);
+            RuleOutcome outcome;
+            if (delegate instanceof CompiledRuleSet) {
+                CompiledRuleSet compiled = (CompiledRuleSet) delegate;
+                outcome = compiled.resolve(periodNo, openingBalance, days, defaultAnnualRate,
+                        evalContext(compiled, periodNo, openingBalance, days, defaultAnnualRate));
+            } else {
+                outcome = delegate.resolve(periodNo, openingBalance, days, defaultAnnualRate);
+            }
             if (outcome == null || !outcome.matched()) {
                 return fallback(periodNo);
             }
             return plan(periodNo, outcome);
+        }
+
+        /**
+         * The nine whitelisted condition variables (design §8.2 column D, parser whitelist)
+         * built from the loop state: {@code PERIOD}, {@code BALANCE}, {@code DAYS},
+         * {@code RATE} (the fallback annual rate — see {@link #resolve}), {@code INDEX} (zero
+         * based), {@code IS_LAST}, {@code PRINCIPAL}, {@code TOTAL_PERIODS} and {@code RESIDUAL}
+         * ({@link Value#blank()} when the element carries no residual — a {@code null} cannot
+         * enter a {@code Map.copyOf} variable map). Functions resolve against the registry the
+         * rules were compiled with.
+         */
+        private EvalContext evalContext(CompiledRuleSet compiled, int periodNo,
+                BigDecimal openingBalance, int days, BigDecimal defaultAnnualRate) {
+            Map<String, Value> variables = new HashMap<>();
+            variables.put("PERIOD", Value.number(BigDecimal.valueOf(periodNo)));
+            variables.put("BALANCE", Value.number(openingBalance));
+            variables.put("DAYS", Value.number(BigDecimal.valueOf(days)));
+            variables.put("RATE", Value.number(defaultAnnualRate));
+            variables.put("INDEX", Value.number(BigDecimal.valueOf(periodNo - 1)));
+            variables.put("IS_LAST", Value.bool(periodNo == totalPeriods));
+            variables.put("PRINCIPAL", Value.number(element.principal()));
+            variables.put("TOTAL_PERIODS", Value.number(BigDecimal.valueOf(totalPeriods)));
+            variables.put("RESIDUAL", element.residualValue() == null
+                    ? Value.blank() : Value.number(element.residualValue()));
+            return new EvalContext(variables, compiled.functionRegistry());
         }
 
         /**

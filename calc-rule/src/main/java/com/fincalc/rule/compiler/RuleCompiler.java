@@ -114,6 +114,6 @@ public final class RuleCompiler {
             }
             compiled.add(rule);
         }
-        return new CompiledRuleSet(compiled, functions.hash());
+        return new CompiledRuleSet(compiled, functions.hash(), functions);
     }
 }

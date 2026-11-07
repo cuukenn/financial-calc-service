@@ -3,6 +3,7 @@ package com.fincalc.rule.model;
 import com.fincalc.domain.model.RuleOutcome;
 import com.fincalc.domain.port.RuleSetView;
 import com.fincalc.rule.expression.EvalContext;
+import com.fincalc.rule.function.FunctionRegistry;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -47,6 +48,7 @@ public final class CompiledRuleSet implements RuleSetView {
 
     private final List<CompiledRule> rules;
     private final String functionRegistryHash;
+    private final FunctionRegistry functionRegistry;
     private final String hash;
 
     /**
@@ -73,14 +75,37 @@ public final class CompiledRuleSet implements RuleSetView {
      *                             {@code null} (use the empty string for "no registry")
      */
     public CompiledRuleSet(List<CompiledRule> rules, String functionRegistryHash) {
+        this(rules, functionRegistryHash, FunctionRegistry.empty());
+    }
+
+    /**
+     * Compiles already-built rules into a rule set carrying the registry their conditions were
+     * parsed against (final-review fix wave): the registry rides along so the engine layer can
+     * build the per-period {@link EvalContext} for
+     * {@link #resolve(int, BigDecimal, int, BigDecimal, EvalContext)} without re-threading it
+     * through the {@code RuleSetView} port.
+     *
+     * @param rules                the compiled rules, in any order; the set re-sorts them into
+     *                             canonical {@code (priority, ruleId)} order; never {@code null}
+     * @param functionRegistryHash the digest of {@code functionRegistry}, folded into
+     *                             {@link #ruleSetHash()}; never {@code null} (use the empty
+     *                             string for "no registry")
+     * @param functionRegistry     the registry condition expressions evaluate against; never
+     *                             {@code null} (use {@link FunctionRegistry#empty()} for "no
+     *                             registry")
+     */
+    public CompiledRuleSet(List<CompiledRule> rules, String functionRegistryHash,
+            FunctionRegistry functionRegistry) {
         Objects.requireNonNull(rules, "rules");
         Objects.requireNonNull(functionRegistryHash, "functionRegistryHash");
+        Objects.requireNonNull(functionRegistry, "functionRegistry");
         List<CompiledRule> sorted = new ArrayList<>(rules);
         sorted.sort(Comparator
                 .comparingInt((CompiledRule rule) -> rule.row().priority())
                 .thenComparing(rule -> rule.row().ruleId()));
         this.rules = Collections.unmodifiableList(sorted);
         this.functionRegistryHash = functionRegistryHash;
+        this.functionRegistry = functionRegistry;
         StringBuilder canonical = new StringBuilder(functionRegistryHash);
         for (CompiledRule rule : sorted) {
             canonical.append('\n');
@@ -183,6 +208,19 @@ public final class CompiledRuleSet implements RuleSetView {
      */
     public String functionRegistryHash() {
         return functionRegistryHash;
+    }
+
+    /**
+     * The function registry the rules' condition expressions were parsed against (final-review
+     * fix wave): the registry this set was built with via the three-argument constructor, or the
+     * {@link FunctionRegistry#empty() empty registry} for sets built without one. The context
+     * builder in the engine layer hands it to the {@link EvalContext} so conditions can call
+     * functions.
+     *
+     * @return the condition-time function registry; never {@code null}
+     */
+    public FunctionRegistry functionRegistry() {
+        return functionRegistry;
     }
 
     /**

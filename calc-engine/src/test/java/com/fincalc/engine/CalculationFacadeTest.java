@@ -178,6 +178,29 @@ class CalculationFacadeTest {
                 .hasMessageContaining("FCS-ENG-1003");
     }
 
+    // ---- Conditions (design §8.2 column D) drive period-specific rates end-to-end ----
+
+    @Test
+    void conditioned_rule_set_drives_period_specific_rates_end_to_end() {
+        LeaseElement element = baseElement().toBuilder()
+                .method(RepaymentMethodId.RULE_DRIVEN).build();
+        // RATE carries the element's nominal rate 0.06, so the condition holds for periods 1..6;
+        // periods 7..12 fall through to the unconditional lower-priority row.
+        RuleRow guarded = builder("R1", 10, 1, 12).rate("0.03")
+                .condition("PERIOD <= 6 && RATE > 0.04").build();
+        CompiledRuleSet set = new RuleCompiler(FunctionRegistry.defaults()).compile(
+                List.of(guarded, rateRow("R2", 20, 1, 12, "0.06")), element, false);
+
+        CalculationResult r = CalculationFacade.defaults().calculate(
+                new CalculationRequest(element, set, CalculationOptions.defaults()));
+
+        assertThat(r.schedule().hasErrors()).isFalse();
+        assertThat(r.schedule().installments().get(0).appliedRate()).isEqualByComparingTo("0.03");
+        assertThat(r.schedule().installments().get(5).appliedRate()).isEqualByComparingTo("0.03");
+        assertThat(r.schedule().installments().get(6).appliedRate()).isEqualByComparingTo("0.06");
+        assertThat(r.schedule().installments().get(11).appliedRate()).isEqualByComparingTo("0.06");
+    }
+
     // ---- Diagnostics: fallback periods surface as WARN issues on the schedule ----
 
     @Test
@@ -232,8 +255,9 @@ class CalculationFacadeTest {
      * A rule set whose highest-priority row guards its applicability with {@code condition} — an
      * expression calling {@code scriptCall}. The condition only parses when the facade's function
      * registry carries the external script function, so a green run proves the end-to-end script
-     * path; the unconditional lower-priority row R1 keeps generation itself unaffected (the
-     * context-less resolution skips conditioned rows by design).
+     * path; the condition itself evaluates true (the generator builds the per-period
+     * {@code EvalContext}), so R0 governs every period and the unconditional lower-priority row
+     * R1 never fires.
      */
     private static RuleSetView ruleSetUsing(String condition, CalculationFacade facade) {
         RuleRow guarded = builder("R0", 5, 1, 12).rate("0.06").condition(condition).build();

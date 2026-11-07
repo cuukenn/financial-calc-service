@@ -149,6 +149,66 @@ class RuleDrivenGeneratorTest {
         assertThat(ex.errorCode()).isEqualTo(RuleErrorCode.PRINCIPAL_PLAN_TOTAL);
     }
 
+    // ---- Conditions (design §8.2 column D): the wired EvalContext drives period-specific rates ----
+
+    @Test
+    void conditioned_rules_drive_period_specific_rates() {
+        // RATE carries the element's nominal (fallback) rate 0.06, so the condition holds for
+        // periods 1..6 only; periods 7..12 fall through to the unconditional lower-priority row.
+        CompiledRuleSet set = compiler().compile(List.of(
+                builder("R1", 10, 1, 12).rate("0.03")
+                        .condition("PERIOD <= 6 && RATE > 0.04").build(),
+                rateRow("R2", 20, 1, 12, "0.06")), element(12), false);
+        Schedule s = new RuleDrivenGenerator(set).generate(context(baseElement().toBuilder()
+                .method(RepaymentMethodId.RULE_DRIVEN).build()));
+
+        assertThat(s.installments().get(0).appliedRate()).isEqualByComparingTo("0.03");
+        assertThat(s.installments().get(5).appliedRate()).isEqualByComparingTo("0.03");
+        assertThat(s.installments().get(6).appliedRate()).isEqualByComparingTo("0.06");
+        assertThat(s.installments().get(11).appliedRate()).isEqualByComparingTo("0.06");
+    }
+
+    @Test
+    void is_last_and_residual_variables_evaluate_in_conditions() {
+        LeaseElement balloon = baseElement().toBuilder()
+                .residualValue(new BigDecimal("100000"))
+                .residualHandling(ResidualHandling.BALLOON_IN_RENT)
+                .build();
+        CompiledRuleSet set = compiler().compile(List.of(
+                builder("R0", 5, 12, 12).rate("0.03")
+                        .condition("IS_LAST && RESIDUAL >= 100000").build(),
+                rateRow("R1", 10, 1, 12, "0.06")), balloon, false);
+        Schedule s = new RuleDrivenGenerator(set).generate(context(balloon));
+
+        assertThat(s.installments().get(11).appliedRate()).isEqualByComparingTo("0.03");
+        assertThat(s.installments().get(10).appliedRate()).isEqualByComparingTo("0.06");
+    }
+
+    @Test
+    void blank_residual_reads_as_empty_cell_in_conditions() {
+        // The base element's residual is 0 under SEPARATE, so RESIDUAL > 0 fails everywhere and
+        // only the unconditional row can match.
+        CompiledRuleSet set = compiler().compile(List.of(
+                builder("R0", 5, 1, 12).rate("0.03").condition("RESIDUAL > 0").build(),
+                rateRow("R1", 10, 1, 12, "0.06")), element(12), false);
+        Schedule s = new RuleDrivenGenerator(set).generate(context(baseElement().toBuilder()
+                .method(RepaymentMethodId.RULE_DRIVEN).build()));
+
+        assertThat(s.installments()).allSatisfy(i ->
+                assertThat(i.appliedRate()).isEqualByComparingTo("0.06"));
+    }
+
+    @Test
+    void condition_false_everywhere_leaves_periods_uncovered() {
+        CompiledRuleSet set = compiler().compile(List.of(
+                builder("R1", 10, 1, 12).rate("0.06").condition("PERIOD > 100").build()),
+                element(12), false);
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> new RuleDrivenGenerator(set).generate(context(baseElement())));
+        assertThat(ex.errorCode().code()).isEqualTo("FCS-RULE-2001");
+        assertThat(ex.getMessage()).contains("第 1 期");
+    }
+
     // ---- R65: special actions other than NONE fail generation loudly (design §8.2.2) ----
 
     @Test
@@ -244,6 +304,7 @@ class RuleDrivenGeneratorTest {
         private String principalSequence;
         private InterestTreatmentKind treatment = InterestTreatmentKind.PAY_AS_INCURRED;
         private SpecialActionKind action = SpecialActionKind.NONE;
+        private String condition;
 
         private RuleRowBuilder(String ruleId, int priority, int from, int to) {
             this.ruleId = ruleId;
@@ -282,10 +343,15 @@ class RuleDrivenGeneratorTest {
             return this;
         }
 
+        RuleRowBuilder condition(String condition) {
+            this.condition = condition;
+            return this;
+        }
+
         RuleRow build() {
             return new RuleRow(ruleId, priority, from, to, annualRate, null, plan,
                     principalValue, principalSequence, treatment,
-                    PaymentTiming.IN_ARREARS, action, null, 0, null, null, 0, null);
+                    PaymentTiming.IN_ARREARS, action, null, 0, condition, null, 0, null);
         }
     }
 }
