@@ -314,6 +314,7 @@ function issueKey(issue: Issue, index: number): string {
           bordered
           size="small"
           :column="3"
+          class="metrics-descriptions"
           data-test="metrics-list"
           style="margin-top: 12px"
         >
@@ -489,5 +490,16 @@ function issueKey(issue: Issue, index: number): string {
   display: block;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
+}
+/* R90：金额/率值禁止折行断数字——宽度不足时由容器横向滚动。 */
+.metrics-descriptions {
+  overflow-x: auto;
+}
+.metrics-descriptions :deep(.ant-descriptions-view) {
+  min-width: 640px;
+}
+.metrics-descriptions :deep(.ant-descriptions-item-label),
+.metrics-descriptions :deep(.ant-descriptions-item-content) {
+  white-space: nowrap;
 }
 </style>
