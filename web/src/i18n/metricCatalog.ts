@@ -91,8 +91,8 @@ export const METRIC_CATALOG: Record<MetricCode, MetricInfo> = {
     nameEn: 'Residual Value',
     formulaZh: 'residualValue',
     formulaEn: 'residualValue',
-    descZh: '输入的残值金额，期末按残值处理方式回收（scale 2）',
-    descEn: 'The residual value input, recovered at end of term per residual handling (scale 2)',
+    descZh: '合同约定的留购价/残值，期末按残值处理方式支付（scale 2）',
+    descEn: 'The contractual purchase price / residual value, settled at end of term per residual handling (scale 2)',
   },
   RENTAL_RATE: {
     nameZh: '租费率',
