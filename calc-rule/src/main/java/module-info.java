@@ -8,6 +8,7 @@ module com.fincalc.rule {
 
     exports com.fincalc.rule;
     exports com.fincalc.rule.compiler;
+    exports com.fincalc.rule.generator;
     exports com.fincalc.rule.expression;
     exports com.fincalc.rule.function;
     exports com.fincalc.rule.model;

@@ -80,6 +80,25 @@ public enum RuleErrorCode implements ErrorCode {
     ANNUAL_RATE_OUT_OF_RANGE("FCS-RULE-2006",
             "FCS-RULE-2006: 年利率须在 [0,1] 内: %s"),
 
+    /**
+     * INHERIT-fallback check of the rule-driven generator (Task 28): a rule row whose
+     * {@code principalPlan} is {@code INHERIT} falls back to the algorithm the lease element's
+     * repayment method names, and v1 can delegate only to equal principal
+     * ({@code EQUAL_PRINCIPAL} and {@code RULE_DRIVEN} itself); any other method is rejected at
+     * runtime instead of being silently amortized differently.
+     */
+    UNSUPPORTED_INHERIT_METHOD("FCS-RULE-2007",
+            "FCS-RULE-2007: 规则本金计划 INHERIT 回落不支持该还款方式, 仅支持等额本金: %s"),
+
+    /**
+     * Interest-treatment check of the rule-driven generator (Task 28): v1 implements only the
+     * single-period treatments {@code PAY_AS_INCURRED} and {@code EXEMPT}; the cross-period
+     * kinds ({@code CAPITALIZE}/{@code DEFER}/{@code SETTLE_AT_MATURITY}) have no §8-defined
+     * per-period semantics yet and are rejected instead of being silently paid.
+     */
+    UNSUPPORTED_INTEREST_TREATMENT("FCS-RULE-2008",
+            "FCS-RULE-2008: 不支持的利息处理方式: %s"),
+
     /** Parse-time whitelist check: the identifier is not one of the nine period variables. */
     UNKNOWN_VARIABLE("FCS-RULE-3001", "FCS-RULE-3001: 未知变量: %s"),
 
