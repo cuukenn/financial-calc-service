@@ -1,0 +1,15 @@
+# calc-server minimal configuration (Plan 2 Task 1, R79 minimal execution).
+server:
+  port: 8080
+  tomcat:
+    # Body-size limits (design §15): Tomcat caps form/multipart posts at max-http-form-post-size
+    # and aborts abandoned uploads at max-swallow-size. NOTE: plain JSON request bodies are NOT
+    # covered by either setting in Spring Boot 2.7 — a strict JSON body-size filter (1MB) is a
+    # deliberate Task 2/3 follow-up if a real consumer needs it (documented limitation, not
+    # silently dropped).
+    max-http-form-post-size: 1MB
+    max-swallow-size: 1MB
+
+spring:
+  application:
+    name: calc-server

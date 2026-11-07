@@ -19,6 +19,7 @@
         <module>calc-rule</module>
         <module>calc-engine</module>
         <module>calc-testkit</module>
+        <module>calc-server</module>
     </modules>
 
     <properties>
