@@ -14,6 +14,8 @@
  * 展示 2 位百分数（P-10）。月可支配收入 ≤ 0 → 指标不可计算，说明原因而不是给 0。
  * Task 6 §3：仪表状态（ok / warn / breach / neutral）由 components/ratioStatus.ts 从未舍入
  * 串上判定，类名 ratio-* 的颜色在 styles/workbench.css 里定义一次，每个状态配一条文案标记。
+ * Task 6 §5：到期一次还本付息的那笔钱行头叫「到期一次性偿还额」并附一条保守代理口径的
+ * 说明 —— 文案诚实、算术不变；按月方式的「月供」语义与口径说明保持原样。
  */
 import { Card, Col, FormItem, Input, Row, Typography } from 'ant-design-vue'
 import { computed } from 'vue'
@@ -55,6 +57,19 @@ const allDebtDti = computed(() =>
  */
 const dtiState = computed(() => dtiStatus(dti.value))
 const allDebtState = computed(() => allDebtRatioStatus(allDebtDti.value))
+
+/**
+ * Task 6 §5：到期一次还本付息的那笔钱在字面上就不是月供 —— 行头与口径说明另起名字，
+ * 但派生口径一个字都不动（§2.2 的月供取全表最大期，DTI 仍从未舍入原值判限）。
+ * 按月方式（等额本息 / 等额本金）仍叫月供、仍是那条月供口径说明。
+ */
+const isBullet = computed(() => props.method === 'BULLET_LOAN')
+const paymentLabel = computed(() =>
+  isBullet.value ? t('mortgage.income.lumpSumPayment') : t('mortgage.income.monthlyPayment'),
+)
+const basisNote = computed(() =>
+  isBullet.value ? t('mortgage.income.lumpSumBasis') : t('mortgage.income.paymentNote'),
+)
 </script>
 
 <template>
@@ -82,7 +97,7 @@ const allDebtState = computed(() => allDebtRatioStatus(allDebtDti.value))
 
     <dl class="ratio-list">
       <div class="ratio-item">
-        <dt>{{ t('mortgage.income.monthlyPayment') }}</dt>
+        <dt data-test="mortgage-payment-label">{{ paymentLabel }}</dt>
         <dd data-test="mortgage-monthly-payment">
           {{ monthlyPayment === null ? '—' : formatMoney(monthlyPayment) }}
         </dd>
@@ -112,11 +127,16 @@ const allDebtState = computed(() => allDebtRatioStatus(allDebtDti.value))
       </div>
     </dl>
 
-    <Typography.Text type="secondary" data-test="mortgage-dti-thresholds">
+    <Typography.Text type="secondary" data-test="mortgage-dti-thresholds" style="display: block">
       {{ t('mortgage.income.thresholds') }}
     </Typography.Text>
-    <Typography.Text type="secondary" data-test="mortgage-payment-basis">
-      {{ t('mortgage.income.paymentNote') }}
+    <!-- 口径说明各占一行（Task 6 §4 的节奏统一）：BULLET 那笔是一次性偿还额，
+         另配一条「与月收入相比是刻意保守的代理口径」的说明（Task 6 §5）。 -->
+    <Typography.Text type="secondary" data-test="mortgage-payment-basis" style="display: block">
+      {{ basisNote }}
+    </Typography.Text>
+    <Typography.Text v-if="isBullet" type="secondary" data-test="mortgage-bullet-note" style="display: block">
+      {{ t('mortgage.income.lumpSumProxyNote') }}
     </Typography.Text>
   </Card>
 </template>

@@ -533,6 +533,8 @@ describe('MortgageForm DTI (AGENTS.md §2.2: 50% / 60%)', () => {
     await submit(wrapper)
 
     expect(calculate).not.toHaveBeenCalled()
+    // settleFormState：错误文案挂着进出场过渡，断言要比过渡先跑就会偶发扑空。
+    await settleFormState()
     expect(wrapper.text()).toContain('金额格式无效')
   })
 })
@@ -829,5 +831,76 @@ describe('MortgageForm 显式重置 (Task 6 §2)', () => {
     expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="mortgage-dti-value"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="mortgage-monthly-payment"]').text()).toBe('—')
+  })
+})
+
+/**
+ * Task 6 §5（Task 5 交接的文案所有权）：到期一次还本付息的那笔钱是一次性偿还额，不是月供。
+ * 算术不动（§2.2 的月供口径仍取全表最大期，DTI 照旧从未舍入原值判限），但读数必须诚实：
+ * 行头改叫「到期一次性偿还额」，并说明把它与月收入直接相比是刻意保守的代理口径。
+ * 按月方式（等额本息 / 等额本金）的「月供」语义与口径说明不得被改名。
+ */
+describe('MortgageForm BULLET 读数文案 (Task 6 §5: 到期一次性偿还额 vs 月供)', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+    setLocale('zh-CN')
+  })
+
+  /** 12 期 BULLET 的摊销形态：递延利息逐期为 0，末期一次还本 + 全部递延利息。 */
+  async function mountBullet(): Promise<VueWrapper> {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['0.00', '0.00', '1012000.00']))
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-periods"]').setValue('12')
+    await flushPromises()
+    await wrapper.find('input[value="BULLET_LOAN"]').setValue()
+    await flushPromises()
+    await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await submit(wrapper)
+    return wrapper
+  }
+
+  it('labels the lump sum as 到期一次性偿还额 (not 月供) and keeps the arithmetic', async () => {
+    const wrapper = await mountBullet()
+
+    expect(wrapper.find('[data-test="mortgage-payment-label"]').text()).toBe('到期一次性偿还额')
+    expect(wrapper.find('[data-test="mortgage-monthly-payment"]').text()).toContain('1,012,000.00')
+    // 口径说明换成「这笔钱不是月供」，仍然明说它取的是全表最大期。
+    expect(wrapper.find('[data-test="mortgage-payment-basis"]').text()).toContain('不是月供')
+
+    // DTI 的规范名不因还款方式而变（AGENTS.md §2.2 不得同义混用）。
+    expect(wrapper.text()).toContain('月房贷支出/收入比')
+    expect(wrapper.find('[data-test="mortgage-dti-value"]').text()).toContain('6325.00%')
+  })
+
+  it('states that comparing the lump sum with monthly income is a deliberately conservative proxy', async () => {
+    const wrapper = await mountBullet()
+    const note = wrapper.find('[data-test="mortgage-bullet-note"]').text()
+
+    expect(note).toContain('到期一次性偿还额')
+    expect(note).toContain('保守')
+    expect(note).toContain('代理口径')
+  })
+
+  it('keeps the 月供 label and the monthly basis note for the 按月 methods', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00', '8000.00']))
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await submit(wrapper)
+
+    expect(wrapper.find('[data-test="mortgage-payment-label"]').text()).toBe('月供')
+    expect(wrapper.find('[data-test="mortgage-payment-basis"]').text()).toContain('月供口径')
+    // 按月方式不需要那条一次性偿还额的说明。
+    expect(wrapper.find('[data-test="mortgage-bullet-note"]').exists()).toBe(false)
+  })
+
+  it('carries the lump-sum copy in en-US as well (R85 parity)', async () => {
+    setLocale('en-US')
+    const wrapper = await mountBullet()
+
+    expect(wrapper.find('[data-test="mortgage-payment-label"]').text()).toBe(
+      'Lump-sum repayment at maturity',
+    )
+    expect(wrapper.find('[data-test="mortgage-payment-basis"]').text()).toContain('not a monthly payment')
+    expect(wrapper.find('[data-test="mortgage-bullet-note"]').text()).toContain('conservative proxy')
   })
 })

@@ -162,6 +162,14 @@ const enUS: typeof zhCN = {
       thresholds:
         'Thresholds and colours: housing-expense ratio ≤ 50% compliant, > 50% approaching the limit, > 60% over the limit; all-debt ratio ≤ 60% compliant, > 60% over the limit; equal to a limit is not a breach (judged on the unrounded value).',
       paymentNote: 'Monthly payment basis: first installment for equal installments; largest installment for equal principal and bullet loans (worst month).',
+      // Task 6 §5 (copy ownership handed over from Task 5): a bullet loan repays one lump sum.
+      // The row heading gets its own name under §2.2 instead of posing as a monthly payment;
+      // the arithmetic and the DTI basis stay exactly as they were.
+      lumpSumPayment: 'Lump-sum repayment at maturity',
+      lumpSumBasis:
+        'Bullet basis: this figure is the principal plus all deferred interest repaid in a single payment at maturity (the largest installment in the schedule) — it is not a monthly payment; the 月供 basis of §2.2 applies to the monthly methods only.',
+      lumpSumProxyNote:
+        'Comparing this lump-sum maturity payment directly with monthly disposable income is a deliberately conservative proxy: the ratio is far larger than the burden actually spread across the months, so it flags the risk of this method.',
     },
     status: {
       // Task 6 §3: one text marker per status, so meaning is not carried by colour alone.
