@@ -157,9 +157,18 @@ const enUS: typeof zhCN = {
       allDebtRatio: 'Total monthly debt / income ratio',
       // AGENTS.md §9.5 posture: an uncomputable metric must say so, never a silent 0.
       unavailable: 'No income provided, DTI cannot be determined',
-      thresholds: 'Limits: housing-expense ratio ≤ 50%, all-debt ratio ≤ 60%; equal to the limit is not a breach.',
+      thresholds:
+        'Thresholds and colours: housing-expense ratio ≤ 50% compliant, > 50% approaching the limit, > 60% over the limit; all-debt ratio ≤ 60% compliant, > 60% over the limit; equal to a limit is not a breach (judged on the unrounded value).',
       paymentNote: 'Monthly payment basis: first installment for equal installments; largest installment for equal principal and bullet loans (worst month).',
-      breach: 'Over limit',
+    },
+    status: {
+      // Task 6 §3: one text marker per status, so meaning is not carried by colour alone.
+      ok: 'Compliant',
+      warn: 'Approaching the limit',
+      breach: 'Over the limit',
+      // A floor breach points the other way: below the floor, not over a ceiling.
+      belowFloor: 'Below the floor',
+      neutral: 'Not evaluable',
     },
     gates: {
       // §71: these [法] thresholds are validated in the UI, the copy must not claim the engine checks them (R107/R109).

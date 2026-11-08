@@ -52,6 +52,7 @@ import {
   buildMortgageRules,
   isBulletRepaymentAllowed,
 } from './mortgageRules'
+import { collateralLeverageStatus, markerKey, statusClass } from './ratioStatus'
 import ResultPanel from './ResultPanel.vue'
 
 const { t } = useI18n()
@@ -136,6 +137,16 @@ const methodOptions = computed(() =>
 const collateral = computed(() => collateralValue(form.transactionPrice, form.appraisalValue))
 const ltv = computed(() => loanToValue(form.principal, collateral.value))
 const downPayment = computed(() => downPaymentRatio(form.principal, collateral.value))
+
+/**
+ * Task 6 §3：抵押物价值 / 贷款成数（LTV）/ 首付比例这组读数的仪表状态。
+ * 判定只在未舍入的十进制串上做（P-10），并且与提交闸门同源（同一个 belowFloor）——
+ * 「仪表说 breach」与「提交被阻断」因此永远不会打架。
+ * 抵押物价值本身不是阈值读数，所以不挂状态。
+ */
+const leverageState = computed(() =>
+  collateralLeverageStatus(collateral.value, downPayment.value),
+)
 
 /** 摊销表各期租金：月供口径的输入，交给 MortgageIncomePanel 派生（R103）。 */
 const rents = computed(() =>
@@ -349,7 +360,8 @@ async function onFinish(): Promise<void> {
                 </FormItem>
               </Col>
             </Row>
-            <!-- 抵押物价值 / 贷款成数 / 首付比例：前端派生指标，不进引擎（R103）。 -->
+            <!-- 抵押物价值 / 贷款成数 / 首付比例：前端派生指标，不进引擎（R103）。
+                 阈值读数（LTV / 首付比例）的颜色与文案标记见 Task 6 §3。 -->
             <dl class="ratio-list">
               <div class="ratio-item">
                 <dt>{{ t('mortgage.collateral.collateralValue') }}</dt>
@@ -357,11 +369,18 @@ async function onFinish(): Promise<void> {
               </div>
               <div class="ratio-item">
                 <dt>{{ t('mortgage.collateral.ltv') }}</dt>
-                <dd data-test="mortgage-ltv-value">{{ formatDecimalPercent(ltv) }}</dd>
+                <dd class="ratio-readout" :class="statusClass(leverageState)" data-test="mortgage-ltv-readout">
+                  <span data-test="mortgage-ltv-value">{{ formatDecimalPercent(ltv) }}</span>
+                  <span data-test="mortgage-ltv-status" class="ratio-marker">{{ t(markerKey(leverageState)) }}</span>
+                </dd>
               </div>
               <div class="ratio-item">
                 <dt>{{ t('mortgage.collateral.downPaymentRatio') }}</dt>
-                <dd data-test="mortgage-down-payment-value">{{ formatDecimalPercent(downPayment) }}</dd>
+                <dd class="ratio-readout" :class="statusClass(leverageState)" data-test="mortgage-down-payment-readout">
+                  <span data-test="mortgage-down-payment-value">{{ formatDecimalPercent(downPayment) }}</span>
+                  <!-- 下限类读数：breach 的方向是「低于下限」，不是「超限」。 -->
+                  <span data-test="mortgage-down-payment-status" class="ratio-marker">{{ t(markerKey(leverageState, true)) }}</span>
+                </dd>
               </div>
             </dl>
           </Card>

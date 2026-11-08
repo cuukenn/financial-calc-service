@@ -1,0 +1,133 @@
+/**
+ * 共用工作台样式（Task 6 §4）：两个测算表单与大块卡片 / 派生读数区共用的
+ * 间距与对齐规则，以及阈值仪表的语义配色，全仓库只在这里定义一次。
+ *
+ * main.ts 在 ant-design-vue/dist/reset.css 之后导入本文件。
+ * 组件的 <style scoped> 只保留真正组件特有的规则：共用规则在组件里再写一遍，
+ * 是 Task 5 评审点出的重复（两套 .block-card / .ratio-list 各一份）。
+ *
+ * 颜色：ant-design-vue 4 的 theme token 默认不以 CSS 自定义属性暴露
+ * （要开 ConfigProvider 的 cssVar），所以配色在此以 AntD 6.x/4.x 调色板的
+ * 同值定义为自定义属性一次，组件的 scoped 块里不出现任何色值。
+ * 状态类名由 components/ratioStatus.ts 的 statusClass() 产出（ratio-ok / ratio-warn /
+ * ratio-breach / ratio-neutral），语义判定在未舍入的十进制串上做（AGENTS.md P-10）。
+ * 每个状态同时配一条文案标记（.ratio-marker），语义不只靠颜色传达。
+ */
+
+:root {
+  /* AntD 调色板同值：green-7 / green-1、gold-7 / gold-1、red-7 / red-1、文本三级灰。 */
+  --fcs-ratio-ok: #389e0d;
+  --fcs-ratio-ok-bg: #f6ffed;
+  --fcs-ratio-warn: #d48806;
+  --fcs-ratio-warn-bg: #fffbe6;
+  --fcs-ratio-breach: #cf1322;
+  --fcs-ratio-breach-bg: #fff1f0;
+  --fcs-ratio-neutral: rgba(0, 0, 0, 0.45);
+  --fcs-ratio-neutral-bg: rgba(0, 0, 0, 0.04);
+  --fcs-ratio-border: rgba(0, 0, 0, 0.15);
+  --fcs-hairline: #f0f0f0;
+  --fcs-label-muted: rgba(0, 0, 0, 0.65);
+  --fcs-text-muted: rgba(0, 0, 0, 0.45);
+}
+
+/* 大块卡片：两个表单的三个分区共用（卡头压低、正文上紧下松）。
+   block-card 与 .ant-card 落在同一个元素上（Card 把额外 class 并入根节点），
+   所以这里的复合选择器比 AntD 自己的 `.ant-card .ant-card-head` 更具体 ——
+   AntD 的 cssinjs 样式在运行时才注入 <head>，同特异性会按后来者胜出。 */
+.block-card {
+  margin-bottom: 12px;
+}
+.block-card.ant-card > .ant-card-head {
+  min-height: 36px;
+}
+.block-card.ant-card > .ant-card-head > .ant-card-head-title {
+  font-size: 14px;
+}
+.block-card.ant-card > .ant-card-body {
+  padding-top: 12px;
+  padding-bottom: 4px;
+}
+
+/* 紧凑栅格：压低表单项的纵向间距（卡内 gutter 12，列间 gutter 16）。 */
+.compact-form.ant-form .ant-form-item {
+  margin-bottom: 12px;
+}
+
+/* 派生读数区（dl/dt/dd）：左标签右数值，基线对齐，数字右对齐 + 等宽数字。
+   MortgageForm 与 MortgageIncomePanel 共用同一套节奏。 */
+.ratio-list {
+  margin: 0 0 12px;
+}
+.ratio-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+}
+.ratio-item dt {
+  color: var(--fcs-label-muted);
+}
+.ratio-item dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 阈值读数：数值与标记同色，颜色即状态的视觉编码（标记负责非颜色的那一份语义）。 */
+.ratio-readout {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.ratio-marker {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--fcs-ratio-border);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.ratio-ok {
+  color: var(--fcs-ratio-ok);
+}
+.ratio-ok .ratio-marker,
+.ratio-marker.ratio-ok {
+  color: var(--fcs-ratio-ok);
+  background: var(--fcs-ratio-ok-bg);
+  border-color: var(--fcs-ratio-ok);
+}
+
+.ratio-warn {
+  color: var(--fcs-ratio-warn);
+}
+.ratio-warn .ratio-marker,
+.ratio-marker.ratio-warn {
+  color: var(--fcs-ratio-warn);
+  background: var(--fcs-ratio-warn-bg);
+  border-color: var(--fcs-ratio-warn);
+}
+
+.ratio-breach {
+  color: var(--fcs-ratio-breach);
+}
+.ratio-breach .ratio-marker,
+.ratio-marker.ratio-breach {
+  color: var(--fcs-ratio-breach);
+  background: var(--fcs-ratio-breach-bg);
+  border-color: var(--fcs-ratio-breach);
+}
+
+/* 未提供 / 未计算 / 抵押物价值 ≤ 0：不可计算既不判 ok 也不显示成 0。 */
+.ratio-neutral {
+  color: var(--fcs-ratio-neutral);
+}
+.ratio-neutral .ratio-marker,
+.ratio-marker.ratio-neutral {
+  color: var(--fcs-ratio-neutral);
+  background: var(--fcs-ratio-neutral-bg);
+  border-color: var(--fcs-ratio-border);
+}

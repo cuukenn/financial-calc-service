@@ -535,3 +535,128 @@ describe('MortgageForm DTI (AGENTS.md §2.2: 50% / 60%)', () => {
     expect(wrapper.text()).toContain('金额格式无效')
   })
 })
+
+/**
+ * Task 6 §3：监管仪表配色。断言的是**语义类名 + 文案标记**（不是颜色值）：
+ * 状态一律从未舍入的十进制串上得出（P-10），恰好等于阈值不视为超限（§2.3 含本数）。
+ */
+describe('MortgageForm 监管仪表配色 (Task 6 §3: LTV / 首付 / DTI 阈值色)', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+    setLocale('zh-CN')
+  })
+
+  it('marks the default 15.00% 首付 / 85.00% LTV readouts ok with a 合规 marker', () => {
+    const wrapper = mountWithI18n(MortgageForm)
+
+    const down = wrapper.find('[data-test="mortgage-down-payment-readout"]')
+    expect(down.classes()).toContain('ratio-ok')
+    expect(wrapper.find('[data-test="mortgage-down-payment-status"]').text()).toBe('合规')
+
+    const ltv = wrapper.find('[data-test="mortgage-ltv-readout"]')
+    expect(ltv.classes()).toContain('ratio-ok')
+    expect(wrapper.find('[data-test="mortgage-ltv-status"]').text()).toBe('合规')
+  })
+
+  it('marks 14.99% 首付 as breach（低于下限）and the matching 85.01% LTV as 超限', async () => {
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('2380280')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="mortgage-down-payment-value"]').text()).toContain('14.99%')
+    expect(wrapper.find('[data-test="mortgage-down-payment-readout"]').classes()).toContain('ratio-breach')
+    expect(wrapper.find('[data-test="mortgage-down-payment-status"]').text()).toBe('低于下限')
+
+    expect(wrapper.find('[data-test="mortgage-ltv-value"]').text()).toContain('85.01%')
+    expect(wrapper.find('[data-test="mortgage-ltv-readout"]').classes()).toContain('ratio-breach')
+    expect(wrapper.find('[data-test="mortgage-ltv-status"]').text()).toBe('超限')
+  })
+
+  it('judges from the unrounded value: a 14.999999% 首付 displayed as 15.00% is still breach (P-10)', async () => {
+    const wrapper = mountWithI18n(MortgageForm)
+    // 2 380 000.028 / 2 800 000 = 0.8500000100 → 首付 0.14999999，展示 15.00%、原值低于下限。
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('2380000.028')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="mortgage-down-payment-value"]').text()).toContain('15.00%')
+    expect(wrapper.find('[data-test="mortgage-down-payment-readout"]').classes()).toContain('ratio-breach')
+    expect(wrapper.find('[data-test="mortgage-down-payment-status"]').text()).toBe('低于下限')
+  })
+
+  it('marks unevaluable readouts neutral with 「无法判断」, never ok and never 0', async () => {
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-transaction-price"]').setValue('0')
+    await wrapper.find('[data-test="mortgage-appraisal-value"]').setValue('0')
+    await flushPromises()
+
+    for (const hook of ['mortgage-ltv', 'mortgage-down-payment']) {
+      const readout = wrapper.find(`[data-test="${hook}-readout"]`)
+      expect(readout.classes()).toContain('ratio-neutral')
+      expect(readout.classes()).not.toContain('ratio-ok')
+      expect(wrapper.find(`[data-test="${hook}-value"]`).text()).toBe('—')
+      expect(wrapper.find(`[data-test="${hook}-status"]`).text()).toBe('无法判断')
+    }
+  })
+
+  it('colours 月房贷支出/收入比 ok at 50.00% and warn at 50.01% with distinct markers', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    const compliant = mountWithI18n(MortgageForm)
+    await compliant.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await submit(compliant)
+
+    expect(compliant.find('[data-test="mortgage-dti-readout"]').classes()).toContain('ratio-ok')
+    expect(compliant.find('[data-test="mortgage-dti-status"]').text()).toBe('合规')
+
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8001.60']))
+    const warning = mountWithI18n(MortgageForm)
+    await warning.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await submit(warning)
+
+    expect(warning.find('[data-test="mortgage-dti-value"]').text()).toContain('50.01%')
+    expect(warning.find('[data-test="mortgage-dti-readout"]').classes()).toContain('ratio-warn')
+    // 越过 50% 但仍在 60% 之内 → warn：文案是「接近上限」，不是「超限」。
+    expect(warning.find('[data-test="mortgage-dti-breach"]').text()).toBe('接近上限')
+  })
+
+  it('colours 月房贷支出/收入比 breach only past 60%', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['9601.60']))
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await submit(wrapper)
+
+    // 9 601.60 ÷ 16 000 = 0.6001 → 越过 60% 硬顶。
+    expect(wrapper.find('[data-test="mortgage-dti-value"]').text()).toContain('60.01%')
+    expect(wrapper.find('[data-test="mortgage-dti-readout"]').classes()).toContain('ratio-breach')
+    expect(wrapper.find('[data-test="mortgage-dti-breach"]').text()).toBe('超限')
+  })
+
+  it('colours 月所有债务支出/收入比 ok at 60.00% and breach at 60.01%', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    const compliant = mountWithI18n(MortgageForm)
+    await compliant.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await compliant.find('[data-test="mortgage-other-debt"]').setValue('1600')
+    await submit(compliant)
+
+    expect(compliant.find('[data-test="mortgage-all-debt-readout"]').classes()).toContain('ratio-ok')
+    expect(compliant.find('[data-test="mortgage-all-debt-status"]').text()).toBe('合规')
+
+    await compliant.find('[data-test="mortgage-other-debt"]').setValue('1601')
+    await submit(compliant)
+
+    expect(compliant.find('[data-test="mortgage-all-debt-readout"]').classes()).toContain('ratio-breach')
+    expect(compliant.find('[data-test="mortgage-all-debt-breach"]').text()).toBe('超限')
+  })
+
+  it('keeps an unprovided 月可支配收入 neutral（无法判断）instead of ok or 0', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('0')
+    await submit(wrapper)
+
+    const readout = wrapper.find('[data-test="mortgage-dti-readout"]')
+    expect(readout.classes()).toContain('ratio-neutral')
+    expect(readout.classes()).not.toContain('ratio-ok')
+    expect(readout.text()).toContain('无法判断')
+    expect(wrapper.find('[data-test="mortgage-dti-status"]').exists()).toBe(false)
+  })
+})

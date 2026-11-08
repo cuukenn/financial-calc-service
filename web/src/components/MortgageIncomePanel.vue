@@ -12,23 +12,23 @@
  * - 月所有债务支出/收入比 = (月供 + 其他月债务支出) ÷ 月可支配收入，上限 60%。
  * 阈值比较一律用未舍入原值（P-10），恰好等于上限不视为超限（§2.3「不足」不含本数）；
  * 展示 2 位百分数（P-10）。月可支配收入 ≤ 0 → 指标不可计算，说明原因而不是给 0。
- * 仪表化着色由 Task 6 负责，这里只把值与超限标记如实呈现。
+ * Task 6 §3：仪表状态（ok / warn / breach / neutral）由 components/ratioStatus.ts 从未舍入
+ * 串上判定，类名 ratio-* 的颜色在 styles/workbench.css 里定义一次，每个状态配一条文案标记。
  */
-import { Card, Col, FormItem, Input, Row, Tag, Typography } from 'ant-design-vue'
+import { Card, Col, FormItem, Input, Row, Typography } from 'ant-design-vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { formatMoney } from '@/utils/format'
 import {
-  ALL_DEBT_DTI_LIMIT,
-  MORTGAGE_DTI_LIMIT,
   allDebtToIncomeRatio,
   debtToIncomeRatio,
-  exceedsLimit,
   formatDecimalPercent,
   isPositiveDecimal,
   pickMonthlyPayment,
 } from '@/utils/ratio'
+
+import { RATIO_MARKER_KEYS, allDebtRatioStatus, dtiStatus, statusClass } from './ratioStatus'
 
 const { t } = useI18n()
 
@@ -48,8 +48,13 @@ const dti = computed(() => debtToIncomeRatio(monthlyPayment.value, monthlyIncome
 const allDebtDti = computed(() =>
   allDebtToIncomeRatio(monthlyPayment.value, otherMonthlyDebt.value, monthlyIncome.value),
 )
-const dtiBreach = computed(() => exceedsLimit(dti.value, MORTGAGE_DTI_LIMIT))
-const allDebtBreach = computed(() => exceedsLimit(allDebtDti.value, ALL_DEBT_DTI_LIMIT))
+/**
+ * Task 6 §3：仪表状态从未舍入的十进制串上得出（P-10），类名与文案标记成对出现。
+ * neutral（未提供收入 / 未计算）不判 ok 也不显示成 0：该情形由 mortgage.income.unavailable
+ * 这条现成的「无法判断」文案承担，不再另挂标记。
+ */
+const dtiState = computed(() => dtiStatus(dti.value))
+const allDebtState = computed(() => allDebtRatioStatus(allDebtDti.value))
 </script>
 
 <template>
@@ -84,32 +89,25 @@ const allDebtBreach = computed(() => exceedsLimit(allDebtDti.value, ALL_DEBT_DTI
       </div>
       <div class="ratio-item">
         <dt>{{ t('mortgage.income.dti') }}</dt>
-        <dd>
-          <span v-if="dti !== null" data-test="mortgage-dti-value">
-            {{ formatDecimalPercent(dti) }}
-          </span>
-          <span v-else-if="!incomeProvided" data-test="mortgage-dti-unavailable">
-            {{ t('mortgage.income.unavailable') }}
-          </span>
+        <dd class="ratio-readout" :class="statusClass(dtiState)" data-test="mortgage-dti-readout">
+          <span v-if="dti !== null" data-test="mortgage-dti-value">{{ formatDecimalPercent(dti) }}</span>
+          <span v-else-if="!incomeProvided" data-test="mortgage-dti-unavailable">{{ t('mortgage.income.unavailable') }}</span>
           <span v-else data-test="mortgage-dti-pending">—</span>
-          <Tag v-if="dtiBreach" color="red" data-test="mortgage-dti-breach">
-            {{ t('mortgage.income.breach') }}
-          </Tag>
+          <!-- 文案标记与颜色成对出现。hook 名 mortgage-dti-breach 沿用 Task 5 的语义：
+               凡越过 50% 上限都在场，文案按状态分成「接近上限」（≤ 60%）与「超限」（> 60%）。 -->
+          <span v-if="dtiState === 'ok'" data-test="mortgage-dti-status" class="ratio-marker">{{ t('mortgage.status.ok') }}</span>
+          <span v-else-if="dtiState === 'warn' || dtiState === 'breach'" data-test="mortgage-dti-breach" class="ratio-marker">{{ t(RATIO_MARKER_KEYS[dtiState]) }}</span>
         </dd>
       </div>
       <div class="ratio-item">
         <dt>{{ t('mortgage.income.allDebtRatio') }}</dt>
-        <dd>
-          <span v-if="allDebtDti !== null" data-test="mortgage-all-debt-value">
-            {{ formatDecimalPercent(allDebtDti) }}
-          </span>
-          <span v-else-if="!incomeProvided" data-test="mortgage-all-debt-unavailable">
-            {{ t('mortgage.income.unavailable') }}
-          </span>
+        <dd class="ratio-readout" :class="statusClass(allDebtState)" data-test="mortgage-all-debt-readout">
+          <span v-if="allDebtDti !== null" data-test="mortgage-all-debt-value">{{ formatDecimalPercent(allDebtDti) }}</span>
+          <span v-else-if="!incomeProvided" data-test="mortgage-all-debt-unavailable">{{ t('mortgage.income.unavailable') }}</span>
           <span v-else data-test="mortgage-all-debt-pending">—</span>
-          <Tag v-if="allDebtBreach" color="red" data-test="mortgage-all-debt-breach">
-            {{ t('mortgage.income.breach') }}
-          </Tag>
+          <!-- 该比例只有 60% 这一条上限，所以只有 ok / breach 两档标记。 -->
+          <span v-if="allDebtState === 'ok'" data-test="mortgage-all-debt-status" class="ratio-marker">{{ t('mortgage.status.ok') }}</span>
+          <span v-else-if="allDebtState === 'breach'" data-test="mortgage-all-debt-breach" class="ratio-marker">{{ t('mortgage.status.breach') }}</span>
         </dd>
       </div>
     </dl>
@@ -122,38 +120,3 @@ const allDebtBreach = computed(() => exceedsLimit(allDebtDti.value, ALL_DEBT_DTI
     </Typography.Text>
   </Card>
 </template>
-
-<style scoped>
-.block-card {
-  margin-bottom: 12px;
-}
-.block-card :deep(.ant-card-head) {
-  min-height: 36px;
-}
-.block-card :deep(.ant-card-head-title) {
-  font-size: 14px;
-}
-.block-card :deep(.ant-card-body) {
-  padding-top: 12px;
-  padding-bottom: 4px;
-}
-
-/* 派生比例读数：左标签右数值，前端计算结果（不进引擎）在此可见。 */
-.ratio-list {
-  margin: 0 0 12px;
-}
-.ratio-item {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 0;
-}
-.ratio-item dt {
-  color: rgba(0, 0, 0, 0.65);
-}
-.ratio-item dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-</style>
