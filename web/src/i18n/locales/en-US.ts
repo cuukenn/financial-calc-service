@@ -8,6 +8,11 @@ const enUS: typeof zhCN = {
   app: {
     title: 'Lease Calculation Workbench',
     footer: 'financial-calc-service · visualization frontend (Plan 3/4)',
+    // R100: the two scenarios share the one engine and the one POST /api/v1/calculations contract.
+    scenario: {
+      lease: 'Finance Lease',
+      mortgage: 'Mortgage Calculator',
+    },
   },
   form: {
     cardTitle: 'Calculation Form',
@@ -107,6 +112,79 @@ const enUS: typeof zhCN = {
       method: 'Please select the repayment method',
     },
   },
+  mortgage: {
+    // Task 5 / R101: the mortgage scenario goes through the same
+    // POST /api/v1/calculations contract; element names follow AGENTS.md §2.2
+    // (loan amount / down payment ratio / LTV / monthly housing-expense-to-income
+    // ratio / total monthly debt-to-income ratio) — no synonyms.
+    cardTitle: 'Mortgage Calculation Form',
+    basic: {
+      title: 'Loan Elements',
+      principal: 'Loan amount',
+      principalPh: 'e.g. 2380000',
+      lpr: 'Current LPR (%)',
+      // P-04: this project has no LPR data source, the user enters the LPR as a percent (3.5 = 3.5%).
+      lprPh: 'e.g. 3.5',
+      spread: 'Spread (bp)',
+      // P-04: LPR quoting step is 0.05pp = 5bp, only multiples of 5bp are accepted.
+      spreadPh: 'e.g. 35 (must be a multiple of 5bp)',
+      composedRate: 'Annual rate (LPR + spread)',
+      composedRateHint: 'Decimal annual rate actually sent to the engine (P-02)',
+      composedRateInvalid: 'Not parseable, check the LPR and the spread',
+      commenceDate: 'Disbursement date',
+      firstRepaymentDate: 'First repayment date',
+      periods: 'Term (months)',
+      method: 'Repayment method',
+    },
+    collateral: {
+      // R103: LTV / down payment ratio are front-end derived metrics, never engine metrics.
+      title: 'Collateral & Leverage (front-end only, not sent)',
+      transactionPrice: 'Transaction price',
+      appraisalValue: 'Appraised value',
+      collateralValue: 'Collateral value (lower of price and appraisal)',
+      ltv: 'Loan-to-value (LTV)',
+      downPaymentRatio: 'Down payment ratio',
+    },
+    income: {
+      // R103: DTI is a front-end derived metric too.
+      title: 'Income & Debts (front-end only, not sent)',
+      monthlyIncome: 'Monthly disposable income',
+      monthlyIncomePh: 'e.g. 16000',
+      otherMonthlyDebt: 'Other monthly debt payments',
+      otherMonthlyDebtPh: 'e.g. 1600',
+      monthlyPayment: 'Monthly payment',
+      dti: 'Monthly housing expense / income ratio',
+      allDebtRatio: 'Total monthly debt / income ratio',
+      // AGENTS.md §9.5 posture: an uncomputable metric must say so, never a silent 0.
+      unavailable: 'No income provided, DTI cannot be determined',
+      thresholds: 'Limits: housing-expense ratio ≤ 50%, all-debt ratio ≤ 60%; equal to the limit is not a breach.',
+      paymentNote: 'Monthly payment basis: first installment for equal installments; largest installment for equal principal and bullet loans (worst month).',
+      breach: 'Over limit',
+    },
+    gates: {
+      // §71: these [法] thresholds are validated in the UI, the copy must not claim the engine checks them (R107/R109).
+      note: 'Client-side gates: down payment ≥ 15%, term ≤ 480 months and the 50%/60% DTI limits are checked by this form; the calculation engine does not check them.',
+      bulletOnly: 'Bullet (principal and interest at maturity) is selectable only when the term is ≤ {max} months (金规〔2026〕5号: only terms ≤ 1 year may repay at maturity).',
+      bulletReset: 'Term exceeds {max} months: bullet repayment is not selectable and the choice was reset to equal installments (front-end rule, not engine-validated).',
+      downPaymentFloor: 'Down payment ratio is below the {min} floor (currently {actual}): submit is blocked (front-end floor, not engine-validated).',
+      rateNotComposable: 'The annual rate cannot be composed from the LPR and the spread, check the inputs.',
+    },
+    validation: {
+      principal: 'Please enter the loan amount',
+      money: 'Invalid amount format: enter a non-negative decimal number (e.g. 2380000)',
+      lpr: 'Please enter the current LPR',
+      lprFormat: 'Invalid LPR format: enter a percent-scale decimal number (e.g. 3.5)',
+      spread: 'Please enter the spread',
+      spreadStep: 'The spread must be an integer multiple of 5bp (P-04: LPR quoting step is 0.05 percentage points), it is never rounded silently',
+      commenceDate: 'Please select the disbursement date',
+      firstRepaymentDate: 'Please select the first repayment date',
+      firstRepaymentBeforeCommence: 'The first repayment date must not precede the disbursement date (the engine rejects it)',
+      periods: 'Please enter the loan term in months',
+      periodsRange: 'The loan term must be within 1–{max} months (≤ 40 years)',
+      transactionPrice: 'Please enter the transaction price',
+      appraisalValue: 'Please enter the appraised value',
+    },
+  },
   enums: {
     // R89: dropdown primary text is the localized name; internal codes never
     // appear in labels (day counts use the industry-standard slash notation,
@@ -157,6 +235,8 @@ const enUS: typeof zhCN = {
       EQUAL_PRINCIPAL: 'Equal principal',
       INTEREST_FIRST: 'Interest first, principal last',
       PRINCIPAL_FIRST: 'Principal first, interest last',
+      // Task 2's BULLET_LOAN (BulletLoanGenerator, IN_ARREARS only); AGENTS.md §2.3: selectable only for terms ≤ 1 year.
+      BULLET_LOAN: 'Principal and interest at maturity',
       RULE_DRIVEN: 'Rule driven',
       EXPLICIT_RENT: 'Explicit rents',
     },

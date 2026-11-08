@@ -12,6 +12,11 @@ const zhCN = {
   app: {
     title: '租赁测算工作台',
     footer: 'financial-calc-service · 可视化测算前端（Plan 3/4）',
+    // R100：同一页面的两个测算场景（共用一个引擎与一个 POST /api/v1/calculations 契约）。
+    scenario: {
+      lease: '融资租赁',
+      mortgage: '房贷计算器',
+    },
   },
   form: {
     cardTitle: '测算表单',
@@ -108,6 +113,78 @@ const zhCN = {
       method: '请选择还款方式',
     },
   },
+  mortgage: {
+    // Task 5 / R101：房贷场景走同一个 POST /api/v1/calculations 契约；
+    // 术语一律取 AGENTS.md §2.2 规范名（贷款金额/首付比例/贷款成数（LTV）/
+    // 月房贷支出/收入比/月所有债务支出/收入比），不得同义替换。
+    cardTitle: '房贷测算表单',
+    basic: {
+      title: '贷款要素',
+      principal: '贷款金额',
+      principalPh: '如 2380000',
+      lpr: '当前 LPR（%）',
+      // P-04：本项目无 LPR 数据源，LPR 由用户按百分数口径自填（3.5 = 3.5%）。
+      lprPh: '如 3.5',
+      spread: '加点（bp）',
+      // P-04：LPR 报价步长 0.05 个百分点 = 5bp，加点只接受 5bp 整数倍。
+      spreadPh: '如 35（须为 5bp 的整数倍）',
+      composedRate: '年利率（LPR + 加点）',
+      composedRateHint: '提交给引擎的年化小数字利率（P-02）',
+      composedRateInvalid: '无法解析，请检查 LPR 与加点',
+      commenceDate: '放款日',
+      firstRepaymentDate: '首期还款日',
+      periods: '贷款期限（月）',
+      method: '还款方式',
+    },
+    collateral: {
+      // R103：LTV/首付为前端派生指标，不进引擎、不进指标目录。
+      title: '抵押物与杠杆（前端计算，不进引擎）',
+      transactionPrice: '抵押物成交价',
+      appraisalValue: '评估价',
+      collateralValue: '抵押物价值（成交价与评估价孰低）',
+      ltv: '贷款成数（LTV）',
+      downPaymentRatio: '首付比例',
+    },
+    income: {
+      // R103：DTI 亦为前端派生指标。
+      title: '收入与债务（前端计算，不进引擎）',
+      monthlyIncome: '月可支配收入',
+      monthlyIncomePh: '如 16000',
+      otherMonthlyDebt: '其他月债务支出',
+      otherMonthlyDebtPh: '如 1600',
+      monthlyPayment: '月供',
+      dti: '月房贷支出/收入比',
+      allDebtRatio: '月所有债务支出/收入比',
+      // AGENTS.md §9.5 姿态：不可计算的指标不得静默取 0，必须说明不可计算。
+      unavailable: '未提供收入，无法判断 DTI',
+      thresholds: '阈值：月房贷支出/收入比 ≤ 50%，月所有债务支出/收入比 ≤ 60%；恰好等于阈值不视为超限。',
+      paymentNote: '月供口径：等额本息取首期租金；等额本金与到期一次还本付息取全表最大租金（最坏月份）。',
+      breach: '超限',
+    },
+    gates: {
+      // §71 硬约束：这些 [法] 门槛由前端校验，文案不得声称后端已校验（R107/R109）。
+      note: '前端门槛：首付 ≥ 15%、期限 ≤ 480 个月、DTI 50%/60% 均由本表单校验，测算引擎不校验这些门槛。',
+      bulletOnly: '「到期一次还本付息」仅在贷款期限 ≤ {max} 个月时可选（金规〔2026〕5号：期限 ≤ 1 年可到期一次还本付息）。',
+      bulletReset: '贷款期限超过 {max} 个月：「到期一次还本付息」不可选，已重置为等额本息（前端规则，引擎未校验）。',
+      downPaymentFloor: '首付比例低于下限 {min}（当前 {actual}）：已阻止提交（该下限由前端校验，引擎未校验）。',
+      rateNotComposable: '无法由 LPR 与加点组合出年利率，请检查输入。',
+    },
+    validation: {
+      principal: '请输入贷款金额',
+      money: '金额格式无效：请输入非负十进制数（如 2380000）',
+      lpr: '请输入当前 LPR',
+      lprFormat: 'LPR 格式无效：请输入百分数口径的十进制数（如 3.5）',
+      spread: '请输入加点',
+      spreadStep: '加点必须是 5bp 的整数倍（P-04：LPR 报价步长 0.05 个百分点），不做静默取整',
+      commenceDate: '请选择放款日',
+      firstRepaymentDate: '请选择首期还款日',
+      firstRepaymentBeforeCommence: '首期还款日不得早于放款日（引擎会拒绝该组合）',
+      periods: '请输入贷款期限（月）',
+      periodsRange: '贷款期限须在 1–{max} 个月之间（≤ 40 年）',
+      transactionPrice: '请输入抵押物成交价',
+      appraisalValue: '请输入评估价',
+    },
+  },
   enums: {
     // R89：下拉主文本一律为本地化名称（纯中文）；内部 code 不再出现在标签中
     // （计息基准例外：行业标准斜杠记法为主文本，code 仅作下拉项次要小字）。
@@ -158,6 +235,8 @@ const zhCN = {
       EQUAL_PRINCIPAL: '等额本金',
       INTEREST_FIRST: '先息后本',
       PRINCIPAL_FIRST: '先本后息',
+      // Task 2 的 BULLET_LOAN（BulletLoanGenerator，仅接受 IN_ARREARS）；§2.3 期限 ≤ 1 年才可选。
+      BULLET_LOAN: '到期一次还本付息',
       RULE_DRIVEN: '规则驱动',
       EXPLICIT_RENT: '显式租金',
     },
