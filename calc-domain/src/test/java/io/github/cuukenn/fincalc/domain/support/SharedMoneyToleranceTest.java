@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  * four private copies could drift, and a validator holding a wider line would absorb a drift its
  * sibling reports.
  */
-class ValidatorToleranceTest {
+class SharedMoneyToleranceTest {
 
     @Test
     void every_validator_compares_against_the_same_money_tolerance() {

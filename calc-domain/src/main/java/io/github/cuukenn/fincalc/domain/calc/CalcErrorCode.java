@@ -17,6 +17,11 @@ import io.github.cuukenn.fincalc.common.error.ErrorCode;
  * formatted by the exception constructor), but not these: rendering a template into a
  * {@code ValidationIssue} would need a second formatting step at every raising site, and one missed
  * argument would change today's message. Concatenation keeps it byte-for-byte.
+ *
+ * <p>On the {@code ValidationIssue} path only {@code code()} is consumed — the validator composes the
+ * message with {@code code() + ": " + …} — so the summary text of 3001/3002/3004 is inert today: it
+ * describes the code, and any future {@code BusinessException} wording for these codes must go
+ * through the validator's composition rather than be pasted from here.
  */
 public enum CalcErrorCode implements ErrorCode {
 

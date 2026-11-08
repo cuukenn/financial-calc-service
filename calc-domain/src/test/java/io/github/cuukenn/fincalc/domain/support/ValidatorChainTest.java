@@ -28,11 +28,22 @@ import io.github.cuukenn.fincalc.domain.support.dateroll.NoRoll;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class ValidatorChainTest {
+
+    /** The five schedule-validation codes the §3.4 chain is responsible for. */
+    private static final Set<String> SECTION_3_4_CODES = new HashSet<>(Arrays.asList(
+            "FCS-CALC-3001", "FCS-CALC-3002", "FCS-CALC-3004",
+            "FCS-CALC-3008", "FCS-CALC-3009"));
 
     @Test
     void detects_principal_conservation_violation() {
@@ -124,6 +135,49 @@ class ValidatorChainTest {
         assertThat(ValidatorChain.defaults().codes()).containsExactly(
                 "PRINCIPAL_CONSERVATION", "TAIL_BALANCE", "PERIOD_IDENTITY",
                 "RENT_COMPOSITION", "DATE_MONOTONIC");
+    }
+
+    /**
+     * R128: the chain-to-code mapping is enforced here, not by javadoc prose. A {@code Validator}
+     * answers a chain key through {@link io.github.cuukenn.fincalc.domain.port.Validator#code()} — a
+     * free-form registry identifier such as {@code PRINCIPAL_CONSERVATION} — and nothing in the type
+     * system ties that key to a {@link CalcErrorCode} constant: the chain would happily register a
+     * validator whose key no error code names, and the enum would happily declare a §3.4 code no
+     * validator raises. This table plus the assertions below close both directions for the five
+     * schedule-validation codes, so dropping a validator, renaming a key or renumbering a constant
+     * fails here instead of drifting silently.
+     */
+    @Test
+    void every_chain_code_maps_to_exactly_one_calc_error_code_and_back() {
+        Map<String, CalcErrorCode> chainToCode = new LinkedHashMap<>();
+        chainToCode.put("PRINCIPAL_CONSERVATION", CalcErrorCode.PRINCIPAL_CONSERVATION_BROKEN);
+        chainToCode.put("TAIL_BALANCE", CalcErrorCode.TAIL_BALANCE_MISMATCH);
+        chainToCode.put("PERIOD_IDENTITY", CalcErrorCode.PERIOD_IDENTITY_BROKEN);
+        chainToCode.put("RENT_COMPOSITION", CalcErrorCode.RENT_COMPOSITION_BROKEN);
+        chainToCode.put("DATE_MONOTONIC", CalcErrorCode.PERIOD_DATE_ORDER_INVALID);
+
+        // The chain answers exactly the mapped keys, in the §3.4 order the code numbers follow.
+        assertThat(ValidatorChain.defaults().codes()).containsExactlyElementsOf(chainToCode.keySet());
+
+        // One-to-one, and in the §3.4 code-number order 3001 → 3002 → 3008 → 3009 → 3004.
+        assertThat(chainToCode.values()).doesNotHaveDuplicates();
+        assertThat(chainToCode.values().stream()
+                .map(CalcErrorCode::code)
+                .collect(Collectors.toList()))
+                .containsExactly("FCS-CALC-3001", "FCS-CALC-3002", "FCS-CALC-3008",
+                        "FCS-CALC-3009", "FCS-CALC-3004");
+
+        // Reachable from the enum side: the §3.4 block the enum declares is exactly the chain's
+        // image, so no schedule-validation constant is left without a validator.
+        Set<String> mappedCodes = chainToCode.values().stream()
+                .map(CalcErrorCode::code)
+                .collect(Collectors.toSet());
+        assertThat(Arrays.stream(CalcErrorCode.values())
+                .map(CalcErrorCode::code)
+                .filter(SECTION_3_4_CODES::contains)
+                .collect(Collectors.toSet()))
+                .as("§3.4 codes declared by CalcErrorCode")
+                .isEqualTo(mappedCodes);
     }
 
     @Test
