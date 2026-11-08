@@ -2,7 +2,7 @@
  * 监管仪表的阈值状态（Task 6 §3，纯模块：不依赖组件，可脱离 DOM 单测）。
  *
  * 输入一律是十进制小数字符串（P-01），判定只走 `utils/ratio` 的精确比较器
- * （compareDecimal / exceedsLimit / belowFloor / isPositiveDecimal），
+ * （exceedsLimit / downPaymentFloorBlocked / isPositiveDecimal），
  * 并且一律用**未舍入原值**（AGENTS.md P-10、§1 补充口径 1）：
  * 禁止从 2 位百分数的展示值或 Number() 解析值反推状态 —— 0.1499999999 显示成
  * 15.00%，状态仍然是 breach。
@@ -15,13 +15,20 @@
  *
  * 状态只描述状态：颜色与文案标记由样式表与 i18n 呈现（两者都是测试断言的对象），
  * 本模块不碰 DOM、不碰颜色。
+ *
+ * 修复轮 1（评审 Important 1）：首付 15% 这道 [法] 门槛在本模块只判定一次，且判定用的
+ * 就是提交闸门用的那个函数（`downPaymentFloorBlocked`，下限常量也只在这里引一次）。
+ * 徽章是闸门的视觉对应物：两处各推导一遍，早晚会分叉成「被阻断的提交配着合规徽章」，
+ * 那正是 AGENTS.md §2.3 禁止的漂移。表单调 `downPaymentFloorOutcome`，仪表调
+ * `collateralLeverageStatus`，两者背后是同一次判定。
  */
 
 import {
   ALL_DEBT_DTI_LIMIT,
   MIN_DOWN_PAYMENT_RATIO,
   MORTGAGE_DTI_LIMIT,
-  belowFloor,
+  downPaymentFloorBlocked,
+  downPaymentRatio,
   exceedsLimit,
   isPositiveDecimal,
 } from '@/utils/ratio'
@@ -53,21 +60,58 @@ export function markerKey(status: RatioStatus, floorThreshold = false): string {
     : RATIO_MARKER_KEYS[status]
 }
 
+/** 首付门槛的三种结局：算得出且达线 / 算得出但低于下限 / 算不出（无法判定）。 */
+export type DownPaymentFloorOutcome = 'ok' | 'breach' | 'unevaluable'
+
 /**
- * 抵押物价值 / 贷款成数（LTV）/ 首付比例这一组的共同状态。
- *
- * 判定与提交闸门同源（`downPaymentFloorBlocked` 用的是同一个 belowFloor），
- * 所以「仪表说 breach」与「提交被阻断」永远不会打架。
- * 抵押物价值缺失、≤ 0 或为负时不可计算 → neutral（§2.3 阈值即硬约束、§9.5 姿态）。
+ * 这道下限本身（表单文案要说「首付 ≥ 15%」时用它的 2 位百分数）。
+ * 下限只有一个来源：`ratio.ts` 的 `MIN_DOWN_PAYMENT_RATIO`，而组件里只有本模块引用它。
  */
-export function collateralLeverageStatus(
+export function downPaymentFloorRatio(): string {
+  return MIN_DOWN_PAYMENT_RATIO
+}
+
+/**
+ * 抵押物价值 / 贷款成数（LTV）/ 首付比例这一组读数算不算得出。
+ *
+ * 只回答「算不算得出」这一件事，不判线：抵押物价值缺失、≤ 0 或为负，
+ * 或首付比例这条式子本身算不出（分母为 0、输入不可解析）→ 不可计算。
+ */
+export function leverageReadoutEvaluable(loanAmount: string, collateral: string | null): boolean {
+  if (collateral === null || !isPositiveDecimal(collateral)) return false
+  return downPaymentRatio(loanAmount, collateral) !== null
+}
+
+/**
+ * 首付硬下限的判定出口（AGENTS.md §2.3：首付比例 ≥ 15%，「以上」含本数）。
+ *
+ * 闸门与仪表共用这一个出口：可计算性单独问，判线一律交给提交闸门用的
+ * `downPaymentFloorBlocked`（下限 `MIN_DOWN_PAYMENT_RATIO` 在本模块只在这里引一次）。
+ * 算不出的门槛同样是阻断的（§2.3「阈值即硬约束」、§9.5 不可计算姿态），
+ * 所以 `unevaluable` 与闸门的 true 永远一致。
+ */
+export function downPaymentFloorOutcome(
+  loanAmount: string,
   collateral: string | null,
-  downPayment: string | null,
-): RatioStatus {
-  if (collateral === null || !isPositiveDecimal(collateral) || downPayment === null) {
-    return 'neutral'
-  }
-  return belowFloor(downPayment, MIN_DOWN_PAYMENT_RATIO) ? 'breach' : 'ok'
+): DownPaymentFloorOutcome {
+  if (!leverageReadoutEvaluable(loanAmount, collateral)) return 'unevaluable'
+  return downPaymentFloorBlocked(loanAmount, collateral, MIN_DOWN_PAYMENT_RATIO) ? 'breach' : 'ok'
+}
+
+/**
+ * 抵押物价值 / 贷款成数（LTV）/ 首付比例这组读数的仪表状态。
+ *
+ * 与 `downPaymentFloorOutcome` 同源，所以「仪表说 breach」与「提交被阻断」
+ * 永远不会打架；不可计算落 neutral —— 既不判 ok 也不显示成 0。
+ */
+export function collateralLeverageStatus(loanAmount: string, collateral: string | null): RatioStatus {
+  return leverageStatusOf(downPaymentFloorOutcome(loanAmount, collateral))
+}
+
+/** 结局 → 状态：unevaluable 只能落 neutral，不会落成 ok（模块内部映射）。 */
+function leverageStatusOf(outcome: DownPaymentFloorOutcome): RatioStatus {
+  if (outcome === 'unevaluable') return 'neutral'
+  return outcome
 }
 
 /**

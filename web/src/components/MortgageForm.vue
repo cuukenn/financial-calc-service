@@ -39,9 +39,7 @@ import type { CalculationRequest, CalculationResult } from '@/api/types'
 import { formatMoney } from '@/utils/format'
 import { composeLprRate } from '@/utils/rate'
 import {
-  MIN_DOWN_PAYMENT_RATIO,
   collateralValue,
-  downPaymentFloorBlocked,
   downPaymentRatio,
   formatDecimalPercent,
   loanToValue,
@@ -54,7 +52,13 @@ import {
   buildMortgageRules,
   isBulletRepaymentAllowed,
 } from './mortgageRules'
-import { collateralLeverageStatus, markerKey, statusClass } from './ratioStatus'
+import {
+  collateralLeverageStatus,
+  downPaymentFloorOutcome,
+  downPaymentFloorRatio,
+  markerKey,
+  statusClass,
+} from './ratioStatus'
 import ResultPanel from './ResultPanel.vue'
 
 const { t } = useI18n()
@@ -149,14 +153,14 @@ const ltv = computed(() => loanToValue(form.principal, collateral.value))
 const downPayment = computed(() => downPaymentRatio(form.principal, collateral.value))
 
 /**
- * Task 6 §3：抵押物价值 / 贷款成数（LTV）/ 首付比例这组读数的仪表状态。
- * 判定只在未舍入的十进制串上做（P-10），并且与提交闸门同源（同一个 belowFloor）——
- * 「仪表说 breach」与「提交被阻断」因此永远不会打架。
+ * Task 6 §3（修复轮 1）：抵押物价值 / 贷款成数（LTV）/ 首付比例这组读数的仪表状态。
+ * 判定在未舍入的十进制串上做（P-10），而且判线用的**就是提交闸门用的那个函数**
+ * （ratioStatus.ts 里唯一的 `downPaymentFloorBlocked` 调用，下限常量也只在那一处引）：
+ * 徽章走 collateralLeverageStatus，闸门走 downPaymentFloorOutcome，同一个模块里的同一次判定。
  * 抵押物价值本身不是阈值读数，所以不挂状态。
  */
-const leverageState = computed(() =>
-  collateralLeverageStatus(collateral.value, downPayment.value),
-)
+const leverageState = computed(() => collateralLeverageStatus(form.principal, collateral.value))
+const leverageOutcome = computed(() => downPaymentFloorOutcome(form.principal, collateral.value))
 
 /** 摊销表各期租金：月供口径的输入，交给 MortgageIncomePanel 派生（R103）。 */
 const rents = computed(() =>
@@ -223,10 +227,12 @@ async function onFinish(): Promise<void> {
   // 首付硬下限 15%：用未舍入原值比较（P-10），恰好 15% 放行（「以上」含本数）。
   // 抵押物价值缺失或 ≤ 0 时贷款成数（LTV）/首付比例不可计算 —— 无法判定的
   // 硬下限必须阻断而不是放行（AGENTS.md §2.3「阈值即硬约束」、§9.5 不可计算姿态）。
-  const floorText = formatDecimalPercent(MIN_DOWN_PAYMENT_RATIO, 0)
-  if (downPaymentFloorBlocked(form.principal, collateral.value, MIN_DOWN_PAYMENT_RATIO)) {
+  // 修复轮 1：闸门读的就是徽章用的那一次结局（ratioStatus.ts 里唯一的判定处），
+  // 表单自己不再比一遍下限。
+  const floorText = formatDecimalPercent(downPaymentFloorRatio(), 0)
+  if (leverageOutcome.value !== 'ok') {
     blockRun(
-      downPayment.value === null
+      leverageOutcome.value === 'unevaluable'
         ? t('mortgage.gates.downPaymentFloorNotEvaluable', { min: floorText })
         : t('mortgage.gates.downPaymentFloor', {
             min: floorText,

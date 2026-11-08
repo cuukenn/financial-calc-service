@@ -662,6 +662,43 @@ describe('MortgageForm 监管仪表配色 (Task 6 §3: LTV / 首付 / DTI 阈值
     expect(readout.text()).toContain('无法判断')
     expect(wrapper.find('[data-test="mortgage-dti-status"]').exists()).toBe(false)
   })
+
+  /**
+   * 修复轮 1（评审 Important 1 / R133）：徽章是提交闸门的另一面。
+   * 同一份输入下，徽章状态与被阻断与否必须一起成立——「合规徽章配被阻断的提交」
+   * 正是 AGENTS.md §2.3 禁止的那类漂移。三档：恰好 15% / 低于 15% / 门槛算不出。
+   */
+  it('badge and 提交闸门 agree on the same input (no 合规 badge on a blocked submit)', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+
+    // 恰好 15%：ok 徽章，提交放行。
+    const okCase = mountWithI18n(MortgageForm)
+    expect(okCase.find('[data-test="mortgage-down-payment-readout"]').classes()).toContain('ratio-ok')
+    await submit(okCase)
+    expect(calculate).toHaveBeenCalledTimes(1)
+    expect(okCase.find('[data-test="mortgage-local-error"]').exists()).toBe(false)
+
+    // 14.99%：breach 徽章，提交被阻断（只放行上面那一次）。
+    const breachCase = mountWithI18n(MortgageForm)
+    await breachCase.find('[data-test="mortgage-principal"]').setValue('2380280')
+    await flushPromises()
+    expect(breachCase.find('[data-test="mortgage-down-payment-readout"]').classes()).toContain('ratio-breach')
+    await submit(breachCase)
+    expect(calculate).toHaveBeenCalledTimes(1)
+    expect(breachCase.find('[data-test="mortgage-local-error"]').text()).toContain('15%')
+
+    // 抵押物价值 0 → 门槛无法判定：neutral 徽章（不是 ok），提交同样被阻断。
+    const neutralCase = mountWithI18n(MortgageForm)
+    await neutralCase.find('[data-test="mortgage-transaction-price"]').setValue('0')
+    await neutralCase.find('[data-test="mortgage-appraisal-value"]').setValue('0')
+    await flushPromises()
+    const neutralReadout = neutralCase.find('[data-test="mortgage-down-payment-readout"]')
+    expect(neutralReadout.classes()).toContain('ratio-neutral')
+    expect(neutralReadout.classes()).not.toContain('ratio-ok')
+    await submit(neutralCase)
+    expect(calculate).toHaveBeenCalledTimes(1)
+    expect(neutralCase.find('[data-test="mortgage-local-error"]').text()).toContain('15%')
+  })
 })
 
 /**
