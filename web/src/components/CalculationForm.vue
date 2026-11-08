@@ -725,23 +725,8 @@ function onReset(): void {
 </template>
 
 <style scoped>
-/* 紧凑栅格：压低表单项纵向间距与大块卡片间距。 */
-.compact-form :deep(.ant-form-item) {
-  margin-bottom: 12px;
-}
-.block-card {
-  margin-bottom: 12px;
-}
-.block-card :deep(.ant-card-head) {
-  min-height: 36px;
-}
-.block-card :deep(.ant-card-head-title) {
-  font-size: 14px;
-}
-.block-card :deep(.ant-card-body) {
-  padding-top: 12px;
-  padding-bottom: 4px;
-}
+/* 只留真正组件特有的规则：紧凑栅格（.compact-form）与大块卡片（.block-card）
+   连同派生读数区的对齐规则，都在 styles/workbench.css 里定义一次（Task 6 §4）。 */
 
 /* R89/R92-7：计息基准下拉项两栏布局——主文本（斜杠记法）左对齐可省略，
    原码小号灰字固定右列，基线对齐；避免原先两个不同字号 inline span
@@ -762,7 +747,7 @@ function onReset(): void {
 .day-count-option-code {
   flex: 0 0 auto;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--fcs-text-muted);
 }
 
 /* R92-5：增值税档次快选按钮行。 */

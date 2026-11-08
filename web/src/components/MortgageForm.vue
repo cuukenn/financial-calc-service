@@ -502,46 +502,14 @@ function onReset(): void {
 </template>
 
 <style scoped>
-/* 与租赁表单同款紧凑栅格。 */
-.compact-form :deep(.ant-form-item) {
-  margin-bottom: 12px;
-}
-.block-card {
-  margin-bottom: 12px;
-}
-.block-card :deep(.ant-card-head) {
-  min-height: 36px;
-}
-.block-card :deep(.ant-card-head-title) {
-  font-size: 14px;
-}
-.block-card :deep(.ant-card-body) {
-  padding-top: 12px;
-  padding-bottom: 4px;
-}
-
-/* 派生比例读数：左标签右数值，前端计算结果（不进引擎）在此可见。 */
-.ratio-list {
-  margin: 0 0 12px;
-}
-.ratio-item {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 2px 0;
-}
-.ratio-item dt {
-  color: rgba(0, 0, 0, 0.65);
-}
-.ratio-item dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
+/* 只留真正组件特有的规则：大块卡片（.block-card）、紧凑栅格（.compact-form）与
+   派生读数区（.ratio-list / .ratio-item / .ratio-readout 与阈值配色）都在
+   styles/workbench.css 里定义一次（Task 6 §4，scoped 块无法用 :deep 之外的方式
+   覆盖 AntD 注入的运行时样式，所以这些规则此前在两个表单里各写了一份）。 */
 .composed-rate {
   display: block;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--fcs-text-muted);
 }
 .composed-rate-hint {
   font-size: 11px;

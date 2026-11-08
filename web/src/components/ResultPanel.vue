@@ -578,11 +578,12 @@ function issueKey(issue: Issue, index: number): string {
 </template>
 
 <style scoped>
-/* R88：行头原码次要展示（小号灰字），与 null 值占位同色系。 */
+/* 颜色一律取共用样式表（styles/workbench.css）定义的自定义属性：
+   组件的样式块里不再有色值字面量（Task 6 §3 / §4）。 */
 .metric-header-code {
   display: block;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--fcs-text-muted);
 }
 /* R93-3 + 用户反馈：指标值必须完整可见——列宽随内容自适应（repeat(3, auto)），
    单元格不裁剪；容器 overflow-x 兜底极端长值。数值 nowrap 保持单行。 */
@@ -592,21 +593,21 @@ function issueKey(issue: Issue, index: number): string {
 .metrics-grid-item {
   display: flex;
   align-items: baseline;
-  border-right: 1px solid #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
+  border-right: 1px solid var(--fcs-hairline);
+  border-bottom: 1px solid var(--fcs-hairline);
 }
 .metrics-grid-item:nth-child(3n + 1) {
-  border-left: 1px solid #f0f0f0;
+  border-left: 1px solid var(--fcs-hairline);
 }
 .metrics-grid {
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--fcs-hairline);
 }
 .metrics-grid-label {
   flex: 0 0 auto;
   max-width: 100%;
   padding: 6px 10px;
-  background: #fafafa;
-  color: rgba(0, 0, 0, 0.65);
+  background: var(--fcs-fill-alter);
+  color: var(--fcs-label-muted);
   white-space: nowrap;
 }
 .metrics-grid-value {

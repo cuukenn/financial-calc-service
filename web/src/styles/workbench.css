@@ -15,7 +15,10 @@
  */
 
 :root {
-  /* AntD 调色板同值：green-7 / green-1、gold-7 / gold-1、red-7 / red-1、文本三级灰。 */
+  /* AntD 调色板同值：green-7 / green-1、gold-7 / gold-1、red-7 / red-1，
+     以及中性色 colorBorderSecondary（#f0f0f0）/ colorFillAlter（#fafafa）与三级文本灰。
+     ant-design-vue 4 默认不把 token 暴露成 CSS 变量（要开 ConfigProvider 的 cssVar），
+     所以共用一套变量、组件的样式块里只写 var(...)，不再各自落色值字面量。 */
   --fcs-ratio-ok: #389e0d;
   --fcs-ratio-ok-bg: #f6ffed;
   --fcs-ratio-warn: #d48806;
@@ -26,21 +29,24 @@
   --fcs-ratio-neutral-bg: rgba(0, 0, 0, 0.04);
   --fcs-ratio-border: rgba(0, 0, 0, 0.15);
   --fcs-hairline: #f0f0f0;
+  --fcs-fill-alter: #fafafa;
   --fcs-label-muted: rgba(0, 0, 0, 0.65);
   --fcs-text-muted: rgba(0, 0, 0, 0.45);
 }
 
 /* 大块卡片：两个表单的三个分区共用（卡头压低、正文上紧下松）。
    block-card 与 .ant-card 落在同一个元素上（Card 把额外 class 并入根节点），
-   所以这里的复合选择器比 AntD 自己的 `.ant-card .ant-card-head` 更具体 ——
-   AntD 的 cssinjs 样式在运行时才注入 <head>，同特异性会按后来者胜出。 */
+   所以这里的复合选择器比 AntD 自己的 `.ant-card-small > .ant-card-head`（0,2,0）更具体 ——
+   AntD 的 cssinjs 样式在运行时才注入 <head>，同特异性会按后来者胜出，故一律留出净胜的位数。
+   卡头标题走后代组合符：AntD 的 DOM 是 head > head-wrapper > head-title，用直接子代组合符
+   选不到它。 */
 .block-card {
   margin-bottom: 12px;
 }
 .block-card.ant-card > .ant-card-head {
   min-height: 36px;
 }
-.block-card.ant-card > .ant-card-head > .ant-card-head-title {
+.block-card.ant-card > .ant-card-head .ant-card-head-title {
   font-size: 14px;
 }
 .block-card.ant-card > .ant-card-body {
