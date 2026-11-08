@@ -80,12 +80,19 @@ function lastRequest(): CalculationRequest {
 }
 
 /**
- * 场景面板的可见性语义 = 是否在场：Tabs 用 destroyInactiveTabPane，
- * 非活动场景的面板整体卸载，所以用 exists() 断言，而不是 jsdom 里
- * 跨显示/隐藏周期后会留下过期 computed style 的 isVisible()。
+ * 场景面板的可见性语义：Tabs 只隐藏非活动面板，不销毁它（显式重置是 Task 6 的职责，
+ * 隐式丢弃用户已填的要素是错的）。未访问过的面板缺席 —— AntD Tabs 懒渲染；
+ * 访问过而切走的面板仍在 DOM 里但被隐藏（AntD 给它 inline display:none +
+ * aria-hidden="true"），所以状态跨场景切换保留。
  */
-function panelPresent(wrapper: VueWrapper, selector: string): boolean {
-  return wrapper.find(selector).exists()
+function paneState(wrapper: VueWrapper, selector: string): 'active' | 'hidden' | 'absent' {
+  const found = wrapper.find(selector)
+  if (!found.exists()) return 'absent'
+  const pane = found.element.closest('.ant-tabs-tabpane')
+  expect(pane, `${selector} 应在一个 TabPane 内`).toBeTruthy()
+  const element = pane as HTMLElement
+  const hidden = element.getAttribute('aria-hidden') === 'true' || element.style.display === 'none'
+  return hidden ? 'hidden' : 'active'
 }
 
 /** 归还给引擎的房贷请求只允许这 11 个键（§3），其余租赁专属键必须缺席。 */
@@ -129,29 +136,44 @@ describe('scenario tabs (R100: one page, one engine contract)', () => {
     ])
   })
 
-  it('renders only the active scenario panel and restores the lease form on the way back', async () => {
+  it('shows only the active scenario panel and keeps the inactive one mounted but hidden', async () => {
     const wrapper = mountWithI18n(App)
 
-    // 默认场景 = 融资租赁：现有测算表单在场，房贷面板尚未渲染。
-    expect(panelPresent(wrapper, '[data-test="scenario-lease"]')).toBe(true)
-    expect(panelPresent(wrapper, '[data-test="calc-form-card"]')).toBe(true)
-    expect(panelPresent(wrapper, '[data-test="scenario-mortgage"]')).toBe(false)
-    expect(panelPresent(wrapper, '[data-test="mortgage-form-card"]')).toBe(false)
+    // 默认场景 = 融资租赁：现有测算表单在场，房贷面板尚未渲染（Tabs 懒渲染）。
+    expect(paneState(wrapper, '[data-test="scenario-lease"]')).toBe('active')
+    expect(paneState(wrapper, '[data-test="calc-form-card"]')).toBe('active')
+    expect(paneState(wrapper, '[data-test="scenario-mortgage"]')).toBe('absent')
 
     await activateTab(wrapper, '房贷计算器')
 
-    // 房贷面板在场；租赁专属表单连同其字段（租赁本金等）整体离场。
-    expect(panelPresent(wrapper, '[data-test="scenario-mortgage"]')).toBe(true)
-    expect(panelPresent(wrapper, '[data-test="mortgage-form-card"]')).toBe(true)
-    expect(panelPresent(wrapper, '[data-test="calc-form-card"]')).toBe(false)
-    expect(panelPresent(wrapper, '[data-test="principal"]')).toBe(false)
+    // 房贷面板在场；租赁面板连同其字段整体隐藏（不是卸载）。
+    expect(paneState(wrapper, '[data-test="scenario-mortgage"]')).toBe('active')
+    expect(paneState(wrapper, '[data-test="mortgage-form-card"]')).toBe('active')
+    expect(paneState(wrapper, '[data-test="calc-form-card"]')).toBe('hidden')
+    expect(paneState(wrapper, '[data-test="principal"]')).toBe('hidden')
 
-    // 切回融资租赁：原表单重新在场，房贷面板离场。
+    // 切回融资租赁：原表单回到在场且可见，房贷面板退到隐藏。
     await activateTab(wrapper, '融资租赁')
-    expect(panelPresent(wrapper, '[data-test="scenario-lease"]')).toBe(true)
-    expect(panelPresent(wrapper, '[data-test="calc-form-card"]')).toBe(true)
-    expect(panelPresent(wrapper, '[data-test="principal"]')).toBe(true)
-    expect(panelPresent(wrapper, '[data-test="mortgage-form-card"]')).toBe(false)
+    expect(paneState(wrapper, '[data-test="scenario-lease"]')).toBe('active')
+    expect(paneState(wrapper, '[data-test="calc-form-card"]')).toBe('active')
+    expect(paneState(wrapper, '[data-test="principal"]')).toBe('active')
+    expect(paneState(wrapper, '[data-test="mortgage-form-card"]')).toBe('hidden')
+  })
+
+  it('keeps a half-filled 租赁 form across a detour to the 房贷 tab (no implicit reset)', async () => {
+    const wrapper = mountWithI18n(App)
+
+    // 用户填了一半的租赁本金（默认值是 1 000 000，改成别的数字才证明保留的是状态本身）。
+    await wrapper.find('[data-test="principal"]').setValue('123456.78')
+    await flushPromises()
+
+    await activateTab(wrapper, '房贷计算器')
+    expect(paneState(wrapper, '[data-test="principal"]')).toBe('hidden')
+
+    await activateTab(wrapper, '融资租赁')
+    const principal = wrapper.find('[data-test="principal"]').element as HTMLInputElement
+    expect(paneState(wrapper, '[data-test="principal"]')).toBe('active')
+    expect(principal.value).toBe('123456.78')
   })
 })
 
