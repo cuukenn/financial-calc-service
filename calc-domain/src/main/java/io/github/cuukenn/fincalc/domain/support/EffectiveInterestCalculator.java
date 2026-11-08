@@ -3,6 +3,7 @@ package io.github.cuukenn.fincalc.domain.support;
 import io.github.cuukenn.fincalc.common.error.BusinessException;
 import io.github.cuukenn.fincalc.common.money.MoneyUtils;
 import io.github.cuukenn.fincalc.common.money.MoneyScale;
+import io.github.cuukenn.fincalc.common.money.MoneyTolerance;
 import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
 import io.github.cuukenn.fincalc.domain.model.EffectiveInterestRow;
 import io.github.cuukenn.fincalc.domain.model.EffectiveInterestTable;
@@ -86,8 +87,12 @@ public final class EffectiveInterestCalculator {
      * a fee/deposit-vs-rent structural mismatch shows up as thousands, not cents. A computed
      * final closing further than {@code 0.01 × periods} from the target is therefore not
      * rounding noise but a broken input pair (design ledger ruling R51).
+     *
+     * <p>Derived from {@link MoneyTolerance#MONEY_COMPARE} rather than merged with it: this is the
+     * per-period share of a closing bound that is scaled by the period count, not a validator's
+     * comparison tolerance, and the scaling stays here — the unit is the same cent by construction.
      */
-    private static final BigDecimal CLOSING_TOLERANCE_PER_PERIOD = new BigDecimal("0.01");
+    private static final BigDecimal CLOSING_TOLERANCE_PER_PERIOD = MoneyTolerance.MONEY_COMPARE;
 
     private EffectiveInterestCalculator() {
     }

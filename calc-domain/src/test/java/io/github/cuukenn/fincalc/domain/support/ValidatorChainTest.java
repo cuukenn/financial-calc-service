@@ -3,6 +3,7 @@ package io.github.cuukenn.fincalc.domain.support;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.cuukenn.fincalc.common.time.SystemClockProvider;
+import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
 import io.github.cuukenn.fincalc.domain.calc.CalculationContext;
 import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
@@ -123,6 +124,20 @@ class ValidatorChainTest {
         assertThat(ValidatorChain.defaults().codes()).containsExactly(
                 "PRINCIPAL_CONSERVATION", "TAIL_BALANCE", "PERIOD_IDENTITY",
                 "RENT_COMPOSITION", "DATE_MONOTONIC");
+    }
+
+    @Test
+    void schedule_validation_findings_carry_the_calc_error_code_constants() {
+        // The emitted code and the enum constant cannot drift apart: the validator reads the
+        // constant instead of holding a literal of its own.
+        assertThat(ValidatorChain.defaults()
+                .validateAll(scheduleWithPrincipalSum("999999.99"), baseElement()))
+                .anySatisfy(issue -> assertThat(issue.code())
+                        .isEqualTo(CalcErrorCode.PRINCIPAL_CONSERVATION_BROKEN.code()));
+        assertThat(ValidatorChain.defaults()
+                .validateAll(scheduleWithLastClosing("0.01"), baseElement()))
+                .anySatisfy(issue -> assertThat(issue.code())
+                        .isEqualTo(CalcErrorCode.TAIL_BALANCE_MISMATCH.code()));
     }
 
     @Test

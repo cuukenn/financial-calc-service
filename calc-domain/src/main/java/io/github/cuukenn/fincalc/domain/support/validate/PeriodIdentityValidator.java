@@ -1,5 +1,6 @@
 package io.github.cuukenn.fincalc.domain.support.validate;
 
+import io.github.cuukenn.fincalc.common.money.MoneyTolerance;
 import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
 import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.IssueLevel;
@@ -19,8 +20,11 @@ import java.util.List;
  */
 public final class PeriodIdentityValidator implements Validator {
 
-    /** A difference of one cent or more is reported; anything smaller is absorbed rounding. */
-    public static final BigDecimal TOLERANCE = new BigDecimal("0.01");
+    /**
+     * A difference of one cent or more is reported; anything smaller is absorbed rounding. The value
+     * is single-sourced in {@link MoneyTolerance} so every §3.4 check judges on the same line.
+     */
+    public static final BigDecimal TOLERANCE = MoneyTolerance.MONEY_COMPARE;
 
     @Override
     public String code() {
@@ -30,7 +34,9 @@ public final class PeriodIdentityValidator implements Validator {
     @Override
     public int order() {
         // Slots between TAIL_BALANCE (20) and DATE_MONOTONIC (30) so the chain runs in the
-        // AGENTS.md code-number order 3001 → 3002 → 3008 → 3009 → 3004.
+        // AGENTS.md §3.4 code-number order:
+        // CalcErrorCode.PRINCIPAL_CONSERVATION_BROKEN → TAIL_BALANCE_MISMATCH →
+        // PERIOD_IDENTITY_BROKEN → RENT_COMPOSITION_BROKEN → PERIOD_DATE_ORDER_INVALID.
         return 21;
     }
 

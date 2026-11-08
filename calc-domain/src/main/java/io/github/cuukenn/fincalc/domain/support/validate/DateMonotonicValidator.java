@@ -1,5 +1,6 @@
 package io.github.cuukenn.fincalc.domain.support.validate;
 
+import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
 import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
@@ -20,12 +21,10 @@ import java.util.List;
 public final class DateMonotonicValidator implements Validator {
 
     /**
-     * The design document assigns one code to the whole rule family ({@code FCS-CALC-3004} 期次日期
-     * 非单调), and the validator chain reports at most one finding per code and period, so every rule
-     * a period breaks is named in that single finding.
+     * The design document assigns one code to the whole rule family (期次日期非单调), carried here as
+     * {@link CalcErrorCode#PERIOD_DATE_ORDER_INVALID}. The validator chain reports at most one finding
+     * per code and period, so every rule a period breaks is named in that single finding.
      */
-    private static final String CODE = "FCS-CALC-3004";
-
     @Override
     public String code() {
         return "DATE_MONOTONIC";
@@ -38,6 +37,7 @@ public final class DateMonotonicValidator implements Validator {
 
     @Override
     public List<ValidationIssue> validate(Schedule schedule, LeaseElement element) {
+        String code = CalcErrorCode.PERIOD_DATE_ORDER_INVALID.code();
         List<ValidationIssue> issues = new ArrayList<>();
         List<Installment> installments = schedule.installments();
         Installment previous = null;
@@ -57,8 +57,8 @@ public final class DateMonotonicValidator implements Validator {
                 }
             }
             if (!causes.isEmpty()) {
-                issues.add(new ValidationIssue(IssueLevel.ERROR, CODE,
-                        CODE + ": 第 " + current.periodNo() + " 期 " + String.join("；", causes),
+                issues.add(new ValidationIssue(IssueLevel.ERROR, code,
+                        code + ": 第 " + current.periodNo() + " 期 " + String.join("；", causes),
                         current.periodNo()));
             }
             previous = current;

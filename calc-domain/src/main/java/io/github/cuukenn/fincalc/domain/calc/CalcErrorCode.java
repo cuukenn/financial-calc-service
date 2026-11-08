@@ -4,12 +4,50 @@ import io.github.cuukenn.fincalc.common.error.ErrorCode;
 
 /**
  * Error codes raised by the calculation orchestration, following the {@code FCS-CALC-<4 digits>}
- * convention. The codes assigned to schedule validation (3001, 3002, 3004) live in the validators
- * themselves; this enum carries the codes raised while assembling inputs and outputs, plus the
- * codes of the §3.4 identity validators (3008, 3009): those validators raise through
- * {@code ValidationIssue}s and reference the constants registered here.
+ * convention. This enum is the single home of every code: the schedule validation codes of AGENTS.md
+ * §3.4 (3001, 3002, 3004, 3008, 3009) as well as the codes raised while assembling inputs and
+ * outputs. Validators raise through {@code ValidationIssue}s and reference the constants registered
+ * here instead of spelling a {@code FCS-CALC-*} literal of their own; with 3001, 3002 and 3004
+ * backfilled, the 3001–3005 block is complete in this enum.
+ *
+ * <p><b>Messages.</b> A §3.4 finding carries measured values and reaches the caller as a
+ * {@code ValidationIssue}, which formats nothing: the raiser composes {@code code() + ": " + values}
+ * — the pattern 3008/3009 already use — and this enum keeps only the static summary. A {@code %s}
+ * template suits the codes below that are thrown as a {@code BusinessException} (3006, 3007 are
+ * formatted by the exception constructor), but not these: rendering a template into a
+ * {@code ValidationIssue} would need a second formatting step at every raising site, and one missed
+ * argument would change today's message. Concatenation keeps it byte-for-byte.
  */
 public enum CalcErrorCode implements ErrorCode {
+
+    /**
+     * AGENTS.md §3.4 校验一：Σ本金 = 合同本金 − 并入租金的残值（残值单独收取时为合同本金）不成立，
+     * 误差 ≥ 0.01 元（补充口径规则 2 的比较容差）。Raised by
+     * {@code PrincipalConservationValidator} and, while the plan is built, by
+     * {@code AbstractAmortizationGenerator#checkConservation}; the finding embeds the two sums, so
+     * the message is composed at the raising site.
+     */
+    PRINCIPAL_CONSERVATION_BROKEN("FCS-CALC-3001",
+            "FCS-CALC-3001: 本金合计与应还本金不一致"),
+
+    /**
+     * AGENTS.md §3.4 校验二：末期余额 = 残值（并入租金时为 BALLOON，单独收取时为 0）不成立，误差
+     * ≥ 0.01 元（补充口径规则 2 的比较容差）。Raised by {@code TailBalanceValidator} and by
+     * {@code AbstractAmortizationGenerator#checkConservation}; the finding embeds the closing balance
+     * and its expectation, so the message is composed at the raising site.
+     */
+    TAIL_BALANCE_MISMATCH("FCS-CALC-3002",
+            "FCS-CALC-3002: 末期余额与预期不一致"),
+
+    /**
+     * The design document's 期次日期规则 family: a period window that is empty, does not start where
+     * the previous one ended, or a period number that does not ascend. One code covers the family
+     * because the chain reports at most one finding per code and period; {@code
+     * DateMonotonicValidator} names every rule a period breaks inside that single finding, so the
+     * message is composed at the raising site.
+     */
+    PERIOD_DATE_ORDER_INVALID("FCS-CALC-3004",
+            "FCS-CALC-3004: 期次日期非单调"),
 
     /** VAT-split cash flows are a v2 feature; the basis is rejected instead of degraded. */
     VAT_SPLIT_NOT_SUPPORTED("FCS-CALC-3005",

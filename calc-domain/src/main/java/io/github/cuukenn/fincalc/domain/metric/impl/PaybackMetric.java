@@ -1,5 +1,6 @@
 package io.github.cuukenn.fincalc.domain.metric.impl;
 
+import io.github.cuukenn.fincalc.common.money.MoneyTolerance;
 import io.github.cuukenn.fincalc.common.money.MoneyUtils;
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetric;
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
@@ -57,8 +58,12 @@ public final class PaybackMetric implements FinancialMetric {
      * {@link #DISCOUNTED_ORDER discounted} walk only: the run publishes {@code IRR_PERIOD} at scale
      * 10, so discounting the flows at that rounded rate leaves a residual of about {@code -2.5e-4}
      * where the exact yield would leave zero. The static walk recovers on the exact line instead.
+     *
+     * <p>Derived from {@link MoneyTolerance#MONEY_COMPARE} rather than merged with it: this is a
+     * recovery line on a discounted cash flow, not a validation tolerance, and the two would part
+     * ways the moment either meaning is refined — the amount is the same cent by construction.
      */
-    private static final BigDecimal RECOVERY_TOLERANCE = new BigDecimal("0.01");
+    private static final BigDecimal RECOVERY_TOLERANCE = MoneyTolerance.MONEY_COMPARE;
 
     private static final int STATIC_ORDER = 20;
     private static final int DISCOUNTED_ORDER = 30;

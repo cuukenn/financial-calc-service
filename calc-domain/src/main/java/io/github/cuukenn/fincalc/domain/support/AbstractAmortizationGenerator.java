@@ -6,7 +6,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import io.github.cuukenn.fincalc.common.money.MoneyTolerance;
 import io.github.cuukenn.fincalc.common.money.MoneyUtils;
+import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
 import io.github.cuukenn.fincalc.domain.calc.CalculationContext;
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetrics;
 import io.github.cuukenn.fincalc.domain.model.Installment;
@@ -33,8 +35,12 @@ import io.github.cuukenn.fincalc.domain.port.ScheduleGenerator;
  */
 public abstract class AbstractAmortizationGenerator implements ScheduleGenerator {
 
-    /** One cent or more of drift is a finding; anything smaller is absorbed rounding. */
-    private static final BigDecimal TOLERANCE = new BigDecimal("0.01");
+    /**
+     * One cent or more of drift is a finding; anything smaller is absorbed rounding. The value is
+     * single-sourced in {@link MoneyTolerance} so the generator and the validator chain judge on the
+     * same line.
+     */
+    private static final BigDecimal TOLERANCE = MoneyTolerance.MONEY_COMPARE;
     private static final String DEFAULT_SOLVER = "CLOSED_FORM";
 
     /**
@@ -210,8 +216,10 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         BigDecimal residual = element.outstandingResidual();
         BigDecimal expectedPrincipal = money(contractPrincipal.subtract(residual), rounding);
         if (principalSum.subtract(expectedPrincipal).abs().compareTo(TOLERANCE) >= 0) {
-            issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3001",
-                    "FCS-CALC-3001: 本金合计 " + principalSum.toPlainString()
+            issues.add(new ValidationIssue(IssueLevel.ERROR,
+                    CalcErrorCode.PRINCIPAL_CONSERVATION_BROKEN.code(),
+                    CalcErrorCode.PRINCIPAL_CONSERVATION_BROKEN.code() + ": 本金合计 "
+                            + principalSum.toPlainString()
                             + " 与应还本金 " + expectedPrincipal.toPlainString() + " 不一致",
                     null));
         }
@@ -222,9 +230,11 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
             // the same one its own tail-balance check would raise, instead of reporting it twice.
             Integer lastPeriodNo = installments.isEmpty() ? null
                     : installments.get(installments.size() - 1).periodNo();
-            issues.add(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3002",
-                    "FCS-CALC-3002: 末期余额 " + closingBalance.toPlainString()
-                            + " 与预期 " + expectedClosing.toPlainString() + " 不一致", lastPeriodNo));
+            issues.add(new ValidationIssue(IssueLevel.ERROR,
+                    CalcErrorCode.TAIL_BALANCE_MISMATCH.code(),
+                    CalcErrorCode.TAIL_BALANCE_MISMATCH.code() + ": 末期余额 "
+                            + closingBalance.toPlainString() + " 与预期 "
+                            + expectedClosing.toPlainString() + " 不一致", lastPeriodNo));
             return money(MoneyUtils.ZERO, rounding);
         }
         return money(difference, rounding);

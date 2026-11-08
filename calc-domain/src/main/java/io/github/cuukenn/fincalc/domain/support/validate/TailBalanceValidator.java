@@ -1,5 +1,7 @@
 package io.github.cuukenn.fincalc.domain.support.validate;
 
+import io.github.cuukenn.fincalc.common.money.MoneyTolerance;
+import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
 import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
@@ -16,8 +18,11 @@ import java.util.List;
  */
 public final class TailBalanceValidator implements Validator {
 
-    /** A difference of one cent or more is reported; anything smaller is absorbed rounding. */
-    public static final BigDecimal TOLERANCE = new BigDecimal("0.01");
+    /**
+     * A difference of one cent or more is reported; anything smaller is absorbed rounding. The value
+     * is single-sourced in {@link MoneyTolerance} so every §3.4 check judges on the same line.
+     */
+    public static final BigDecimal TOLERANCE = MoneyTolerance.MONEY_COMPARE;
 
     @Override
     public String code() {
@@ -40,8 +45,10 @@ public final class TailBalanceValidator implements Validator {
         if (last.closingBalance().subtract(expected).abs().compareTo(TOLERANCE) < 0) {
             return Collections.emptyList();
         }
-        return Collections.singletonList(new ValidationIssue(IssueLevel.ERROR, "FCS-CALC-3002",
-                "FCS-CALC-3002: 末期余额 " + last.closingBalance().toPlainString()
+        return Collections.singletonList(new ValidationIssue(IssueLevel.ERROR,
+                CalcErrorCode.TAIL_BALANCE_MISMATCH.code(),
+                CalcErrorCode.TAIL_BALANCE_MISMATCH.code() + ": 末期余额 "
+                        + last.closingBalance().toPlainString()
                         + " 与预期 " + expected.toPlainString() + " 不一致", last.periodNo()));
     }
 

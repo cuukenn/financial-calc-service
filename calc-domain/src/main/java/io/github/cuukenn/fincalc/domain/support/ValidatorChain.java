@@ -1,6 +1,7 @@
 package io.github.cuukenn.fincalc.domain.support;
 
 import io.github.cuukenn.fincalc.common.spi.ExtensionRegistry;
+import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
 import io.github.cuukenn.fincalc.domain.model.ValidationIssue;
@@ -37,9 +38,13 @@ public final class ValidatorChain {
     }
 
     /**
-     * The chain every built-in calculation uses, in the AGENTS.md §3.4 code-number order:
-     * principal conservation (3001), tail balance (3002), per-period identity (3008), rent
-     * composition (3009) and, last, the period-date monotonicity net (3004).
+     * The chain every built-in calculation uses, in the AGENTS.md §3.4 code-number order: principal
+     * conservation ({@link CalcErrorCode#PRINCIPAL_CONSERVATION_BROKEN}), tail balance
+     * ({@link CalcErrorCode#TAIL_BALANCE_MISMATCH}), per-period identity
+     * ({@link CalcErrorCode#PERIOD_IDENTITY_BROKEN}), rent composition
+     * ({@link CalcErrorCode#RENT_COMPOSITION_BROKEN}) and, last, the period-date monotonicity net
+     * ({@link CalcErrorCode#PERIOD_DATE_ORDER_INVALID}). The registration order below is the order
+     * {@link #codes()} reports, and {@code ValidatorChainTest} pins it.
      */
     public static ValidatorChain defaults() {
         ExtensionRegistry<Validator> validators = ExtensionRegistry.empty();
