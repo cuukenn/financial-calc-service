@@ -68,11 +68,13 @@ import java.util.stream.Stream;
  *   <li><b>Step 3</b> — {@link StandardCashFlowBuilder}: the §9.4 event table, lessor perspective,
  *       the request's cash-flow basis.</li>
  *   <li><b>Step 4</b> — {@link MetricRegistry#computeAll}: the §9.5 metric run over
- *       {@code MetricContext(flows, schedule, element, m, null, null, null)}. The rates are left
- *       unconfigured on purpose: {@code discountRate} is per-period and the metrics derive it from
- *       the run's own IRR; the MIRR reinvest/finance rates default inside the metric layer
+ *       {@code MetricContext(flows, schedule, element, m, null, null, null, perspective)}. The rates
+ *       are left unconfigured on purpose: {@code discountRate} is per-period and the metrics derive
+ *       it from the run's own IRR; the MIRR reinvest/finance rates default inside the metric layer
  *       (R42/R44 — {@code CalculationOptions} carries no rate fields in v1, so nothing to pass).
- *       MIRR arrives already annual — nothing downstream annualizes it again (R32).</li>
+ *       MIRR arrives already annual — nothing downstream annualizes it again (R32). The
+ *       perspective is the request's (R103), defaulting to the lessor view; per R109 it only
+ *       gates the {@code BORROWER_*} family and changes no schedule, cash flow or validator.</li>
  *   <li><b>Step 5</b> — {@link Schedule#with}: the schedule carries the metrics and the flows.</li>
  *   <li><b>Step 6</b> — {@link ValidatorChain#validate} plus the engine's own diagnostics: every
  *       finding is appended to the schedule's issues (the schedule is immutable — the enriched
@@ -228,10 +230,13 @@ public final class CalculationFacade {
         // Step 3: the §9.4 event table.
         List<CashFlow> flows = cashFlowBuilder.build(schedule, element, request.options());
 
-        // Step 4: the §9.5 metric run (rates unconfigured — derived inside the metric layer).
+        // Step 4: the §9.5 metric run (rates unconfigured — derived inside the metric layer). The
+        // perspective is the caller's (R103); it changes nothing above, and the schedule keeps the
+        // lessor event table whatever the metric view is (R109).
         List<String> failedMetrics = new ArrayList<>();
         FinancialMetrics metrics = this.metrics.computeAll(new MetricContext(flows, schedule,
-                element, periodsPerYear(element), null, null, null), failedMetrics);
+                element, periodsPerYear(element), null, null, null, request.perspective()),
+                failedMetrics);
 
         // Step 5: the enriched schedule.
         schedule = schedule.with(metrics, flows);

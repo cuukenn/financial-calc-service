@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.cuukenn.fincalc.common.error.BusinessException;
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetrics;
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
+import io.github.cuukenn.fincalc.domain.metric.MetricPerspective;
 import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
 import io.github.cuukenn.fincalc.domain.model.CashFlowType;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
@@ -100,6 +101,60 @@ class CalculationFacadeTest {
         assertThat(r.effectiveInterest().rows()).hasSize(12);
         assertThat(r.effectiveInterest().rows().get(11).closingNetInvestment())
                 .isEqualByComparingTo("0.00");
+    }
+
+    /**
+     * R103: the perspective is caller-selectable and reaches the metric run, while the schedule —
+     * installments, rents and the lessor cash-flow table — is untouched (R109: the lessee view
+     * drives only the {@code BORROWER_*} family).
+     */
+    @Test
+    void a_lessee_request_publishes_the_borrower_family_and_leaves_the_schedule_alone() {
+        assertThat(new CalculationRequest(baseElement(), null, null).perspective())
+                .isEqualTo(MetricPerspective.LESSOR);
+        assertThat(new CalculationRequest(baseElement(), null, null, null).perspective())
+                .isEqualTo(MetricPerspective.LESSOR);
+
+        CalculationResult lessor = CalculationFacade.defaults().calculate(
+                new CalculationRequest(baseElement(), null, CalculationOptions.defaults()));
+        CalculationResult lessee = CalculationFacade.defaults().calculate(
+                new CalculationRequest(baseElement(), null, CalculationOptions.defaults(),
+                        MetricPerspective.LESSEE));
+
+        assertThat(lessor.schedule().header().metrics()
+                .find(MetricCodes.BORROWER_TOTAL_REPAYMENT)).isNull();
+        assertThat(lessee.schedule().header().metrics()
+                .find(MetricCodes.BORROWER_TOTAL_REPAYMENT)).isEqualByComparingTo("1032797.15");
+        assertThat(lessee.schedule().header().metrics().find(MetricCodes.BORROWER_IRR_PERIOD))
+                .isEqualByComparingTo(lessee.schedule().header().metrics()
+                        .find(MetricCodes.IRR_PERIOD));
+        // No generator, cash-flow or validator behaviour changes: same rows, same event table.
+        assertThat(lessee.schedule().installments()).hasSize(12);
+        assertThat(lessee.schedule().header().metrics().find(MetricCodes.TOTAL_RENT))
+                .isEqualByComparingTo("1032797.15");
+        assertThat(lessee.schedule().cashFlows()).hasSameSizeAs(lessor.schedule().cashFlows());
+        assertThat(lessee.schedule().cashFlows().get(0).direction()).isEqualTo(
+                lessor.schedule().cashFlows().get(0).direction());
+    }
+
+    /**
+     * A {@code BULLET_LOAN} schedule is the cleanest lessee case: zero intermediate rents are
+     * dropped by the §9.4 builder, so the borrower view is one funded inflow and one maturity
+     * outflow — and the borrower total is the single 1 060 000.00 settlement (1 000 000.00
+     * principal + 60 000.00 interest).
+     */
+    @Test
+    void a_bullet_loan_lessee_run_prices_the_single_maturity_repayment() {
+        CalculationResult r = CalculationFacade.defaults().calculate(
+                new CalculationRequest(baseElement().toBuilder()
+                        .method(RepaymentMethodId.BULLET_LOAN).build(), null,
+                        CalculationOptions.defaults(), MetricPerspective.LESSEE));
+
+        FinancialMetrics m = r.schedule().header().metrics();
+        assertThat(m.find(MetricCodes.BORROWER_TOTAL_REPAYMENT))
+                .isEqualByComparingTo("1060000.00");
+        assertThat(m.find(MetricCodes.BORROWER_IRR_PERIOD)).isNotNull();
+        assertThat(m.find(MetricCodes.BORROWER_IRR_ANNUAL)).isNotNull();
     }
 
     @Test
