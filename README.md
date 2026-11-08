@@ -2,7 +2,7 @@
 
 融资租赁/贷款核心计算引擎（Plan 1：核心计算内核）。纯 Java、无框架依赖、JSR-310 时间、
 `BigDecimal` 精确算术，支持六种内置还款算法与规则驱动的租金生成（Rule DSL + Excel 兼容函数库），
-并输出设计文档 §9.5 定义的全部 21 项金融指标与 §9.7 实际利率法摊销表。
+并输出设计文档 §9.5 定义的 21 项金融指标、R103 借款方视角的 4 项 `BORROWER_*` 指标与 §9.7 实际利率法摊销表。
 
 ## 环境要求
 
@@ -35,7 +35,7 @@ module your.app {
 CalculationResult r = CalculationFacade.defaults().calculate(
         new CalculationRequest(leaseElement, null, CalculationOptions.defaults()));
 Schedule schedule = r.schedule();                       // 12 期租金表（含校验问题列表）
-BigDecimal totalRent = schedule.header().metrics()      // 21 项金融指标（TOTAL_RENT、IRR…）
+BigDecimal totalRent = schedule.header().metrics()      // 25 项金融指标（TOTAL_RENT、IRR…）
         .find(MetricCodes.TOTAL_RENT);
 EffectiveInterestTable eir = r.effectiveInterest();     // §9.7 实际利率法摊销表（可能为 null）
 ```
@@ -43,6 +43,23 @@ EffectiveInterestTable eir = r.effectiveInterest();     // §9.7 实际利率法
 `CalculationRequest(element, ruleSet, options)` 中 `ruleSet` 仅在 `method = RULE_DRIVEN` 时必填，
 其余算法传 `null` 即按要素的名义利率生成；`options` 传 `null` 等价于
 `CalculationOptions.defaults()`（不放宽规则、利率变动 RESOLVE、现金流含费用）。
+
+### 指标口径：视角（R103）
+
+`metrics` 中的 25 个 code 分两族，**同一包里共存、键不加前缀**：
+
+- §9.5 的 21 项（`TOTAL_*`、`NPV`/`IRR*`、久期…）按出租方（lessor）视角读现金流，即 v1 口径；
+- 借款方（承租方）视角的 4 项 `BORROWER_IRR_PERIOD`、`BORROWER_IRR_ANNUAL`、
+  `BORROWER_IRR_ANNUAL_SIMPLE`、`BORROWER_TOTAL_REPAYMENT`：把同一份现金流的方向整体翻转
+  （本金由流出变流入、租金由流入变流出）后计价。
+
+视角由 `new CalculationRequest(element, ruleSet, options, MetricPerspective.LESSEE)` 选择，
+缺省与三参数构造均为 `MetricPerspective.LESSOR`。**默认的 LESSOR 运行与 v1 完全一致**，
+只是多出 4 个显式 `null` 的 `BORROWER_*` 条目（不可计算即为 `null`，字段不省略）；
+`LESSEE` 运行下这 4 项才有值。视角只作用于指标层：计划表、现金流表、校验器一律不变（R109）。
+
+`BORROWER_*` 是**展示辅助指标**（[实]），不是监管指标，也不得与「租赁内含利率 / 增量借款利率」
+等 §2.1 规范名混用。
 
 ## 还款算法 code 对照表
 
