@@ -96,6 +96,19 @@ function metricTooltipWithRaw(code: string, value: string | null): string {
 }
 
 /**
+ * R121（Task 6 §6）：借款方视角的四个 code 是**展示辅助**，不是合同收取的利率，
+ * 也不得与任何出租方金额相加 —— 所以它们不进上面的指标卡、不进出租方指标表，
+ * 只在下面这一节里单独出现（节标题即 R121 的绑定文案）。
+ * BORROWER_TOTAL_REPAYMENT（还款总额）是其中唯一的独立新数字。
+ */
+const BORROWER_METRIC_CODES = [
+  'BORROWER_IRR_PERIOD',
+  'BORROWER_IRR_ANNUAL',
+  'BORROWER_IRR_ANNUAL_SIMPLE',
+  'BORROWER_TOTAL_REPAYMENT',
+] as const
+
+/**
  * R92-8：指标卡主展示名与指标表行头同规则（R92-4 分类：标准缩写原样 / IRR 家族带
  * 口径限定 / 其余目录本地化名），目录内且主文本非原码时附原码次要小字。
  */
@@ -109,10 +122,20 @@ const metricCards = computed(() =>
   })),
 )
 
-/** 未入选指标卡的全量指标（保持 §9.5 全量可见），行头 hover 同样挂指标目录。 */
+/** 借款方视角一节的行（引擎没给的 code 不显示，也不补 0）。 */
+const borrowerMetrics = computed(() =>
+  BORROWER_METRIC_CODES.map(
+    (code) => [code, metrics.value[code] ?? null] as const,
+  ).filter(([, value]) => value !== null),
+)
+
+/**
+ * 未入选指标卡的全量指标（保持 §9.5 全量可见），行头 hover 同样挂指标目录。
+ * 借款方视角的四个 code 不在这里 —— 它们另有自己的一节（R121，Task 6 §6）。
+ */
 const otherMetrics = computed(() => {
-  const cardCodes = new Set(METRIC_CARD_CODES)
-  return Object.entries(metrics.value).filter(([code]) => !cardCodes.has(code))
+  const excluded = new Set<string>([...METRIC_CARD_CODES, ...BORROWER_METRIC_CODES])
+  return Object.entries(metrics.value).filter(([code]) => !excluded.has(code))
 })
 
 function otherMetricTooltip(code: string, value: string | null): string {
@@ -130,6 +153,11 @@ function otherMetricLabel(code: string): string {
 /** 目录内且主文本非原码时，以小号灰字在行头附上原码（对账用）；目录外/标准缩写不重复显示。 */
 function showsSecondaryCode(code: string): boolean {
   return metricShowsSecondaryCode(code, locale.value as AppLocale)
+}
+
+/** 借款方视角一节的行头主文本走目录本地化名，原码一律以小字附在旁边（R121：不得被读成合同利率）。 */
+function borrowerMetricLabel(code: string): string {
+  return metricPrimaryLabel(code, locale.value as AppLocale)
 }
 
 /** ERROR 红 / WARN 橙 / INFO 灰（后端 IssueLevel 枚举名）。 */
@@ -359,6 +387,48 @@ function issueKey(issue: Issue, index: number): string {
                 {{ formatMetricValue(code, value) }}
               </span>
             </Tooltip>
+          </div>
+        </div>
+
+        <!-- Task 6 §6 / R121：借款方视角另成一节。四个 BORROWER_* 是同一张摊销表在
+             借款方现金流方向上的展示辅助：不是合同收取的利率、不与任何出租方金额相加，
+             所以既不进上面的指标卡也不进上面的指标表。DTI / LTV 不在这里 ——
+             它们是房贷表单自己的前端读数（R110），不是引擎指标。 -->
+        <div
+          v-if="borrowerMetrics.length > 0"
+          class="borrower-metrics"
+          data-test="borrower-metrics-section"
+        >
+          <Typography.Title :level="5" style="margin-top: 12px">
+            {{ t('result.borrowerSection.title') }}
+          </Typography.Title>
+          <Typography.Text type="secondary" style="display: block; margin-top: 4px">
+            {{ t('result.borrowerSection.note') }}
+          </Typography.Text>
+          <div
+            class="metrics-grid"
+            data-test="borrower-metrics-grid"
+            style="margin-top: 8px; display: grid; grid-template-columns: repeat(3, auto)"
+          >
+            <div
+              v-for="[code, value] in borrowerMetrics"
+              :key="code"
+              class="metrics-grid-item borrower-metric-item"
+              data-test="borrower-metric-item"
+            >
+              <!-- 同款指标目录 hover（中文名 / 公式 / 说明 + 原值）。 -->
+              <Tooltip :title="metricTooltipWithRaw(code, value)">
+                <span data-test="borrower-metric-header" class="metrics-grid-label">
+                  <span data-test="borrower-metric-name">{{ borrowerMetricLabel(code) }}</span>
+                  <span data-test="borrower-metric-code" class="metric-header-code">{{ code }}</span>
+                </span>
+              </Tooltip>
+              <Tooltip :title="t('result.raw', { value: value ?? '—' })">
+                <span data-test="borrower-metric-value" class="metrics-grid-value">
+                  {{ formatMetricValue(code, value) }}
+                </span>
+              </Tooltip>
+            </div>
           </div>
         </div>
 

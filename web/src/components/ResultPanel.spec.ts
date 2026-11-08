@@ -359,4 +359,93 @@ describe('ResultPanel', () => {
 
     expect(wrapper.find('[data-test="issue-level"]').text()).toBe('WARNING')
   })
+
+  /**
+   * Task 6 §6 / R121：BORROWER_* 是展示辅助，不是合同收取的利率 ——
+   * 它们必须有自己带标签的一节，并且不得混进出租方指标列表、不得与出租方金额相加。
+   */
+  it('renders the borrower metrics as their own labelled section (R121 wording)', () => {
+    const withBorrower = result()
+    withBorrower.schedule.header.metrics = {
+      ...withBorrower.schedule.header.metrics,
+      BORROWER_IRR_PERIOD: '0.005',
+      BORROWER_IRR_ANNUAL: '0.0617',
+      BORROWER_IRR_ANNUAL_SIMPLE: '0.062',
+      BORROWER_TOTAL_REPAYMENT: '1032797.15',
+    }
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withBorrower } })
+
+    const section = wrapper.find('[data-test="borrower-metrics-section"]')
+    expect(section.exists()).toBe(true)
+    // R121 绑定文案：资金成本指标，非合同利率。
+    expect(section.text()).toContain('借款方视角（资金成本指标，非合同利率）')
+    expect(section.text()).toContain('不是合同收取的利率')
+
+    const codes = section.findAll('[data-test="borrower-metric-code"]').map((c) => c.text())
+    expect(codes).toEqual([
+      'BORROWER_IRR_PERIOD',
+      'BORROWER_IRR_ANNUAL',
+      'BORROWER_IRR_ANNUAL_SIMPLE',
+      'BORROWER_TOTAL_REPAYMENT',
+    ])
+    // 利率类按百分比显示（R90b），金额类按 #,##0.00（R93-2）。
+    const values = section.findAll('[data-test="borrower-metric-value"]').map((v) => v.text())
+    expect(values).toEqual(['0.5000%', '6.1700%', '6.2000%', '1,032,797.15'])
+    // 指标目录的 hover 解释照旧挂着（既有 tooltip helper）。
+    const titles = wrapper.findAllComponents(Tooltip).map((tp) => tp.props('title') as string)
+    expect(titles.join('\n')).toContain('Σ rentDue + 单独结算的留购价')
+  })
+
+  it('keeps every borrower code out of the lessor metric cards and the lessor metric list', () => {
+    const withBorrower = result()
+    withBorrower.schedule.header.metrics = {
+      ...withBorrower.schedule.header.metrics,
+      BORROWER_IRR_PERIOD: '0.005',
+      BORROWER_IRR_ANNUAL: '0.0617',
+      BORROWER_IRR_ANNUAL_SIMPLE: '0.062',
+      BORROWER_TOTAL_REPAYMENT: '1032797.15',
+      NPV: null,
+      MIRR: '0.058',
+    }
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withBorrower } })
+
+    const cardCodes = wrapper.findAll('[data-test="metric-card-code"]').map((c) => c.text())
+    const cardHooks = wrapper.findAll('[data-test^="metric-"]').map((c) => c.attributes('data-test'))
+    for (const code of [
+      'BORROWER_IRR_PERIOD',
+      'BORROWER_IRR_ANNUAL',
+      'BORROWER_IRR_ANNUAL_SIMPLE',
+      'BORROWER_TOTAL_REPAYMENT',
+    ]) {
+      expect(cardCodes, `borrower code ${code} 不得进指标卡`).not.toContain(code)
+      expect(cardHooks, `borrower hook metric-${code} 不得出现在结果卡区`).not.toContain(`metric-${code}`)
+    }
+
+    const lessorList = wrapper.find('[data-test="metrics-list"]')
+    expect(lessorList.text()).not.toContain('BORROWER')
+    expect(lessorList.text()).not.toContain('借款方')
+    const lessorNames = lessorList.findAll('[data-test="metric-header-name"]').map((n) => n.text())
+    expect(lessorNames).toContain('MIRR')
+  })
+
+  it('renders no borrower section when the engine emitted no borrower metrics (lease view)', () => {
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
+
+    expect(wrapper.find('[data-test="borrower-metrics-section"]').exists()).toBe(false)
+  })
+
+  it('names the borrower section in en-US too (R121 wording in both locales)', () => {
+    setLocale('en-US')
+    const withBorrower = result()
+    withBorrower.schedule.header.metrics = {
+      ...withBorrower.schedule.header.metrics,
+      BORROWER_IRR_ANNUAL: '0.0617',
+      BORROWER_TOTAL_REPAYMENT: '1032797.15',
+    }
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: withBorrower } })
+
+    const section = wrapper.find('[data-test="borrower-metrics-section"]')
+    expect(section.text()).toContain('Borrower-side view (funding-cost indicators, not contract interest rates)')
+    expect(section.text()).not.toContain('借款方视角')
+  })
 })

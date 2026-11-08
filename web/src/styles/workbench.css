@@ -74,6 +74,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 借款方视角一节（Task 6 §6 / R121）：与出租方指标区之间要有可见的分界，
+   它不是出租方指标的一部分，只是同一张表的另一种读法。 */
+.borrower-metrics {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--fcs-hairline);
+}
+
 /* 阈值读数：数值与标记同色，颜色即状态的视觉编码（标记负责非颜色的那一份语义）。 */
 .ratio-readout {
   display: flex;

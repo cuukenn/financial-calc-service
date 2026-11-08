@@ -270,6 +270,13 @@ const enUS: typeof zhCN = {
       cashflow: 'Cash Flow',
       eir: 'Effective Interest',
     },
+    // Task 6 §6 / R121: the borrower-view section title and note (binding wording —
+    // never rephrased as a rate the contract charges).
+    borrowerSection: {
+      title: 'Borrower-side view (funding-cost indicators, not contract interest rates)',
+      note:
+        'These are labels of the same schedule read from the borrower-side cash-flow direction. They are funding-cost display aids: not interest the contract charges, and never summed with any lessor figure.',
+    },
     issues: {
       title: 'Issues',
       period: '(period {n})',
