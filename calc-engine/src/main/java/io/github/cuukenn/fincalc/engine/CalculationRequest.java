@@ -22,10 +22,13 @@ import java.util.Objects;
  *
  * <p>{@code perspective} is the {@link CashFlowPerspective} the §9.5 metric run reads (R103). A
  * {@code null} perspective is normalized to {@link CashFlowPerspective#LESSOR}, so the three-argument
- * constructor and every existing caller keep the v1 run exactly. Per R109 the scope limit holds:
- * the {@code LESSEE} view drives only the {@code BORROWER_*} metric family — it changes no
- * schedule, no cash flow and no validator behaviour, and the schedule's own cash-flow list stays
- * the lessor event table.
+ * constructor and every existing caller keep the v1 run exactly. A {@code LESSEE} run reads the
+ * mirrored flow set, so the flow-driven §9.5 codes follow that view — {@code NPV}/{@code XNPV}
+ * change sign, {@code PAYBACK_PERIOD}/{@code DISCOUNTED_PAYBACK} answer {@code null} because the
+ * first flow is money in, and the IRR family keeps the same root digit for digit — while the
+ * {@code BORROWER_*} family becomes computable. Nothing outside the metric layer reads the view:
+ * the schedule, its §9.4 event table (which stays the lessor table) and the validators are
+ * unchanged (R109/R124).
  */
 public final class CalculationRequest {
 

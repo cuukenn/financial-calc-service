@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.cuukenn.fincalc.common.time.SystemClockProvider;
 import io.github.cuukenn.fincalc.domain.calc.CalculationContext;
+import io.github.cuukenn.fincalc.domain.metric.impl.BorrowerIrrMetrics;
+import io.github.cuukenn.fincalc.domain.metric.impl.BorrowerIrrPeriodMetric;
 import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
 import io.github.cuukenn.fincalc.domain.model.CashFlow;
 import io.github.cuukenn.fincalc.domain.model.CashFlowDirection;
@@ -228,6 +230,47 @@ class CashFlowPerspectiveMetricsTest {
                 IrrCalculator.simpleAnnualize(period, 12));
     }
 
+    /**
+     * R125: the borrower root is read through, not solved again. A stub publishes a sentinel under
+     * {@code IRR_PERIOD} that is <em>not</em> this flow set's root (0.0049999991); a borrower metric
+     * that solved the mirrored set itself would answer the real root instead of the sentinel, so the
+     * equality below is direct evidence that no second solve happened.
+     */
+    @Test
+    void the_borrower_root_reads_the_recorded_irr_period_instead_of_solving_again() {
+        BigDecimal sentinel = new BigDecimal("0.1234567891");
+        MetricRegistry registry = MetricRegistry.empty()
+                .register(stubMetric(MetricCodes.IRR_PERIOD, sentinel))
+                .register(new BorrowerIrrPeriodMetric());
+
+        FinancialMetrics metrics = registry.computeAll(
+                context(flatLoanSchedule(), CashFlowPerspective.LESSEE));
+
+        assertThat(metrics.find(MetricCodes.BORROWER_IRR_PERIOD)).isEqualByComparingTo(sentinel);
+    }
+
+    /**
+     * R125 fallback: a registry that registers the borrower family without {@code IRR_PERIOD} still
+     * works — the metric solves the flipped flow set itself and lands on the same root, so the two
+     * annualizations resolve as well.
+     */
+    @Test
+    void a_borrower_family_without_irr_period_still_solves_its_root() {
+        MetricRegistry registry = MetricRegistry.empty()
+                .register(new BorrowerIrrPeriodMetric());
+        for (FinancialMetric metric : BorrowerIrrMetrics.instances()) {
+            registry.register(metric);
+        }
+
+        FinancialMetrics metrics = registry.computeAll(
+                context(flatLoanSchedule(), CashFlowPerspective.LESSEE));
+
+        assertThat(metrics.find(MetricCodes.BORROWER_IRR_PERIOD))
+                .isEqualByComparingTo("0.0049999991");
+        assertThat(metrics.find(MetricCodes.BORROWER_IRR_ANNUAL))
+                .isEqualByComparingTo("0.061677800455");
+    }
+
     /** No root in the borrower view leaves the whole borrower yield family absent, never zero. */
     @Test
     void a_borrower_view_without_a_root_leaves_all_three_yield_codes_null() {
@@ -320,6 +363,26 @@ class CashFlowPerspectiveMetricsTest {
     }
 
     // ---------------------------------------------------------------- fixtures
+
+    /** A metric that publishes a fixed value under {@code code}; used to prove a read-through. */
+    private static FinancialMetric stubMetric(String code, BigDecimal value) {
+        return new FinancialMetric() {
+            @Override
+            public String code() {
+                return code;
+            }
+
+            @Override
+            public int order() {
+                return 10;
+            }
+
+            @Override
+            public BigDecimal compute(MetricContext context) {
+                return value;
+            }
+        };
+    }
 
     private static MetricContext context(Schedule schedule, CashFlowPerspective perspective) {
         List<CashFlow> flows = schedule.cashFlows().isEmpty() ? flowsOf(schedule)

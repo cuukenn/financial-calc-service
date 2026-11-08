@@ -32,19 +32,22 @@ import java.util.Optional;
  *   <li>{@code 10} — derived straight from the schedule and element (the six totals, {@code RENTAL_RATE},
  *       {@code AVG_OUTSTANDING_BALANCE}, and the R103 borrower total {@code BORROWER_TOTAL_REPAYMENT});</li>
  *   <li>{@code 20} — the yield solvers ({@code IRR_PERIOD}, {@code IRR_ANNUAL},
- *       {@code IRR_ANNUAL_SIMPLE}, {@code MIRR}, {@code XIRR}, {@code PAYBACK_PERIOD}, and the R103
- *       borrower root {@code BORROWER_IRR_PERIOD});</li>
+ *       {@code IRR_ANNUAL_SIMPLE}, {@code MIRR}, {@code XIRR}, {@code PAYBACK_PERIOD}) plus the R103
+ *       borrower root {@code BORROWER_IRR_PERIOD}, which reads {@code IRR_PERIOD} when the run has
+ *       recorded it instead of solving the mirrored set again;</li>
  *   <li>{@code 30} — the metrics that consume a yield ({@code NPV}, {@code XNPV},
  *       {@code DISCOUNTED_PAYBACK}, the durations, {@code CONVEXITY}, {@code TRUE_ANNUAL_RATE}, and
  *       the R103 borrower annualizations {@code BORROWER_IRR_ANNUAL} /
  *       {@code BORROWER_IRR_ANNUAL_SIMPLE}).</li>
  * </ul>
  * A tier-30 metric reads its yield through {@link MetricContext#computed(String)} instead of solving
- * again, so the tier order is what makes the run cost <b>one</b> root solve per schedule rather than
- * one per metric. Ties inside a tier keep registration order, which {@link #defaults()} relies on:
- * {@code IRR_PERIOD} is registered before its annualizations, {@code XIRR} before
- * {@code TRUE_ANNUAL_RATE}, and {@code BORROWER_IRR_PERIOD} before the two borrower annualizations
- * that read it.
+ * again, so the tier order is what makes the run cost <b>one root solve per yield family</b> rather
+ * than one per metric: {@code IRR_PERIOD} pays for the §9.5 family, and the R103 borrower root reads
+ * that recorded value instead of adding a solve of its own (R125), so the borrower family costs
+ * nothing when {@code IRR_PERIOD} is present. Ties inside a tier keep registration order, which
+ * {@link #defaults()} relies on: {@code IRR_PERIOD} is registered before its annualizations and
+ * before {@code BORROWER_IRR_PERIOD}, {@code XIRR} before {@code TRUE_ANNUAL_RATE}, and
+ * {@code BORROWER_IRR_PERIOD} before the two borrower annualizations that read it.
  *
  * <p><b>Perspective (R103).</b> The borrower family reads the lessee side of the same schedule and
  * answers {@code null} on a {@link CashFlowPerspective#LESSOR} run, which is the default — so the run
@@ -83,14 +86,14 @@ public final class MetricRegistry {
         }
         registry.register(new RentalRateMetric());
         registry.register(new AverageBalanceMetric());
-        // R103: the borrower family, registered as a block — the order-20 root before the two
-        // order-30 annualizations that read it out of the run.
         registry.register(new BorrowerTotalRepaymentMetric());
-        registry.register(new BorrowerIrrPeriodMetric());
-        for (FinancialMetric metric : BorrowerIrrMetrics.instances()) {
+        // R125: IRR_PERIOD first — the borrower root reads it through instead of solving again —
+        // then the borrower root, whose two order-30 annualizations read BORROWER_IRR_PERIOD.
+        for (FinancialMetric metric : IrrMetrics.instances()) {
             registry.register(metric);
         }
-        for (FinancialMetric metric : IrrMetrics.instances()) {
+        registry.register(new BorrowerIrrPeriodMetric());
+        for (FinancialMetric metric : BorrowerIrrMetrics.instances()) {
             registry.register(metric);
         }
         registry.register(new MirrMetric());

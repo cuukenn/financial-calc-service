@@ -133,6 +133,13 @@ class MetricRegistryTest {
                 .isLessThan(sequence.indexOf(MetricCodes.IRR_ANNUAL));
         assertThat(sequence.indexOf(MetricCodes.IRR_PERIOD))
                 .isLessThan(sequence.indexOf(MetricCodes.IRR_ANNUAL_SIMPLE));
+        // R125: the borrower root reads IRR_PERIOD through, so the recorded root must exist first.
+        assertThat(sequence.indexOf(MetricCodes.IRR_PERIOD))
+                .isLessThan(sequence.indexOf(MetricCodes.BORROWER_IRR_PERIOD));
+        assertThat(sequence.indexOf(MetricCodes.BORROWER_IRR_PERIOD))
+                .isLessThan(sequence.indexOf(MetricCodes.BORROWER_IRR_ANNUAL));
+        assertThat(sequence.indexOf(MetricCodes.BORROWER_IRR_PERIOD))
+                .isLessThan(sequence.indexOf(MetricCodes.BORROWER_IRR_ANNUAL_SIMPLE));
         assertThat(sequence.indexOf(MetricCodes.XIRR))
                 .isLessThan(sequence.indexOf(MetricCodes.TRUE_ANNUAL_RATE));
         assertThat(sequence.indexOf(MetricCodes.IRR_PERIOD))

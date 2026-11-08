@@ -73,8 +73,11 @@ import java.util.stream.Stream;
  *       it from the run's own IRR; the MIRR reinvest/finance rates default inside the metric layer
  *       (R42/R44 — {@code CalculationOptions} carries no rate fields in v1, so nothing to pass).
  *       MIRR arrives already annual — nothing downstream annualizes it again (R32). The
- *       perspective is the request's (R103), defaulting to the lessor view; per R109 it only
- *       gates the {@code BORROWER_*} family and changes no schedule, cash flow or validator.</li>
+ *       perspective is the request's (R103), defaulting to the lessor view; a {@code LESSEE} run
+ *       reads the mirrored flow set, so the flow-driven §9.5 codes follow it ({@code NPV}/
+ *       {@code XNPV} negate, the payback pair answers {@code null}, the IRR family keeps the same
+ *       root) and the {@code BORROWER_*} family becomes computable. Nothing else reads it — the
+ *       schedule, its lessor §9.4 event table and the validators are unchanged (R109/R124).</li>
  *   <li><b>Step 5</b> — {@link Schedule#with}: the schedule carries the metrics and the flows.</li>
  *   <li><b>Step 6</b> — {@link ValidatorChain#validate} plus the engine's own diagnostics: every
  *       finding is appended to the schedule's issues (the schedule is immutable — the enriched
