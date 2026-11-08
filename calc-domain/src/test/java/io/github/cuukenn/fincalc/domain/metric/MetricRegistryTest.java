@@ -277,7 +277,7 @@ class MetricRegistryTest {
         for (String code : MetricCodes.ALL) {
             if (BORROWER_CODES.contains(code)) {
                 // R103: the borrower family reads the lessee side, so a LESSOR run carries it
-                // present-but-null; MetricPerspectiveTest pins its scales on a LESSEE run.
+                // present-but-null; CashFlowPerspectiveMetricsTest pins its scales on a LESSEE run.
                 assertThat(metrics.find(code)).as(code).isNull();
                 continue;
             }

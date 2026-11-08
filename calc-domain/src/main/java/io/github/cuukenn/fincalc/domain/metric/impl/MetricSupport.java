@@ -2,9 +2,9 @@ package io.github.cuukenn.fincalc.domain.metric.impl;
 
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
 import io.github.cuukenn.fincalc.domain.metric.MetricContext;
-import io.github.cuukenn.fincalc.domain.metric.MetricPerspective;
 import io.github.cuukenn.fincalc.domain.model.CashFlow;
 import io.github.cuukenn.fincalc.domain.model.CashFlowDirection;
+import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
 import java.math.BigDecimal;
@@ -38,8 +38,8 @@ final class MetricSupport {
 
     /**
      * The flow set to measure, read from the side of the transaction the caller asked for (R103):
-     * {@link MetricContext#cashFlows()} as built for {@link MetricPerspective#LESSOR}, each flow
-     * {@link #flip(CashFlow) flipped} for {@link MetricPerspective#LESSEE}.
+     * {@link MetricContext#cashFlows()} as built for {@link CashFlowPerspective#LESSOR}, each flow
+     * {@link #flip(CashFlow) flipped} for {@link CashFlowPerspective#LESSEE}.
      *
      * <p>This is the <b>single</b> place that knows the view, so no metric re-decides what a
      * perspective means and a new flow-driven metric cannot forget to ask. The flip keeps every
@@ -49,7 +49,7 @@ final class MetricSupport {
      */
     static List<CashFlow> flowsFor(MetricContext context) {
         List<CashFlow> flows = context.cashFlows();
-        if (context.perspective() == MetricPerspective.LESSOR) {
+        if (context.perspective() == CashFlowPerspective.LESSOR) {
             return flows;
         }
         List<CashFlow> flipped = new ArrayList<>(flows.size());

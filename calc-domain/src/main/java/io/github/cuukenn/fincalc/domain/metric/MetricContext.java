@@ -1,6 +1,7 @@
 package io.github.cuukenn.fincalc.domain.metric;
 
 import io.github.cuukenn.fincalc.domain.model.CashFlow;
+import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
 import java.math.BigDecimal;
@@ -28,7 +29,7 @@ import java.util.Objects;
  * needs the missing input returns {@code null} instead of failing. {@code discountRate},
  * {@code reinvestRate} and {@code financeRate} being {@code null} means "not configured", which
  * the metrics resolve from the run itself (see each metric's javadoc). A {@code null}
- * {@code perspective} is normalised to {@link MetricPerspective#LESSOR}, so no metric ever reads a
+ * {@code perspective} is normalised to {@link CashFlowPerspective#LESSOR}, so no metric ever reads a
  * missing view.
  *
  * <p><b>Yields already produced by the run.</b> A metric that consumes a yield reads it through
@@ -40,7 +41,7 @@ import java.util.Objects;
  * those follow the {@link io.github.cuukenn.fincalc.common.spi.OrderedExtension#order()} sequence.
  *
  * <p><b>Perspective (R103).</b> {@code cashFlows()} always carries the flows as the caller built
- * them — the lessor event table — and {@link MetricPerspective#LESSEE} is applied by
+ * them — the lessor event table — and {@link CashFlowPerspective#LESSEE} is applied by
  * {@code MetricSupport.flowsFor(context)}, the single place that knows the view. The perspective
  * changes <em>no</em> key: {@link #computed(String)} and {@code FinancialMetrics} stay keyed by the
  * plain codes of {@link MetricCodes}, because the two views coexist in one bag and the registry
@@ -55,11 +56,11 @@ public final class MetricContext {
     private final BigDecimal discountRate;
     private final BigDecimal reinvestRate;
     private final BigDecimal financeRate;
-    private final MetricPerspective perspective;
+    private final CashFlowPerspective perspective;
     private final Map<String, BigDecimal> computedValues;
 
     /**
-     * A lessor-view context — the v1 shape; delegates with {@link MetricPerspective#LESSOR}.
+     * A lessor-view context — the v1 shape; delegates with {@link CashFlowPerspective#LESSOR}.
      *
      * @param cashFlows     flows to measure, ordered by {@link CashFlow#sequence()}; never
      *                      {@code null}
@@ -75,7 +76,7 @@ public final class MetricContext {
             int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
             BigDecimal financeRate) {
         this(cashFlows, schedule, element, periodsPerYear, discountRate, reinvestRate, financeRate,
-                MetricPerspective.LESSOR);
+                CashFlowPerspective.LESSOR);
     }
 
     /**
@@ -90,18 +91,18 @@ public final class MetricContext {
      * @param reinvestRate  annual reinvestment rate for MIRR; {@code null} means default it
      * @param financeRate   annual finance rate for MIRR; {@code null} means default it
      * @param perspective   whose side to read; {@code null} means
-     *                      {@link MetricPerspective#LESSOR}
+     *                      {@link CashFlowPerspective#LESSOR}
      */
     public MetricContext(List<CashFlow> cashFlows, Schedule schedule, LeaseElement element,
             int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
-            BigDecimal financeRate, MetricPerspective perspective) {
+            BigDecimal financeRate, CashFlowPerspective perspective) {
         this(cashFlows, schedule, element, periodsPerYear, discountRate, reinvestRate, financeRate,
                 perspective, Collections.<String, BigDecimal>emptyMap());
     }
 
     private MetricContext(List<CashFlow> cashFlows, Schedule schedule, LeaseElement element,
             int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
-            BigDecimal financeRate, MetricPerspective perspective,
+            BigDecimal financeRate, CashFlowPerspective perspective,
             Map<String, BigDecimal> computedValues) {
         Objects.requireNonNull(cashFlows, "cashFlows");
         if (periodsPerYear < 1) {
@@ -115,7 +116,7 @@ public final class MetricContext {
         this.discountRate = discountRate;
         this.reinvestRate = reinvestRate;
         this.financeRate = financeRate;
-        this.perspective = perspective == null ? MetricPerspective.LESSOR : perspective;
+        this.perspective = perspective == null ? CashFlowPerspective.LESSOR : perspective;
         this.computedValues = computedValues;
     }
 
@@ -175,9 +176,9 @@ public final class MetricContext {
 
     /**
      * The side of the transaction the run reads its metrics from (R103); never {@code null} —
-     * an unnamed perspective is {@link MetricPerspective#LESSOR}, the v1 posture.
+     * an unnamed perspective is {@link CashFlowPerspective#LESSOR}, the v1 posture.
      */
-    public MetricPerspective perspective() {
+    public CashFlowPerspective perspective() {
         return perspective;
     }
 

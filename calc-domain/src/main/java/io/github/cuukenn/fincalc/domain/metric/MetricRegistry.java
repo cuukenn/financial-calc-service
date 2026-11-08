@@ -13,6 +13,7 @@ import io.github.cuukenn.fincalc.domain.metric.impl.PaybackMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.RentalRateMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.TotalMetrics;
 import io.github.cuukenn.fincalc.domain.metric.impl.XirrMetric;
+import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -46,7 +47,7 @@ import java.util.Optional;
  * that read it.
  *
  * <p><b>Perspective (R103).</b> The borrower family reads the lessee side of the same schedule and
- * answers {@code null} on a {@link MetricPerspective#LESSOR} run, which is the default — so the run
+ * answers {@code null} on a {@link CashFlowPerspective#LESSOR} run, which is the default — so the run
  * v1 produced is byte-for-byte what it was, with four extra present-but-null codes in the bag. The
  * registry only gates on {@link MetricContext#perspective()}; no code is prefixed per perspective,
  * because the two families coexist in one bag.

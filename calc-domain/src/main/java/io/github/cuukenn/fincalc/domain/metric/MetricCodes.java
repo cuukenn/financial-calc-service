@@ -79,21 +79,31 @@ public final class MetricCodes {
     public static final String TRUE_ANNUAL_RATE = "TRUE_ANNUAL_RATE";
 
     /**
-     * Borrower-view gross outlay, scale 2: Σ rentDue + Σ fee + Σ tax + the residual the lessee
-     * settles separately ({@code LeaseElement#residualValue()} under
-     * {@code ResidualHandling#SEPARATE}, else 0) + the deposit it pays separately
-     * ({@code LeaseElement#deposit()}). Null on a {@code LESSOR} run. A presentation aid, not a
-     * regulatory metric.
+     * Borrower-view repayment total, scale 2: Σ {@code rentDue} + the residual the lessee settles
+     * separately ({@code LeaseElement#residualValue()} under {@code ResidualHandling#SEPARATE},
+     * else 0). The rent already contains principal, interest, fee and tax, and a refundable deposit
+     * is not a repayment, so neither is added. Null on a {@code LESSOR} run. A presentation aid,
+     * not a regulatory metric.
      */
     public static final String BORROWER_TOTAL_REPAYMENT = "BORROWER_TOTAL_REPAYMENT";
 
-    /** Compound annualization of {@link #BORROWER_IRR_PERIOD}, scale 10 like the IRR family. */
+    /**
+     * Compound annualization of {@link #BORROWER_IRR_PERIOD}, scale 10 like the IRR family. The
+     * same root as {@link #IRR_ANNUAL}: it labels the borrower view, it does not reprice the deal.
+     */
     public static final String BORROWER_IRR_ANNUAL = "BORROWER_IRR_ANNUAL";
 
-    /** Simple annualization of {@link #BORROWER_IRR_PERIOD} (Excel {@code IRR()*m} convention). */
+    /**
+     * Simple annualization of {@link #BORROWER_IRR_PERIOD} (Excel {@code IRR()*m} convention); the
+     * same root as {@link #IRR_ANNUAL_SIMPLE}.
+     */
     public static final String BORROWER_IRR_ANNUAL_SIMPLE = "BORROWER_IRR_ANNUAL_SIMPLE";
 
-    /** Periodic yield of the borrower view; the one root solve the borrower family pays for. */
+    /**
+     * Periodic root of the borrower (lessee) flow set, scale 10; always equal to
+     * {@link #IRR_PERIOD}, which it is published separately from so the two annualizations can read
+     * a recorded root instead of solving again.
+     */
     public static final String BORROWER_IRR_PERIOD = "BORROWER_IRR_PERIOD";
 
     /**

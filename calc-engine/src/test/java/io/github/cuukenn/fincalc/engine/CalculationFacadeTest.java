@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.cuukenn.fincalc.common.error.BusinessException;
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetrics;
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
-import io.github.cuukenn.fincalc.domain.metric.MetricPerspective;
+import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
 import io.github.cuukenn.fincalc.domain.model.CashFlowType;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
@@ -111,15 +111,15 @@ class CalculationFacadeTest {
     @Test
     void a_lessee_request_publishes_the_borrower_family_and_leaves_the_schedule_alone() {
         assertThat(new CalculationRequest(baseElement(), null, null).perspective())
-                .isEqualTo(MetricPerspective.LESSOR);
+                .isEqualTo(CashFlowPerspective.LESSOR);
         assertThat(new CalculationRequest(baseElement(), null, null, null).perspective())
-                .isEqualTo(MetricPerspective.LESSOR);
+                .isEqualTo(CashFlowPerspective.LESSOR);
 
         CalculationResult lessor = CalculationFacade.defaults().calculate(
                 new CalculationRequest(baseElement(), null, CalculationOptions.defaults()));
         CalculationResult lessee = CalculationFacade.defaults().calculate(
                 new CalculationRequest(baseElement(), null, CalculationOptions.defaults(),
-                        MetricPerspective.LESSEE));
+                        CashFlowPerspective.LESSEE));
 
         assertThat(lessor.schedule().header().metrics()
                 .find(MetricCodes.BORROWER_TOTAL_REPAYMENT)).isNull();
@@ -148,7 +148,7 @@ class CalculationFacadeTest {
         CalculationResult r = CalculationFacade.defaults().calculate(
                 new CalculationRequest(baseElement().toBuilder()
                         .method(RepaymentMethodId.BULLET_LOAN).build(), null,
-                        CalculationOptions.defaults(), MetricPerspective.LESSEE));
+                        CalculationOptions.defaults(), CashFlowPerspective.LESSEE));
 
         FinancialMetrics m = r.schedule().header().metrics();
         assertThat(m.find(MetricCodes.BORROWER_TOTAL_REPAYMENT))

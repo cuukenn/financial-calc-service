@@ -7,6 +7,7 @@ import io.github.cuukenn.fincalc.domain.calc.CalculationContext;
 import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
 import io.github.cuukenn.fincalc.domain.model.CashFlow;
 import io.github.cuukenn.fincalc.domain.model.CashFlowDirection;
+import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.model.CashFlowType;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
 import io.github.cuukenn.fincalc.domain.model.Installment;
@@ -52,7 +53,7 @@ import org.junit.jupiter.api.Test;
  * arrears. Rents 11 × 86 066.43 + 86 066.42 = 1 032 797.15; no fees, no tax, no residual, no
  * deposit.
  */
-class MetricPerspectiveTest {
+class CashFlowPerspectiveMetricsTest {
 
     private static final LocalDate T0 = LocalDate.of(2024, 1, 1);
 
@@ -65,15 +66,15 @@ class MetricPerspectiveTest {
 
     /**
      * A run that never names a perspective is the v1 run: the 21 §9.5 codes carry the golden
-     * values (pinned here as the regression anchor for the flip) and the three {@code BORROWER_*}
+     * values (pinned here as the regression anchor for the flip) and the four {@code BORROWER_*}
      * codes are present-but-null, the registry's existing posture for a metric that cannot compute.
      */
     @Test
     void a_lessor_run_keeps_the_21_golden_codes_and_leaves_the_borrower_family_null() {
-        MetricContext context = context(flatLoanSchedule(), MetricPerspective.LESSOR);
+        MetricContext context = context(flatLoanSchedule(), CashFlowPerspective.LESSOR);
         FinancialMetrics metrics = MetricRegistry.defaults().computeAll(context);
 
-        assertThat(context.perspective()).isEqualTo(MetricPerspective.LESSOR);
+        assertThat(context.perspective()).isEqualTo(CashFlowPerspective.LESSOR);
 
         assertThat(metrics.find(MetricCodes.TOTAL_RENT)).isEqualByComparingTo("1032797.15");
         assertThat(metrics.find(MetricCodes.IRR_PERIOD)).isEqualByComparingTo("0.0049999991");
@@ -93,13 +94,13 @@ class MetricPerspectiveTest {
         MetricContext context = new MetricContext(flowsOf(schedule), schedule, element(), 12, null,
                 null, null);
 
-        assertThat(context.perspective()).isEqualTo(MetricPerspective.LESSOR);
+        assertThat(context.perspective()).isEqualTo(CashFlowPerspective.LESSOR);
     }
 
     /**
      * A {@code null} perspective must never blow up a metric run (the constructor-tolerance rule
      * the class javadoc already applies to a missing schedule and element): it normalises to
-     * {@link MetricPerspective#LESSOR}.
+     * {@link CashFlowPerspective#LESSOR}.
      */
     @Test
     void a_null_perspective_normalises_to_lessor() {
@@ -107,7 +108,7 @@ class MetricPerspectiveTest {
         MetricContext context = new MetricContext(flowsOf(schedule), schedule, element(), 12, null,
                 null, null, null);
 
-        assertThat(context.perspective()).isEqualTo(MetricPerspective.LESSOR);
+        assertThat(context.perspective()).isEqualTo(CashFlowPerspective.LESSOR);
         assertThat(MetricRegistry.defaults().computeAll(context).find(
                 MetricCodes.BORROWER_IRR_ANNUAL)).isNull();
     }
@@ -120,11 +121,11 @@ class MetricPerspectiveTest {
     void the_per_run_copy_keeps_the_perspective() {
         Schedule schedule = flatLoanSchedule();
         MetricContext lessee = new MetricContext(flowsOf(schedule), schedule, element(), 12, null,
-                null, null, MetricPerspective.LESSEE);
+                null, null, CashFlowPerspective.LESSEE);
 
         MetricContext run = lessee.withRunValues(Collections.<String, BigDecimal>emptyMap());
 
-        assertThat(run.perspective()).isEqualTo(MetricPerspective.LESSEE);
+        assertThat(run.perspective()).isEqualTo(CashFlowPerspective.LESSEE);
         assertThat(run.cashFlows()).isEqualTo(lessee.cashFlows());
     }
 
@@ -136,8 +137,8 @@ class MetricPerspectiveTest {
      *
      * <p>Hand-computed ({@code M} = 12 periods per year, root {@code i} = 0.0049999991):
      * <ul>
-     *   <li>{@code BORROWER_TOTAL_REPAYMENT} = Σ rentDue + Σ fee + Σ tax + 0 + 0 =
-     *       1 032 797.15 (the fixture carries no residual and no deposit);</li>
+     *   <li>{@code BORROWER_TOTAL_REPAYMENT} = Σ rentDue + 0 (no residual, no fee/tax on top —
+     *       they are already inside the rent) = 1 032 797.15;</li>
      *   <li>{@code BORROWER_IRR_PERIOD} = {@code i} — the flipped flow set has the same root;</li>
      *   <li>{@code BORROWER_IRR_ANNUAL} = (1 + i)^12 − 1 = 0.061677800455;</li>
      *   <li>{@code BORROWER_IRR_ANNUAL_SIMPLE} = i × 12 = 0.059999989200.</li>
@@ -145,7 +146,7 @@ class MetricPerspectiveTest {
      */
     @Test
     void a_lessee_run_publishes_the_borrower_family_next_to_the_lessor_yields() {
-        MetricContext context = context(flatLoanSchedule(), MetricPerspective.LESSEE);
+        MetricContext context = context(flatLoanSchedule(), CashFlowPerspective.LESSEE);
         FinancialMetrics metrics = MetricRegistry.defaults().computeAll(context);
 
         assertThat(metrics.find(MetricCodes.BORROWER_TOTAL_REPAYMENT))
@@ -165,14 +166,19 @@ class MetricPerspectiveTest {
         }
         assertThat(metrics.find(MetricCodes.IRR_ANNUAL))
                 .isEqualByComparingTo(metrics.find(MetricCodes.BORROWER_IRR_ANNUAL));
+        assertThat(metrics.find(MetricCodes.IRR_ANNUAL_SIMPLE))
+                .isEqualByComparingTo(metrics.find(MetricCodes.BORROWER_IRR_ANNUAL_SIMPLE));
+        assertThat(metrics.find(MetricCodes.IRR_PERIOD))
+                .isEqualByComparingTo(metrics.find(MetricCodes.BORROWER_IRR_PERIOD));
         assertThat(metrics.find(MetricCodes.TOTAL_RENT)).isEqualByComparingTo("1032797.15");
     }
 
     /**
      * The flip is a direction flip, not a sign on the amount, and the metrics read it: at a
-     * configured per-period rate the lessee NPV is the negation of the lessor one, and a flow set
-     * that starts with money in (the lessee's funded principal) has no payback period at all —
-     * §9.5's「无回收期 → null」, not 0.
+     * configured per-period rate the lessee NPV and XNPV are the negation of the lessor ones, a
+     * flow set that starts with money in (the lessee's funded principal) has no payback period at
+     * all — §9.5's「无回收期 → null」, not 0 — and the duration group is unchanged, because it
+     * weights magnitudes ({@code |CF_t|}), which a direction flip does not touch.
      */
     @Test
     void the_lessee_view_mirrors_the_present_value_and_has_no_payback() {
@@ -180,19 +186,28 @@ class MetricPerspectiveTest {
         List<CashFlow> flows = flowsOf(schedule);
         BigDecimal rate = new BigDecimal("0.005");
 
-        BigDecimal lessorNpv = MetricRegistry.defaults()
+        FinancialMetrics lessor = MetricRegistry.defaults()
                 .computeAll(new MetricContext(flows, schedule, element(), 12, rate, null, null,
-                        MetricPerspective.LESSOR))
-                .find(MetricCodes.NPV);
+                        CashFlowPerspective.LESSOR));
         FinancialMetrics lessee = MetricRegistry.defaults()
                 .computeAll(new MetricContext(flows, schedule, element(), 12, rate, null, null,
-                        MetricPerspective.LESSEE));
+                        CashFlowPerspective.LESSEE));
 
-        assertThat(lessee.find(MetricCodes.NPV)).isEqualByComparingTo(lessorNpv.negate());
+        assertThat(lessee.find(MetricCodes.NPV))
+                .isEqualByComparingTo(lessor.find(MetricCodes.NPV).negate());
+        assertThat(lessee.find(MetricCodes.XNPV))
+                .isEqualByComparingTo(lessor.find(MetricCodes.XNPV).negate());
         // -1 000 000 in, +86 066.43 … out: the running total after the first flow is positive,
         // so there is nothing to recover and both walks answer null.
         assertThat(lessee.find(MetricCodes.PAYBACK_PERIOD)).isNull();
         assertThat(lessee.find(MetricCodes.DISCOUNTED_PAYBACK)).isNull();
+        // The sensitivity block reads |CF|, so the mirror leaves it exactly where it was.
+        assertThat(lessee.find(MetricCodes.DURATION_MACAULAY))
+                .isEqualByComparingTo(lessor.find(MetricCodes.DURATION_MACAULAY));
+        assertThat(lessee.find(MetricCodes.DURATION_MODIFIED))
+                .isEqualByComparingTo(lessor.find(MetricCodes.DURATION_MODIFIED));
+        assertThat(lessee.find(MetricCodes.CONVEXITY))
+                .isEqualByComparingTo(lessor.find(MetricCodes.CONVEXITY));
     }
 
     /**
@@ -203,7 +218,7 @@ class MetricPerspectiveTest {
     @Test
     void the_borrower_annualizations_read_the_recorded_root() {
         FinancialMetrics metrics = MetricRegistry.defaults()
-                .computeAll(context(flatLoanSchedule(), MetricPerspective.LESSEE));
+                .computeAll(context(flatLoanSchedule(), CashFlowPerspective.LESSEE));
 
         BigDecimal period = metrics.find(MetricCodes.BORROWER_IRR_PERIOD);
         assertThat(period).isEqualByComparingTo("0.0049999991");
@@ -218,7 +233,7 @@ class MetricPerspectiveTest {
     void a_borrower_view_without_a_root_leaves_all_three_yield_codes_null() {
         Schedule schedule = scheduleWithSingleInflowOnly();
         MetricContext context = new MetricContext(schedule.cashFlows(), schedule, element(), 12,
-                null, null, null, MetricPerspective.LESSEE);
+                null, null, null, CashFlowPerspective.LESSEE);
 
         FinancialMetrics metrics = MetricRegistry.defaults().computeAll(context);
 
@@ -243,20 +258,15 @@ class MetricPerspectiveTest {
      *   Σ       100 000.00  1 050.00  300.00 180.00  101 530.00
      * </pre>
      *
-     * <p>plus the 5 000.00 residual settled separately ({@link ResidualHandling#SEPARATE}) and the
-     * 10 000.00 deposit collected separately = <b>117 010.00</b>. The deposit basis matters: a
-     * refundable deposit is handed over at t0 and returned at maturity, so the borrower's gross
-     * outlay counts it once (v1 has no basis that nets it off the funded principal — see the
-     * metric's javadoc).
-     *
-     * <p>The fee and tax columns are added <em>on top of</em> {@code rentDue} because R103 defines
-     * the total that way; this fixture's rows are the ones a pre-FeeAllocator schedule could carry
-     * (the v1 generators emit zero fees in the schedule and no separate VAT column), so the pinned
-     * 117 010.00 is the brief's arithmetic rather than a claim that a real rent double counts its
-     * own VAT.
+     * <p>plus the 5 000.00 residual settled separately ({@link ResidualHandling#SEPARATE}) =
+     * <b>106 530.00</b>. The fee and tax columns are <em>not</em> added on top: a row's rent already
+     * is principal + interest + fee + tax (AGENTS.md §3.4 check 4), so Σ {@code rentDue} carries
+     * them once. The 10 000.00 deposit is excluded too — v1 collects every deposit separately and
+     * refunds it at maturity, so it is a §9.4 leg rather than a repayment (R120/R123); this fixture
+     * pins that exclusion by carrying a non-zero deposit and expecting it to change nothing.
      */
     @Test
-    void total_repayment_adds_the_separately_paid_residual_and_the_deposit() {
+    void total_repayment_adds_the_separately_paid_residual_and_not_its_components() {
         LeaseElement element = element().toBuilder()
                 .periods(3)
                 .residualValue(new BigDecimal("5000"))
@@ -267,10 +277,11 @@ class MetricPerspectiveTest {
 
         FinancialMetrics metrics = MetricRegistry.defaults().computeAll(new MetricContext(
                 Collections.<CashFlow>emptyList(), schedule, element, 12, null, null, null,
-                MetricPerspective.LESSEE));
+                CashFlowPerspective.LESSEE));
 
+        // 101 530.00 rents (fee/tax already inside them) + 5 000.00 separate residual.
         assertThat(metrics.find(MetricCodes.BORROWER_TOTAL_REPAYMENT))
-                .isEqualByComparingTo("117010.00");
+                .isEqualByComparingTo("106530.00");
         assertThat(metrics.find(MetricCodes.BORROWER_TOTAL_REPAYMENT).scale()).isEqualTo(2);
     }
 
@@ -287,11 +298,11 @@ class MetricPerspectiveTest {
 
         FinancialMetrics metrics = MetricRegistry.defaults().computeAll(new MetricContext(
                 Collections.<CashFlow>emptyList(), schedule, element, 12, null, null, null,
-                MetricPerspective.LESSEE));
+                CashFlowPerspective.LESSEE));
 
-        // 101 530.00 rents + 300.00 fees + 180.00 tax + 0.00 residual + 10 000.00 deposit.
+        // 101 530.00 rents + 0.00 residual (already inside them) + 0.00 deposit (refundable).
         assertThat(metrics.find(MetricCodes.BORROWER_TOTAL_REPAYMENT))
-                .isEqualByComparingTo("112010.00");
+                .isEqualByComparingTo("101530.00");
     }
 
     /** Null-safety mirrors {@code TotalMetrics}: no schedule, no total — never a fabricated 0.00. */
@@ -299,18 +310,18 @@ class MetricPerspectiveTest {
     void total_repayment_is_absent_without_a_schedule_and_on_a_lessor_run() {
         FinancialMetrics lessor = MetricRegistry.defaults().computeAll(new MetricContext(
                 Collections.<CashFlow>emptyList(), handWrittenSchedule(), element(), 12, null, null,
-                null, MetricPerspective.LESSOR));
+                null, CashFlowPerspective.LESSOR));
         assertThat(lessor.find(MetricCodes.BORROWER_TOTAL_REPAYMENT)).isNull();
 
         FinancialMetrics noSchedule = MetricRegistry.defaults().computeAll(new MetricContext(
                 Collections.<CashFlow>emptyList(), null, element(), 12, null, null, null,
-                MetricPerspective.LESSEE));
+                CashFlowPerspective.LESSEE));
         assertThat(noSchedule.find(MetricCodes.BORROWER_TOTAL_REPAYMENT)).isNull();
     }
 
     // ---------------------------------------------------------------- fixtures
 
-    private static MetricContext context(Schedule schedule, MetricPerspective perspective) {
+    private static MetricContext context(Schedule schedule, CashFlowPerspective perspective) {
         List<CashFlow> flows = schedule.cashFlows().isEmpty() ? flowsOf(schedule)
                 : schedule.cashFlows();
         return new MetricContext(flows, schedule, element(), 12, null, null, null, perspective);

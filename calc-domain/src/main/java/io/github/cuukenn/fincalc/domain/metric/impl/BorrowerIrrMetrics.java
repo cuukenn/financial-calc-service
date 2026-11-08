@@ -3,7 +3,7 @@ package io.github.cuukenn.fincalc.domain.metric.impl;
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetric;
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
 import io.github.cuukenn.fincalc.domain.metric.MetricContext;
-import io.github.cuukenn.fincalc.domain.metric.MetricPerspective;
+import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.support.IrrCalculator;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -11,9 +11,16 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The two annual views of the borrower yield (R103): {@code BORROWER_IRR_ANNUAL} compounds the
- * periodic root and {@code BORROWER_IRR_ANNUAL_SIMPLE} multiplies it, both at order 30 and both
+ * The two annual views of the borrower-side root (R103/R121): {@code BORROWER_IRR_ANNUAL}
+ * compounds it and {@code BORROWER_IRR_ANNUAL_SIMPLE} multiplies it, both at order 30 and both
  * reading {@link BorrowerIrrPeriodMetric#BORROWER_IRR_PERIOD} out of the run.
+ *
+ * <p><b>The same numbers as the lessor family.</b> These are exact annualizations of the root
+ * {@code IRR_PERIOD} solved — a direction flip leaves every zero of NPV where it was — so
+ * {@code BORROWER_IRR_ANNUAL} equals {@code IRR_ANNUAL} and {@code BORROWER_IRR_ANNUAL_SIMPLE}
+ * equals {@code IRR_ANNUAL_SIMPLE}, digit for digit. They exist to <em>label</em> the view for a
+ * reader looking at the lessee's books; they do not reprice the contract, and no caller should
+ * read a difference between the two families as a pricing signal.
  *
  * <p>Shaped exactly like {@link IrrMetrics}, and for the same reason: the annualizations must
  * <b>never solve</b>. One root solve is about a hundred NPV evaluations, and on a 1000-period
@@ -24,7 +31,7 @@ import java.util.List;
  * <p>Registration order inside the tier is the dependency contract: {@link #instances()} must be
  * registered after {@link BorrowerIrrPeriodMetric} (see {@code MetricRegistry.defaults()}).
  *
- * <p>Both are present-but-null on a {@link MetricPerspective#LESSOR} run and when the borrower root
+ * <p>Both are present-but-null on a {@link CashFlowPerspective#LESSOR} run and when the borrower root
  * is not computable — a rate that does not exist is not zero. The annualizations themselves are
  * exact transformations of the published root, so they arrive at
  * {@link io.github.cuukenn.fincalc.common.money.MoneyScale#CALC} from {@link IrrCalculator} and are
@@ -72,7 +79,7 @@ public final class BorrowerIrrMetrics implements FinancialMetric {
 
     @Override
     public BigDecimal compute(MetricContext context) {
-        if (context.perspective() != MetricPerspective.LESSEE) {
+        if (context.perspective() != CashFlowPerspective.LESSEE) {
             return null;
         }
         BigDecimal periodIrr = context.computed(BorrowerIrrPeriodMetric.BORROWER_IRR_PERIOD);
