@@ -7,7 +7,7 @@ import App from '@/App.vue'
 import MortgageForm from '@/components/MortgageForm.vue'
 import { setLocale } from '@/i18n'
 import { mountWithI18n } from '@/test-utils/mount'
-import { activateTab } from '@/test-utils/tabs'
+import { activateTab, paneState } from '@/test-utils/tabs'
 
 vi.mock('@/api/client', () => ({
   ApiError: class ApiError extends Error {
@@ -77,22 +77,6 @@ async function submit(wrapper: VueWrapper): Promise<void> {
 function lastRequest(): CalculationRequest {
   const calls = vi.mocked(calculate).mock.calls
   return calls[calls.length - 1]![0] as CalculationRequest
-}
-
-/**
- * 场景面板的可见性语义：Tabs 只隐藏非活动面板，不销毁它（显式重置是 Task 6 的职责，
- * 隐式丢弃用户已填的要素是错的）。未访问过的面板缺席 —— AntD Tabs 懒渲染；
- * 访问过而切走的面板仍在 DOM 里但被隐藏（AntD 给它 inline display:none +
- * aria-hidden="true"），所以状态跨场景切换保留。
- */
-function paneState(wrapper: VueWrapper, selector: string): 'active' | 'hidden' | 'absent' {
-  const found = wrapper.find(selector)
-  if (!found.exists()) return 'absent'
-  const pane = found.element.closest('.ant-tabs-tabpane')
-  expect(pane, `${selector} 应在一个 TabPane 内`).toBeTruthy()
-  const element = pane as HTMLElement
-  const hidden = element.getAttribute('aria-hidden') === 'true' || element.style.display === 'none'
-  return hidden ? 'hidden' : 'active'
 }
 
 /** 归还给引擎的房贷请求只允许这 11 个键（§3），其余租赁专属键必须缺席。 */
