@@ -226,36 +226,36 @@ export const METRIC_CATALOG: Record<MetricCode, MetricInfo> = {
     nameEn: 'Borrower Periodic IRR',
     formulaZh: '解 Σ CF_t/(1+r)^t = 0（CF 取借款方现金流方向）',
     formulaEn: 'solve Σ CF_t/(1+r)^t = 0 with the borrower-side flow directions',
-    descZh: '承租方视角的期内收益率（本金流入、租金流出），与 IRR_PERIOD 同一求根口径',
+    descZh: '借款方视角的标注（本金流入、租金流出）：方向整体翻转不移动 NPV 零点，数值恒等于 IRR_PERIOD',
     descEn:
-      'Per-period yield from the lessee side (principal in, rents out), same root-finding convention as IRR_PERIOD',
+      'Borrower-side label (principal in, rents out): a direction flip leaves NPV zeros in place, so the value always equals IRR_PERIOD',
   },
   BORROWER_IRR_ANNUAL: {
-    nameZh: '借款方年化 IRR（复利）',
-    nameEn: 'Borrower Annual IRR (compounded)',
+    nameZh: '借款方视角 IRR（年化 复利）',
+    nameEn: 'Borrower-side IRR (annual, compounded)',
     formulaZh: '(1 + BORROWER_IRR_PERIOD)^m − 1',
     formulaEn: '(1 + BORROWER_IRR_PERIOD)^m − 1',
-    descZh: '读取 BORROWER_IRR_PERIOD 复利年化，不再单独求根；m 为每年期数',
+    descZh: '与 IRR_ANNUAL 同一个根的年化标注，数值逐位相等；m 为每年期数，不另求根',
     descEn:
-      'Compounded annualization of BORROWER_IRR_PERIOD (no second root solve); m is periods per year',
+      'Annualization of the same root as IRR_ANNUAL, digit-for-digit equal; m is periods per year, no second solve',
   },
   BORROWER_IRR_ANNUAL_SIMPLE: {
-    nameZh: '借款方年化 IRR（单利）',
-    nameEn: 'Borrower Annual IRR (simple)',
+    nameZh: '借款方视角 IRR（年化 单利）',
+    nameEn: 'Borrower-side IRR (annual, simple)',
     formulaZh: 'BORROWER_IRR_PERIOD × m',
     formulaEn: 'BORROWER_IRR_PERIOD × m',
-    descZh: '单利年化，对齐 Excel IRR()*12 口径',
-    descEn: 'Simple annualization, matching Excel IRR()*12',
+    descZh: '与 IRR_ANNUAL_SIMPLE 同一个根的单利标注，数值逐位相等（Excel IRR()*12 口径）',
+    descEn: 'Simple annualization of the same root as IRR_ANNUAL_SIMPLE, digit-for-digit equal (Excel IRR()*12)',
   },
   BORROWER_TOTAL_REPAYMENT: {
     nameZh: '借款方还款总额',
     nameEn: 'Borrower Total Repayment',
-    formulaZh: 'Σ rentDue + Σ fee + Σ tax + 单独支付的留购价 + 单独收取的保证金',
-    formulaEn: 'Σ rentDue + Σ fee + Σ tax + separate residual + separate deposit',
+    formulaZh: 'Σ rentDue + 单独结算的留购价',
+    formulaEn: 'Σ rentDue + separately settled residual',
     descZh:
-      '承租方视角的现金支出合计（scale 2）：留购价仅在残值单独结算时计入，残值并入租金时不重复计算',
+      '承租方需偿付的合计（scale 2）：rentDue 已含本金/利息/费用/税，不再重复相加；留购价仅在单独结算时计入，可退还的保证金不计入',
     descEn:
-      'Gross cash outlay from the lessee side (scale 2); the residual is added only when settled separately, never twice',
+      'Amount the lessee must repay (scale 2); rentDue already contains principal, interest, fee and tax, so they are not added again. The residual counts only when settled separately; a refundable deposit is not a repayment',
   },
 }
 
