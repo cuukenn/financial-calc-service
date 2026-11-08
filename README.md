@@ -51,10 +51,20 @@ EffectiveInterestTable eir = r.effectiveInterest();     // §9.7 实际利率法
 - §9.5 的 21 项（`TOTAL_*`、`NPV`/`IRR*`、久期…）按出租方（lessor）视角读现金流，即 v1 口径；
 - 借款方（承租方）视角的 4 项 `BORROWER_IRR_PERIOD`、`BORROWER_IRR_ANNUAL`、
   `BORROWER_IRR_ANNUAL_SIMPLE`、`BORROWER_TOTAL_REPAYMENT`：把同一份现金流的方向整体翻转
-  （本金由流出变流入、租金由流入变流出）后计价。
+  （本金由流出变流入、租金由流入变流出）后读取。
 
-视角由 `new CalculationRequest(element, ruleSet, options, MetricPerspective.LESSEE)` 选择，
-缺省与三参数构造均为 `MetricPerspective.LESSOR`。**默认的 LESSOR 运行与 v1 完全一致**，
+**不是两套利率，而是同一个根。** 方向整体翻转只会让 NPV 变号，不移动它的零点，所以
+`BORROWER_IRR_PERIOD / _ANNUAL / _ANNUAL_SIMPLE` 与 `IRR_PERIOD / IRR_ANNUAL /
+IRR_ANNUAL_SIMPLE` **数值逐位相等**（测试里直接断言相等）。`BORROWER_*` 的 IRR 族是给
+借款方视角做标注用的，不是另一套定价利率，不得据此判断融资成本不同。
+
+`BORROWER_TOTAL_REPAYMENT`（scale 2）= **Σ rentDue + 单独结算的留购价**
+（`ResidualHandling.SEPARATE` 时取 `residualValue`，`BALLOON_IN_RENT` 时为 0，因为留购价已在
+租金内）。`rentDue` 本身已含本金、利息、费用与税，因此不再重复加 Σ fee / Σ tax；保证金是可
+退还的 §9.4 现金流，不属于还款，也不计入。
+
+视角由 `new CalculationRequest(element, ruleSet, options, CashFlowPerspective.LESSEE)` 选择，
+缺省与三参数构造均为 `CashFlowPerspective.LESSOR`。**默认的 LESSOR 运行与 v1 完全一致**，
 只是多出 4 个显式 `null` 的 `BORROWER_*` 条目（不可计算即为 `null`，字段不省略）；
 `LESSEE` 运行下这 4 项才有值。视角只作用于指标层：计划表、现金流表、校验器一律不变（R109）。
 
