@@ -9,7 +9,13 @@
  * - 非法输入返回 null（由调用方决定校验/透传行为）。
  *
  * 精度约定：不做浮点乘除，直接对十进制字符串移位小数点，输入多少位就保留多少位。
+ *
+ * Task 5 追加（R101 / P-04）：`composeLprRate`（LPR + 加点 → 年化小数字符串）与
+ * `isLprStepAligned`（5bp 报价步长）。加法本身借用 utils/ratio 的精确十进制加法，
+ * 本模块仍是纯函数，仍然不出现 Number()/parseFloat/toFixed。
  */
+
+import { decimalAdd } from './ratio'
 
 const NUMERIC_RE = /^[+-]?\d+(\.\d+)?$/
 
@@ -35,6 +41,38 @@ function shiftDecimalLeft(numStr: string, places: number): string {
   const out = outFrac ? `${outInt}.${outFrac}` : outInt
   if (negative && out !== '0') return `-${out}`
   return out
+}
+
+/**
+ * R101/P-04：LPR + 加点 → 年化小数字符串（提交给引擎的 nominalRate）。
+ *
+ * - lprPercent 为百分数口径（'3.5' = 3.5%），按十进制移位 ÷100；
+ * - spreadBp 为基点（1bp = 0.01 个百分点），按十进制移位 ÷10000，可为负；
+ * - 只用十进制移位与精确加法（ratio.decimalAdd），不经过浮点。
+ * - 非法输入，或加分后为负（房贷年利率不可能为负）→ null，由表单阻断提交。
+ */
+export function composeLprRate(lprPercent: string, spreadBp: string): string | null {
+  const lpr = lprPercent.trim()
+  const spread = spreadBp.trim()
+  if (!NUMERIC_RE.test(lpr) || !NUMERIC_RE.test(spread)) return null
+
+  const base = shiftDecimalLeft(lpr, 2)
+  const spreadDecimal = shiftDecimalLeft(spread, 4)
+  const composed = decimalAdd(base, spreadDecimal)
+  if (composed === null || composed.startsWith('-')) return null
+  return composed
+}
+
+/**
+ * P-04：LPR 报价步长 0.05 个百分点 = 5bp。
+ *
+ * 本项目没有 LPR 数据源（用户自填 LPR 与加点），因此把步长约束加在「加点」输入上：
+ * 只接受 5bp 的整数倍（含 0 与负加点），非法即拒绝，绝不静默就近取整。
+ */
+export function isLprStepAligned(spreadBp: string): boolean {
+  const text = spreadBp.trim()
+  if (!/^[+-]?\d+$/.test(text)) return false
+  return Number.parseInt(text, 10) % 5 === 0
 }
 
 /**
