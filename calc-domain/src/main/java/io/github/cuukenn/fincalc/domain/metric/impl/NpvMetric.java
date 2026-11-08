@@ -4,6 +4,7 @@ import io.github.cuukenn.fincalc.common.money.MoneyUtils;
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetric;
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
 import io.github.cuukenn.fincalc.domain.metric.MetricContext;
+import io.github.cuukenn.fincalc.domain.model.CashFlow;
 import io.github.cuukenn.fincalc.domain.support.IrrCalculator;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -69,19 +70,20 @@ public final class NpvMetric implements FinancialMetric {
 
     @Override
     public BigDecimal compute(MetricContext context) {
-        if (context.cashFlows().isEmpty()) {
+        List<CashFlow> flows = MetricSupport.flowsFor(context);
+        if (flows.isEmpty()) {
             return null;
         }
         if (!dateBased) {
             BigDecimal periodRate = MetricSupport.periodRate(context);
             return periodRate == null
                     ? null
-                    : MoneyUtils.out(IrrCalculator.npv(context.cashFlows(), periodRate));
+                    : MoneyUtils.out(IrrCalculator.npv(flows, periodRate));
         }
         BigDecimal annualRate = annualRate(context);
         return annualRate == null
                 ? null
-                : MoneyUtils.out(IrrCalculator.xnpv(context.cashFlows(), annualRate));
+                : MoneyUtils.out(IrrCalculator.xnpv(flows, annualRate));
     }
 
     /** Effective annual rate of the configured periodic one, else the run's annual yield. */

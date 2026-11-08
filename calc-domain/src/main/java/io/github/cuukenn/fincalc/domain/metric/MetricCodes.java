@@ -78,14 +78,40 @@ public final class MetricCodes {
     /** True annual rate; v1 equals {@link #XIRR}. */
     public static final String TRUE_ANNUAL_RATE = "TRUE_ANNUAL_RATE";
 
-    /** Every built-in code, immutable, in §9.5 table order. */
+    /**
+     * Borrower-view gross outlay, scale 2: Σ rentDue + Σ fee + Σ tax + the residual the lessee
+     * settles separately ({@code LeaseElement#residualValue()} under
+     * {@code ResidualHandling#SEPARATE}, else 0) + the deposit it pays separately
+     * ({@code LeaseElement#deposit()}). Null on a {@code LESSOR} run. A presentation aid, not a
+     * regulatory metric.
+     */
+    public static final String BORROWER_TOTAL_REPAYMENT = "BORROWER_TOTAL_REPAYMENT";
+
+    /** Compound annualization of {@link #BORROWER_IRR_PERIOD}, scale 10 like the IRR family. */
+    public static final String BORROWER_IRR_ANNUAL = "BORROWER_IRR_ANNUAL";
+
+    /** Simple annualization of {@link #BORROWER_IRR_PERIOD} (Excel {@code IRR()*m} convention). */
+    public static final String BORROWER_IRR_ANNUAL_SIMPLE = "BORROWER_IRR_ANNUAL_SIMPLE";
+
+    /** Periodic yield of the borrower view; the one root solve the borrower family pays for. */
+    public static final String BORROWER_IRR_PERIOD = "BORROWER_IRR_PERIOD";
+
+    /**
+     * Every built-in code, immutable, in §9.5 table order.
+     *
+     * <p>The tail — the {@code BORROWER_*} four — is the R103 perspective extension rather than
+     * §9.5 table order: the borrower family is appended whole, in its own dependency order (the
+     * periodic root before the two annual views it feeds). A LESSOR run carries all four
+     * present-but-null.
+     */
     public static final Set<String> ALL = Collections.unmodifiableSet(new LinkedHashSet<>(
             Arrays.asList(
                     TOTAL_PRINCIPAL, TOTAL_INTEREST, TOTAL_FEE, TOTAL_TAX, TOTAL_RENT,
                     RESIDUAL_VALUE, RENTAL_RATE, NPV, XNPV, IRR_PERIOD, IRR_ANNUAL,
                     IRR_ANNUAL_SIMPLE, XIRR, MIRR, PAYBACK_PERIOD, DISCOUNTED_PAYBACK,
                     DURATION_MACAULAY, DURATION_MODIFIED, CONVEXITY, AVG_OUTSTANDING_BALANCE,
-                    TRUE_ANNUAL_RATE)));
+                    TRUE_ANNUAL_RATE, BORROWER_IRR_PERIOD, BORROWER_IRR_ANNUAL,
+                    BORROWER_IRR_ANNUAL_SIMPLE, BORROWER_TOTAL_REPAYMENT)));
 
     private MetricCodes() {
     }

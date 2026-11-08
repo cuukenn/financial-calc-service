@@ -2,6 +2,9 @@ package io.github.cuukenn.fincalc.domain.metric;
 
 import io.github.cuukenn.fincalc.common.spi.ExtensionRegistry;
 import io.github.cuukenn.fincalc.domain.metric.impl.AverageBalanceMetric;
+import io.github.cuukenn.fincalc.domain.metric.impl.BorrowerIrrMetrics;
+import io.github.cuukenn.fincalc.domain.metric.impl.BorrowerIrrPeriodMetric;
+import io.github.cuukenn.fincalc.domain.metric.impl.BorrowerTotalRepaymentMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.DurationMetrics;
 import io.github.cuukenn.fincalc.domain.metric.impl.IrrMetrics;
 import io.github.cuukenn.fincalc.domain.metric.impl.MirrMetric;
@@ -26,17 +29,27 @@ import java.util.Optional;
  * contract, not cosmetics:
  * <ul>
  *   <li>{@code 10} — derived straight from the schedule and element (the six totals, {@code RENTAL_RATE},
- *       {@code AVG_OUTSTANDING_BALANCE});</li>
+ *       {@code AVG_OUTSTANDING_BALANCE}, and the R103 borrower total {@code BORROWER_TOTAL_REPAYMENT});</li>
  *   <li>{@code 20} — the yield solvers ({@code IRR_PERIOD}, {@code IRR_ANNUAL},
- *       {@code IRR_ANNUAL_SIMPLE}, {@code MIRR}, {@code XIRR}, {@code PAYBACK_PERIOD});</li>
+ *       {@code IRR_ANNUAL_SIMPLE}, {@code MIRR}, {@code XIRR}, {@code PAYBACK_PERIOD}, and the R103
+ *       borrower root {@code BORROWER_IRR_PERIOD});</li>
  *   <li>{@code 30} — the metrics that consume a yield ({@code NPV}, {@code XNPV},
- *       {@code DISCOUNTED_PAYBACK}, the durations, {@code CONVEXITY}, {@code TRUE_ANNUAL_RATE}).</li>
+ *       {@code DISCOUNTED_PAYBACK}, the durations, {@code CONVEXITY}, {@code TRUE_ANNUAL_RATE}, and
+ *       the R103 borrower annualizations {@code BORROWER_IRR_ANNUAL} /
+ *       {@code BORROWER_IRR_ANNUAL_SIMPLE}).</li>
  * </ul>
  * A tier-30 metric reads its yield through {@link MetricContext#computed(String)} instead of solving
  * again, so the tier order is what makes the run cost <b>one</b> root solve per schedule rather than
  * one per metric. Ties inside a tier keep registration order, which {@link #defaults()} relies on:
- * {@code IRR_PERIOD} is registered before its annualizations, and {@code XIRR} before
- * {@code TRUE_ANNUAL_RATE}.
+ * {@code IRR_PERIOD} is registered before its annualizations, {@code XIRR} before
+ * {@code TRUE_ANNUAL_RATE}, and {@code BORROWER_IRR_PERIOD} before the two borrower annualizations
+ * that read it.
+ *
+ * <p><b>Perspective (R103).</b> The borrower family reads the lessee side of the same schedule and
+ * answers {@code null} on a {@link MetricPerspective#LESSOR} run, which is the default — so the run
+ * v1 produced is byte-for-byte what it was, with four extra present-but-null codes in the bag. The
+ * registry only gates on {@link MetricContext#perspective()}; no code is prefixed per perspective,
+ * because the two families coexist in one bag.
  *
  * <p><b>A metric that fails is recorded, not propagated.</b> This is a deliberate deviation from the
  * brief's「单个指标异常只记 WARN 并跳过」: no logger exists in this build (nothing in
@@ -57,8 +70,8 @@ public final class MetricRegistry {
     }
 
     /**
-     * A registry with the full §9.5 built-in set: the 21 codes of {@link MetricCodes#ALL}, nothing
-     * else.
+     * A registry with the full built-in set: the 25 codes of {@link MetricCodes#ALL} — the §9.5
+     * table plus the R103 borrower family — nothing else.
      *
      * @return a fresh registry; registering a metric with an existing code replaces it
      */
@@ -69,6 +82,13 @@ public final class MetricRegistry {
         }
         registry.register(new RentalRateMetric());
         registry.register(new AverageBalanceMetric());
+        // R103: the borrower family, registered as a block — the order-20 root before the two
+        // order-30 annualizations that read it out of the run.
+        registry.register(new BorrowerTotalRepaymentMetric());
+        registry.register(new BorrowerIrrPeriodMetric());
+        for (FinancialMetric metric : BorrowerIrrMetrics.instances()) {
+            registry.register(metric);
+        }
         for (FinancialMetric metric : IrrMetrics.instances()) {
             registry.register(metric);
         }

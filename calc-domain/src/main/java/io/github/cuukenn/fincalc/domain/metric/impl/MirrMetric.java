@@ -38,7 +38,7 @@ public final class MirrMetric implements FinancialMetric {
 
     @Override
     public BigDecimal compute(MetricContext context) {
-        List<CashFlow> flows = context.cashFlows();
+        List<CashFlow> flows = MetricSupport.flowsFor(context);
         if (flows.isEmpty()) {
             return null;
         }

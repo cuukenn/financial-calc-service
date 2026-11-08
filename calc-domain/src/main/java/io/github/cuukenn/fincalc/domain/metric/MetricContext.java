@@ -12,7 +12,8 @@ import java.util.Objects;
 
 /**
  * Everything the §9.5 metrics read: the schedule, its cash flows, the lease element, the period
- * frequency and the three configurable rates.
+ * frequency, the three configurable rates and the perspective whose side of the transaction they
+ * are read from.
  *
  * <p><b>Rate units — this is where a silent bug hides.</b> {@link #discountRate()} is a
  * <b>per-period</b> rate, the same unit as {@link MetricCodes#IRR_PERIOD}, because
@@ -26,7 +27,9 @@ import java.util.Objects;
  * may be {@code null} for a caller that only wants the flow-driven metrics, and every metric that
  * needs the missing input returns {@code null} instead of failing. {@code discountRate},
  * {@code reinvestRate} and {@code financeRate} being {@code null} means "not configured", which
- * the metrics resolve from the run itself (see each metric's javadoc).
+ * the metrics resolve from the run itself (see each metric's javadoc). A {@code null}
+ * {@code perspective} is normalised to {@link MetricPerspective#LESSOR}, so no metric ever reads a
+ * missing view.
  *
  * <p><b>Yields already produced by the run.</b> A metric that consumes a yield reads it through
  * {@link #computed(String)} rather than solving for it again — one root solve is roughly a hundred
@@ -35,6 +38,13 @@ import java.util.Objects;
  * #computed(String)} answers {@code null} for every code; only the per-run copy
  * {@link MetricRegistry} installs during {@link MetricRegistry#computeAll} carries values, and
  * those follow the {@link io.github.cuukenn.fincalc.common.spi.OrderedExtension#order()} sequence.
+ *
+ * <p><b>Perspective (R103).</b> {@code cashFlows()} always carries the flows as the caller built
+ * them — the lessor event table — and {@link MetricPerspective#LESSEE} is applied by
+ * {@code MetricSupport.flowsFor(context)}, the single place that knows the view. The perspective
+ * changes <em>no</em> key: {@link #computed(String)} and {@code FinancialMetrics} stay keyed by the
+ * plain codes of {@link MetricCodes}, because the two views coexist in one bag and the registry
+ * gates each family on {@link #perspective()} instead of on a code prefix.
  */
 public final class MetricContext {
 
@@ -45,9 +55,12 @@ public final class MetricContext {
     private final BigDecimal discountRate;
     private final BigDecimal reinvestRate;
     private final BigDecimal financeRate;
+    private final MetricPerspective perspective;
     private final Map<String, BigDecimal> computedValues;
 
     /**
+     * A lessor-view context — the v1 shape; delegates with {@link MetricPerspective#LESSOR}.
+     *
      * @param cashFlows     flows to measure, ordered by {@link CashFlow#sequence()}; never
      *                      {@code null}
      * @param schedule      schedule the totals and balances read; may be {@code null}
@@ -62,12 +75,34 @@ public final class MetricContext {
             int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
             BigDecimal financeRate) {
         this(cashFlows, schedule, element, periodsPerYear, discountRate, reinvestRate, financeRate,
-                Collections.<String, BigDecimal>emptyMap());
+                MetricPerspective.LESSOR);
+    }
+
+    /**
+     * A context that reads the metrics from {@code perspective}'s side of the transaction.
+     *
+     * @param cashFlows     flows as the caller built them (the lessor event table); never
+     *                      {@code null}
+     * @param schedule      schedule the totals and balances read; may be {@code null}
+     * @param element       lease element the rates and residual read; may be {@code null}
+     * @param periodsPerYear periods per year; at least 1
+     * @param discountRate  per-period discount rate; {@code null} means derive it from the run
+     * @param reinvestRate  annual reinvestment rate for MIRR; {@code null} means default it
+     * @param financeRate   annual finance rate for MIRR; {@code null} means default it
+     * @param perspective   whose side to read; {@code null} means
+     *                      {@link MetricPerspective#LESSOR}
+     */
+    public MetricContext(List<CashFlow> cashFlows, Schedule schedule, LeaseElement element,
+            int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
+            BigDecimal financeRate, MetricPerspective perspective) {
+        this(cashFlows, schedule, element, periodsPerYear, discountRate, reinvestRate, financeRate,
+                perspective, Collections.<String, BigDecimal>emptyMap());
     }
 
     private MetricContext(List<CashFlow> cashFlows, Schedule schedule, LeaseElement element,
             int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
-            BigDecimal financeRate, Map<String, BigDecimal> computedValues) {
+            BigDecimal financeRate, MetricPerspective perspective,
+            Map<String, BigDecimal> computedValues) {
         Objects.requireNonNull(cashFlows, "cashFlows");
         if (periodsPerYear < 1) {
             throw new IllegalArgumentException("periodsPerYear must be at least 1: "
@@ -80,6 +115,7 @@ public final class MetricContext {
         this.discountRate = discountRate;
         this.reinvestRate = reinvestRate;
         this.financeRate = financeRate;
+        this.perspective = perspective == null ? MetricPerspective.LESSOR : perspective;
         this.computedValues = computedValues;
     }
 
@@ -89,12 +125,16 @@ public final class MetricContext {
      * {@link io.github.cuukenn.fincalc.common.spi.OrderedExtension#order()} sequence. One copy per run, not per
      * metric, so every metric sees the same accumulated results.
      *
+     * <p>The copy carries {@link #perspective()} unchanged: the tier-20/30 metrics of the run must
+     * read the same side of the transaction the caller asked for, and dropping it here would make
+     * the whole run silently answer as a lessor.
+     *
      * <p>Package-private on purpose: only the registry assembles a run, and a metric is never
      * allowed to install its own dependencies.
      */
     MetricContext withRunValues(Map<String, BigDecimal> runValues) {
         return new MetricContext(cashFlows, schedule, element, periodsPerYear, discountRate,
-                reinvestRate, financeRate,
+                reinvestRate, financeRate, perspective,
                 Objects.requireNonNull(runValues, "runValues"));
     }
 
@@ -131,6 +171,14 @@ public final class MetricContext {
     /** Annual finance rate for MIRR, or {@code null} when the run must default it. */
     public BigDecimal financeRate() {
         return financeRate;
+    }
+
+    /**
+     * The side of the transaction the run reads its metrics from (R103); never {@code null} —
+     * an unnamed perspective is {@link MetricPerspective#LESSOR}, the v1 posture.
+     */
+    public MetricPerspective perspective() {
+        return perspective;
     }
 
     /**

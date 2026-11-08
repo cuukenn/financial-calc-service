@@ -76,7 +76,8 @@ public final class DurationMetrics implements FinancialMetric {
 
     @Override
     public BigDecimal compute(MetricContext context) {
-        if (context.cashFlows().isEmpty()) {
+        List<CashFlow> flows = MetricSupport.flowsFor(context);
+        if (flows.isEmpty()) {
             return null;
         }
         BigDecimal rate = MetricSupport.periodRate(context);
@@ -91,7 +92,7 @@ public final class DurationMetrics implements FinancialMetric {
         BigDecimal presentValues = BigDecimal.ZERO;
         BigDecimal timeWeighted = BigDecimal.ZERO;
         BigDecimal convexWeighted = BigDecimal.ZERO;
-        for (CashFlow flow : context.cashFlows()) {
+        for (CashFlow flow : flows) {
             BigDecimal periods = BigDecimal.valueOf(flow.sequence());
             BigDecimal present = flow.amount().divide(growth.pow(flow.sequence(), MetricSupport.MC),
                     MetricSupport.MC);

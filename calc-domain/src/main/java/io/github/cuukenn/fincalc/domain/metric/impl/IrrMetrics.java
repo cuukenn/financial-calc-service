@@ -24,6 +24,12 @@ import java.util.List;
  * {@code ctx.computed(IRR_PERIOD)} instead, which is the value {@code IRR_PERIOD} published at its
  * §9.5 scale of 10 — the same number the output carries, so no metric can disagree with it.
  *
+ * <p><b>Perspective (R103).</b> The flows come from {@link MetricSupport#flowsFor(MetricContext)},
+ * so a {@code LESSEE} run solves the same root over the mirrored flow set and publishes it under the
+ * same {@code IRR_*} codes — the perspective flips the direction of the money, and a global sign flip
+ * leaves the zeros of NPV where they were. The borrower family keeps its own record
+ * ({@code BORROWER_IRR_PERIOD}) so a caller can tell which view asked.
+ *
  * <p>Scale: {@code IRR_PERIOD} is rounded to {@link io.github.cuukenn.fincalc.common.money.MoneyScale#INTERMEDIATE};
  * the annual pair arrives from {@link IrrCalculator} already at {@link
  * io.github.cuukenn.fincalc.common.money.MoneyScale#CALC} and is passed through unrounded, because rounding an
@@ -76,7 +82,7 @@ public final class IrrMetrics implements FinancialMetric {
 
     @Override
     public BigDecimal compute(MetricContext context) {
-        List<CashFlow> flows = context.cashFlows();
+        List<CashFlow> flows = MetricSupport.flowsFor(context);
         if (flows.isEmpty()) {
             return null;
         }

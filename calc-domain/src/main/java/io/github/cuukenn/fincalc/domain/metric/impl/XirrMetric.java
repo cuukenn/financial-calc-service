@@ -72,7 +72,7 @@ public final class XirrMetric implements FinancialMetric {
         if (!solver) {
             return context.computed(MetricCodes.XIRR);
         }
-        List<CashFlow> flows = context.cashFlows();
+        List<CashFlow> flows = MetricSupport.flowsFor(context);
         if (flows.isEmpty()) {
             return null;
         }

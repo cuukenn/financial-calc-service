@@ -24,6 +24,7 @@ import io.github.cuukenn.fincalc.domain.support.daycount.Thirty360;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +33,11 @@ import org.junit.jupiter.api.Test;
 class MetricRegistryTest {
 
     private static final LocalDate T0 = LocalDate.of(2024, 1, 1);
+
+    /** R103: the borrower-view family, present-but-null on every LESSOR run. */
+    private static final Set<String> BORROWER_CODES = new LinkedHashSet<>(Arrays.asList(
+            MetricCodes.BORROWER_TOTAL_REPAYMENT, MetricCodes.BORROWER_IRR_PERIOD,
+            MetricCodes.BORROWER_IRR_ANNUAL, MetricCodes.BORROWER_IRR_ANNUAL_SIMPLE));
 
     @Test
     void computes_all_builtin_metrics() {
@@ -83,15 +89,15 @@ class MetricRegistryTest {
                 .isEqualByComparingTo("42");
     }
 
-    /** {@link MetricCodes#ALL} and {@link MetricRegistry#defaults()} describe the same 21 codes. */
+    /** {@link MetricCodes#ALL} and {@link MetricRegistry#defaults()} describe the same 25 codes. */
     @Test
     void builtin_registry_covers_exactly_the_spec_metric_set() {
         Set<String> registered = new LinkedHashSet<>();
         for (FinancialMetric metric : MetricRegistry.defaults().metrics()) {
             registered.add(metric.code());
         }
-        assertThat(MetricCodes.ALL).hasSize(21);
-        assertThat(registered).hasSize(21);
+        assertThat(MetricCodes.ALL).hasSize(25);
+        assertThat(registered).hasSize(25);
         assertThat(registered).containsExactlyInAnyOrderElementsOf(MetricCodes.ALL);
     }
 
@@ -269,6 +275,12 @@ class MetricRegistryTest {
         FinancialMetrics metrics = MetricRegistry.defaults().computeAll(context(flatLoanSchedule()));
 
         for (String code : MetricCodes.ALL) {
+            if (BORROWER_CODES.contains(code)) {
+                // R103: the borrower family reads the lessee side, so a LESSOR run carries it
+                // present-but-null; MetricPerspectiveTest pins its scales on a LESSEE run.
+                assertThat(metrics.find(code)).as(code).isNull();
+                continue;
+            }
             assertThat(metrics.find(code)).as(code).isNotNull();
         }
         assertThat(metrics.find(MetricCodes.TOTAL_PRINCIPAL).scale()).isEqualTo(2);

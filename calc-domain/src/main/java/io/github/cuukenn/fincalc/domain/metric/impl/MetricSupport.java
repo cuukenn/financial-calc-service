@@ -2,18 +2,21 @@ package io.github.cuukenn.fincalc.domain.metric.impl;
 
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
 import io.github.cuukenn.fincalc.domain.metric.MetricContext;
+import io.github.cuukenn.fincalc.domain.metric.MetricPerspective;
 import io.github.cuukenn.fincalc.domain.model.CashFlow;
 import io.github.cuukenn.fincalc.domain.model.CashFlowDirection;
 import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * Arithmetic shared by the built-in metrics: the signed view of a flow, the inputs a context may
- * be missing, and the one rate lookup that must not solve for a yield a second time.
+ * Arithmetic shared by the built-in metrics: the signed view of a flow, the side of the
+ * transaction the flows are read from, the inputs a context may be missing, and the one rate lookup
+ * that must not solve for a yield a second time.
  *
  * <p>Division always goes through {@link MathContext#DECIMAL128} or an explicit scale: an unguarded
  * {@code divide} throws {@link ArithmeticException} on a non-terminating quotient, which in a metric
@@ -34,9 +37,49 @@ final class MetricSupport {
     }
 
     /**
+     * The flow set to measure, read from the side of the transaction the caller asked for (R103):
+     * {@link MetricContext#cashFlows()} as built for {@link MetricPerspective#LESSOR}, each flow
+     * {@link #flip(CashFlow) flipped} for {@link MetricPerspective#LESSEE}.
+     *
+     * <p>This is the <b>single</b> place that knows the view, so no metric re-decides what a
+     * perspective means and a new flow-driven metric cannot forget to ask. The flip keeps every
+     * amount positive (AGENTS.md 补充口径规则 3) and moves the sign into
+     * {@link CashFlow#direction()}, so {@link #signed(CashFlow)} negates by construction and the
+     * same {@link io.github.cuukenn.fincalc.domain.support.IrrCalculator} runs on either side.
+     */
+    static List<CashFlow> flowsFor(MetricContext context) {
+        List<CashFlow> flows = context.cashFlows();
+        if (context.perspective() == MetricPerspective.LESSOR) {
+            return flows;
+        }
+        List<CashFlow> flipped = new ArrayList<>(flows.size());
+        for (CashFlow flow : flows) {
+            flipped.add(flip(flow));
+        }
+        return Collections.unmodifiableList(flipped);
+    }
+
+    /**
+     * The same event seen from the other side: same {@code sequence}, {@code date}, {@code type}
+     * and <b>same non-negative amount</b>, opposite {@link CashFlowDirection}.
+     *
+     * <p>A mirrored view is expressed by the direction field, never by a negative amount: a
+     * negated amount would be negated a second time by {@link #signed(CashFlow)} and silently
+     * invert the whole yield (design document §9.4 review focus 6).
+     */
+    static CashFlow flip(CashFlow flow) {
+        return new CashFlow(flow.sequence(), flow.date(), flow.amount(), flow.type(),
+                flow.direction() == CashFlowDirection.INFLOW
+                        ? CashFlowDirection.OUTFLOW
+                        : CashFlowDirection.INFLOW);
+    }
+
+    /**
      * INFLOW positive, OUTFLOW negative — the convention {@link
      * io.github.cuukenn.fincalc.domain.support.IrrCalculator} uses, so a metric never disagrees with the yields
-     * about which side of the lease a flow belongs to.
+     * about which side of the lease a flow belongs to. A flow taken from
+     * {@link #flowsFor(MetricContext)} on the lessee side contributes the negated amount, which is
+     * exactly the mirror image of the lessor run.
      */
     static BigDecimal signed(CashFlow flow) {
         return flow.direction() == CashFlowDirection.INFLOW ? flow.amount() : flow.amount().negate();
