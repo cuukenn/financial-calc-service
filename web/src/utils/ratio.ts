@@ -247,9 +247,35 @@ export function exceedsLimit(value: string | null, limit: string): boolean {
   return value !== null && compareDecimal(value, limit) > 0
 }
 
-/** 比例类指标是否低于下限（恰好等于下限不算未达标：「以上」含本数）。 */
+/**
+ * 比例类指标是否低于下限（恰好等于下限不算未达标：「以上」含本数）。
+ *
+ * 注意：null 只代表「该比例不可计算」，本比较器不替调用方决定放不放行 ——
+ * 不可计算的监管阈值必须阻断（AGENTS.md §2.3「阈值即硬约束」、§9.5 的不可计算姿态），
+ * 所以提交闸门请用 downPaymentFloorBlocked，不要直接拿本函数的 false 当放行。
+ */
 export function belowFloor(value: string | null, floor: string): boolean {
   return value !== null && compareDecimal(value, floor) < 0
+}
+
+/**
+ * 首付比例硬下限闸门（AGENTS.md §2.3：首付比例 ≥ 15%，全国统一下限）。
+ *
+ * 三种情况都阻断：
+ * 1. 抵押物价值缺失（成交价 / 评估价不可解析）；
+ * 2. 抵押物价值不大于 0（0 或负数）—— 此时贷款成数与首付比例都是「—」；
+ * 3. 首付比例算得出且低于下限。
+ * 恰好等于下限放行（「以上」含本数），比较用未舍入原值（P-10），不得先舍入再判限。
+ */
+export function downPaymentFloorBlocked(
+  loanAmount: string,
+  collateral: string | null,
+  floor: string,
+): boolean {
+  if (collateral === null || !isPositiveDecimal(collateral)) return true
+  const ratio = downPaymentRatio(loanAmount, collateral)
+  if (ratio === null) return true
+  return belowFloor(ratio, floor)
 }
 
 /**

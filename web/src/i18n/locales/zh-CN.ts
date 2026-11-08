@@ -167,6 +167,9 @@ const zhCN = {
       bulletOnly: '「到期一次还本付息」仅在贷款期限 ≤ {max} 个月时可选（金规〔2026〕5号：期限 ≤ 1 年可到期一次还本付息）。',
       bulletReset: '贷款期限超过 {max} 个月：「到期一次还本付息」不可选，已重置为等额本息（前端规则，引擎未校验）。',
       downPaymentFloor: '首付比例低于下限 {min}（当前 {actual}）：已阻止提交（该下限由前端校验，引擎未校验）。',
+      // AGENTS.md §2.3「阈值即硬约束」：不可判定的下限不得静默放行。
+      downPaymentFloorNotEvaluable:
+        '抵押物价值不大于 0（成交价与评估价孰低），贷款成数（LTV）与首付比例无法计算：首付比例 ≥ {min} 的下限无法判定，已阻止提交（该下限由前端校验，引擎未校验）。',
       rateNotComposable: '无法由 LPR 与加点组合出年利率，请检查输入。',
     },
     validation: {

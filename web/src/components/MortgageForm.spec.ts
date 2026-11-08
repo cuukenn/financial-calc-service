@@ -423,6 +423,25 @@ describe('MortgageForm 首付 / LTV gate (AGENTS.md §2.3: 首付 ≥ 15%)', () 
     expect(calculate).not.toHaveBeenCalled()
     expect(wrapper.find('[data-test="mortgage-local-error"]').text()).toContain('15%')
   })
+
+  it('blocks submit when 抵押物价值 is 0: an unevaluable floor is not a pass', async () => {
+    const wrapper = mountWithI18n(MortgageForm)
+    // 成交价 = 评估价 = 0 → 抵押物价值 0 → 贷款成数与首付比例都是「—」。
+    await wrapper.find('[data-test="mortgage-transaction-price"]').setValue('0')
+    await wrapper.find('[data-test="mortgage-appraisal-value"]').setValue('0')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="mortgage-collateral-value"]').text()).toContain('0.00')
+    expect(wrapper.find('[data-test="mortgage-ltv-value"]').text()).toBe('—')
+    expect(wrapper.find('[data-test="mortgage-down-payment-value"]').text()).toBe('—')
+
+    await submit(wrapper)
+    // AGENTS.md §2.3「阈值即硬约束」：无法判定的下限必须阻断，并说明为什么无法判定。
+    expect(calculate).not.toHaveBeenCalled()
+    const message = wrapper.find('[data-test="mortgage-local-error"]').text()
+    expect(message).toContain('15%')
+    expect(message).toContain('抵押物价值')
+  })
 })
 
 describe('MortgageForm DTI (AGENTS.md §2.2: 50% / 60%)', () => {

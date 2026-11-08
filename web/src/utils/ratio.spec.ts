@@ -12,6 +12,7 @@ import {
   decimalAdd,
   decimalDivide,
   decimalSubtract,
+  downPaymentFloorBlocked,
   downPaymentRatio,
   exceedsLimit,
   formatDecimalPercent,
@@ -113,7 +114,21 @@ describe('collateral value / LTV / 首付比例 (AGENTS.md §2.2)', () => {
     expect(MIN_DOWN_PAYMENT_RATIO).toBe('0.15')
     expect(belowFloor(downPaymentRatio('2380000', '2800000'), MIN_DOWN_PAYMENT_RATIO)).toBe(false)
     expect(belowFloor(downPaymentRatio('2380280', '2800000'), MIN_DOWN_PAYMENT_RATIO)).toBe(true)
+    // 比较器本身只说「低于下限」：null 表示不可计算，不替调用方决定阻断。
     expect(belowFloor(null, MIN_DOWN_PAYMENT_RATIO)).toBe(false)
+  })
+
+  it('blocks the submit gate when the floor cannot be evaluated (AGENTS.md §2.3)', () => {
+    // 阈值即硬约束：不可计算的阈值视为未满足，不得静默放行（§9.5 姿态）。
+    expect(downPaymentFloorBlocked('2380000', '2800000', MIN_DOWN_PAYMENT_RATIO)).toBe(false)
+    expect(downPaymentFloorBlocked('2380280', '2800000', MIN_DOWN_PAYMENT_RATIO)).toBe(true)
+    // 抵押物价值为 0 / 缺失 / 非正 → 贷款成数与首付比例都是「—」，闸门必须阻断。
+    expect(downPaymentFloorBlocked('2380000', '0', MIN_DOWN_PAYMENT_RATIO)).toBe(true)
+    expect(downPaymentFloorBlocked('2380000', '0.00', MIN_DOWN_PAYMENT_RATIO)).toBe(true)
+    expect(downPaymentFloorBlocked('2380000', '-2800000', MIN_DOWN_PAYMENT_RATIO)).toBe(true)
+    expect(downPaymentFloorBlocked('2380000', null, MIN_DOWN_PAYMENT_RATIO)).toBe(true)
+    // 贷款金额本身不可解析时也不放行：首付比例算不出来就是「无法判定」。
+    expect(downPaymentFloorBlocked('1,000,000', '2800000', MIN_DOWN_PAYMENT_RATIO)).toBe(true)
   })
 })
 

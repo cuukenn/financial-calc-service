@@ -167,6 +167,9 @@ const enUS: typeof zhCN = {
       bulletOnly: 'Bullet (principal and interest at maturity) is selectable only when the term is ≤ {max} months (金规〔2026〕5号: only terms ≤ 1 year may repay at maturity).',
       bulletReset: 'Term exceeds {max} months: bullet repayment is not selectable and the choice was reset to equal installments (front-end rule, not engine-validated).',
       downPaymentFloor: 'Down payment ratio is below the {min} floor (currently {actual}): submit is blocked (front-end floor, not engine-validated).',
+      // AGENTS.md §2.3 "the threshold is a hard constraint": an unevaluable floor must not pass silently.
+      downPaymentFloorNotEvaluable:
+        'The collateral value is not greater than 0 (the lower of transaction price and appraised value), so LTV and the down payment ratio cannot be computed: the {min} down payment floor cannot be evaluated and submit is blocked (front-end floor, not engine-validated).',
       rateNotComposable: 'The annual rate cannot be composed from the LPR and the spread, check the inputs.',
     },
     validation: {

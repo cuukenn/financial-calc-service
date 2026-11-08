@@ -38,8 +38,8 @@ import { formatMoney } from '@/utils/format'
 import { composeLprRate } from '@/utils/rate'
 import {
   MIN_DOWN_PAYMENT_RATIO,
-  belowFloor,
   collateralValue,
+  downPaymentFloorBlocked,
   downPaymentRatio,
   formatDecimalPercent,
   loanToValue,
@@ -183,11 +183,17 @@ function buildRequest(annualRateDecimal: string): CalculationRequest {
 /** AntD Form 的 @finish 只在内置校验通过后触发；此处再跑前端 [法] 门槛。 */
 async function onFinish(): Promise<void> {
   // 首付硬下限 15%：用未舍入原值比较（P-10），恰好 15% 放行（「以上」含本数）。
-  if (belowFloor(downPayment.value, MIN_DOWN_PAYMENT_RATIO)) {
-    localError.value = t('mortgage.gates.downPaymentFloor', {
-      min: formatDecimalPercent(MIN_DOWN_PAYMENT_RATIO, 0),
-      actual: formatDecimalPercent(downPayment.value),
-    })
+  // 抵押物价值缺失或 ≤ 0 时贷款成数（LTV）/首付比例不可计算 —— 无法判定的
+  // 硬下限必须阻断而不是放行（AGENTS.md §2.3「阈值即硬约束」、§9.5 不可计算姿态）。
+  const floorText = formatDecimalPercent(MIN_DOWN_PAYMENT_RATIO, 0)
+  if (downPaymentFloorBlocked(form.principal, collateral.value, MIN_DOWN_PAYMENT_RATIO)) {
+    localError.value =
+      downPayment.value === null
+        ? t('mortgage.gates.downPaymentFloorNotEvaluable', { min: floorText })
+        : t('mortgage.gates.downPaymentFloor', {
+            min: floorText,
+            actual: formatDecimalPercent(downPayment.value),
+          })
     return
   }
   // R109 兜底：期限 > 12 月时 BULLET_LOAN 不可能被提交（选项已禁用并被 watch 重置）。
