@@ -9,7 +9,7 @@ import {
   metricTooltip,
 } from './metricCatalog'
 
-/** §9.5 指标表全量 21 项（与设计文档表格一一对应）。 */
+/** 全量 25 项：§9.5 指标表 21 项（与设计文档表格一一对应）+ R103 借款方视角家族 4 项。 */
 const EXPECTED_CODES = [
   'TOTAL_PRINCIPAL',
   'TOTAL_INTEREST',
@@ -32,15 +32,19 @@ const EXPECTED_CODES = [
   'CONVEXITY',
   'AVG_OUTSTANDING_BALANCE',
   'TRUE_ANNUAL_RATE',
+  'BORROWER_IRR_PERIOD',
+  'BORROWER_IRR_ANNUAL',
+  'BORROWER_IRR_ANNUAL_SIMPLE',
+  'BORROWER_TOTAL_REPAYMENT',
 ]
 
 describe('metric catalog (R86)', () => {
-  it('covers exactly the 21 §9.5 metric codes, in design-doc order', () => {
-    expect(METRIC_CODES).toHaveLength(21)
+  it('covers exactly the 25 metric codes: §9.5 table order, then the R103 borrower family', () => {
+    expect(METRIC_CODES).toHaveLength(25)
     expect([...METRIC_CODES]).toEqual(EXPECTED_CODES)
   })
 
-  it('every metric carries name / formula / description in both locales (21 × 6 fields)', () => {
+  it('every metric carries name / formula / description in both locales (25 × 6 fields)', () => {
     const fields = ['nameZh', 'nameEn', 'formulaZh', 'formulaEn', 'descZh', 'descEn'] as const
     for (const code of EXPECTED_CODES) {
       const info = METRIC_CATALOG[code as keyof typeof METRIC_CATALOG]
@@ -71,6 +75,23 @@ describe('metric catalog (R86)', () => {
     expect(en).toContain('XIRR')
     expect(en).toContain('Formula')
     expect(en).toContain('days_i/365')
+  })
+
+  it('labels the borrower family without reusing the lease-internal-rate terminology (R103)', () => {
+    // AGENTS.md §2.1：借款方视角指标不得复用「租赁内含利率 / 增量借款利率」等规范名。
+    for (const code of [
+      'BORROWER_IRR_PERIOD',
+      'BORROWER_IRR_ANNUAL',
+      'BORROWER_IRR_ANNUAL_SIMPLE',
+      'BORROWER_TOTAL_REPAYMENT',
+    ] as const) {
+      const zh = metricLabel(code, 'zh-CN')
+      expect(zh, `${code} zh label`).toContain('借款方')
+      expect(zh).not.toContain('租赁内含利率')
+      expect(zh).not.toContain('增量借款利率')
+      expect(metricLabel(code, 'en-US')).toContain('Borrower')
+    }
+    expect(metricTooltip('BORROWER_TOTAL_REPAYMENT', 'zh-CN')).toContain('Σ rentDue')
   })
 
   it('passes unknown codes through verbatim (backend may add metrics)', () => {

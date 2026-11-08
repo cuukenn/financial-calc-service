@@ -1,11 +1,13 @@
 /**
- * 指标目录（R86）：§9.5 全部 21 项金融指标的 code → 中文名 / 英文名 / 公式 / 一行说明。
+ * 指标目录（R86）：全部 25 项金融指标的 code → 中文名 / 英文名 / 公式 / 一行说明。
  *
- * 内容对齐设计文档 §9.5 的指标表
- * （docs/superpowers/specs/2026-11-02-financial-calc-service-design.md），
- * 不在此发明公式。驱动：
+ * 前 21 项对齐设计文档 §9.5 的指标表
+ * （docs/superpowers/specs/2026-11-02-financial-calc-service-design.md），不在此发明公式；
+ * 末 4 项为 R103 的借款方（承租方）视角家族 BORROWER_*，是展示辅助，不是监管指标，
+ * 且仅在 LESSEE 视角的测算中有值（LESSOR 视角下后端返回显式 null，界面显示「—」）。
+ * 驱动：
  * - ResultPanel 指标卡 Tooltip 与指标表 hover；
- * - 完整性测试（metricCatalog.spec：21 code × 双语字段）。
+ * - 完整性测试（metricCatalog.spec：25 code × 双语字段）。
  */
 import type { AppLocale } from './index'
 
@@ -18,7 +20,7 @@ export interface MetricInfo {
   descEn: string
 }
 
-/** §9.5 FinancialMetrics 的 21 个指标 code（顺序与设计文档表格一致）。 */
+/** FinancialMetrics 的 25 个指标 code：§9.5 表格顺序，末尾接 R103 借款方视角家族。 */
 export const METRIC_CODES = [
   'TOTAL_PRINCIPAL',
   'TOTAL_INTEREST',
@@ -41,6 +43,10 @@ export const METRIC_CODES = [
   'CONVEXITY',
   'AVG_OUTSTANDING_BALANCE',
   'TRUE_ANNUAL_RATE',
+  'BORROWER_IRR_PERIOD',
+  'BORROWER_IRR_ANNUAL',
+  'BORROWER_IRR_ANNUAL_SIMPLE',
+  'BORROWER_TOTAL_REPAYMENT',
 ] as const
 
 export type MetricCode = (typeof METRIC_CODES)[number]
@@ -213,6 +219,43 @@ export const METRIC_CATALOG: Record<MetricCode, MetricInfo> = {
     formulaEn: 'defaults to XIRR',
     descZh: '缺省取 XIRR，可配置为单利年化',
     descEn: 'Defaults to XIRR; configurable to simple annualization',
+  },
+  // R103 借款方（承租方）视角：展示辅助指标，非监管指标。LESSOR 视角下为 null。
+  BORROWER_IRR_PERIOD: {
+    nameZh: '借款方期内 IRR',
+    nameEn: 'Borrower Periodic IRR',
+    formulaZh: '解 Σ CF_t/(1+r)^t = 0（CF 取借款方现金流方向）',
+    formulaEn: 'solve Σ CF_t/(1+r)^t = 0 with the borrower-side flow directions',
+    descZh: '承租方视角的期内收益率（本金流入、租金流出），与 IRR_PERIOD 同一求根口径',
+    descEn:
+      'Per-period yield from the lessee side (principal in, rents out), same root-finding convention as IRR_PERIOD',
+  },
+  BORROWER_IRR_ANNUAL: {
+    nameZh: '借款方年化 IRR（复利）',
+    nameEn: 'Borrower Annual IRR (compounded)',
+    formulaZh: '(1 + BORROWER_IRR_PERIOD)^m − 1',
+    formulaEn: '(1 + BORROWER_IRR_PERIOD)^m − 1',
+    descZh: '读取 BORROWER_IRR_PERIOD 复利年化，不再单独求根；m 为每年期数',
+    descEn:
+      'Compounded annualization of BORROWER_IRR_PERIOD (no second root solve); m is periods per year',
+  },
+  BORROWER_IRR_ANNUAL_SIMPLE: {
+    nameZh: '借款方年化 IRR（单利）',
+    nameEn: 'Borrower Annual IRR (simple)',
+    formulaZh: 'BORROWER_IRR_PERIOD × m',
+    formulaEn: 'BORROWER_IRR_PERIOD × m',
+    descZh: '单利年化，对齐 Excel IRR()*12 口径',
+    descEn: 'Simple annualization, matching Excel IRR()*12',
+  },
+  BORROWER_TOTAL_REPAYMENT: {
+    nameZh: '借款方还款总额',
+    nameEn: 'Borrower Total Repayment',
+    formulaZh: 'Σ rentDue + Σ fee + Σ tax + 单独支付的留购价 + 单独收取的保证金',
+    formulaEn: 'Σ rentDue + Σ fee + Σ tax + separate residual + separate deposit',
+    descZh:
+      '承租方视角的现金支出合计（scale 2）：留购价仅在残值单独结算时计入，残值并入租金时不重复计算',
+    descEn:
+      'Gross cash outlay from the lessee side (scale 2); the residual is added only when settled separately, never twice',
   },
 }
 

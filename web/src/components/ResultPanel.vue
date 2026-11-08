@@ -67,6 +67,10 @@ const PERCENT_METRICS = new Set([
   'XIRR',
   'MIRR',
   'TRUE_ANNUAL_RATE',
+  // R103 借款方视角的收益率同为利率类（金额类格式会把 0.0617 显示成 0.06）。
+  'BORROWER_IRR_PERIOD',
+  'BORROWER_IRR_ANNUAL',
+  'BORROWER_IRR_ANNUAL_SIMPLE',
 ])
 const NUMBER_METRICS = new Set([
   'RENTAL_RATE',
