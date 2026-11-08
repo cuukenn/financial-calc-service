@@ -27,8 +27,10 @@ import {
   Radio,
   RadioGroup,
   Row,
+  Space,
   Typography,
 } from 'ant-design-vue'
+import type { FormInstance } from 'ant-design-vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -83,23 +85,31 @@ interface MortgageFormState {
 }
 
 /**
- * 默认要素 = Task 5 钉住的边界样例：成交 3 000 000 / 评估 2 800 000 → 抵押物价值
- * 2 800 000（成交价与评估价孰低），贷款 2 380 000 → 贷款成数 85.00%、首付比例
- * 15.00%，恰好达全国统一下限（「以上」含本数）。与租赁表单同款：开箱即得一组合法要素。
+ * 表单的初始要素 = Task 5 钉住的边界样例（一份 defaults() 工厂，重置与初始态共用，
+ * 不重复写第二遍）：成交 3 000 000 / 评估 2 800 000 → 抵押物价值 2 800 000
+ * （成交价与评估价孰低），贷款 2 380 000 → 贷款成数 85.00%、首付比例 15.00%，
+ * 恰好达全国统一下限（「以上」含本数）。与租赁表单同款：开箱即得一组合法要素。
  */
-const form = reactive<MortgageFormState>({
-  principal: '2380000',
-  lprPercent: '3.5',
-  spreadBp: '0',
-  commenceDate: '2026-11-01',
-  firstRepaymentDate: '2026-12-01',
-  periods: 360,
-  method: 'EQUAL_INSTALLMENT',
-  transactionPrice: '3000000',
-  appraisalValue: '2800000',
-  monthlyIncome: '',
-  otherMonthlyDebt: '',
-})
+function defaults(): MortgageFormState {
+  return {
+    principal: '2380000',
+    lprPercent: '3.5',
+    spreadBp: '0',
+    commenceDate: '2026-11-01',
+    firstRepaymentDate: '2026-12-01',
+    periods: 360,
+    method: 'EQUAL_INSTALLMENT',
+    transactionPrice: '3000000',
+    appraisalValue: '2800000',
+    monthlyIncome: '',
+    otherMonthlyDebt: '',
+  }
+}
+
+const form = reactive<MortgageFormState>(defaults())
+
+/** AntD Form 实例：重置时要 resetFields()，否则上一次被阻断的字段错误会留着。 */
+const formRef = ref<FormInstance | null>(null)
 
 const loading = ref(false)
 const result = ref<CalculationResult | null>(null)
@@ -191,6 +201,23 @@ function buildRequest(annualRateDecimal: string): CalculationRequest {
   }
 }
 
+/**
+ * 被前端 [法] 门槛阻断（Task 6 §2）：先把上一次跑的结果与 API 错误清掉，再给阻断文案。
+ * Task 5 评审点出的 stale readout 路径就在这里 —— 被阻断的一次提交不能把上一次的结果
+ * 和 DTI/LTV 读数留在屏幕上。
+ */
+function blockRun(message: string): void {
+  result.value = null
+  submitError.value = null
+  localError.value = message
+}
+
+/** 表单规则把提交拦下（贷款金额 > 0、格式非法等）：同样不得留下上一次跑的结果与读数。 */
+function onFinishFailed(): void {
+  result.value = null
+  submitError.value = null
+}
+
 /** AntD Form 的 @finish 只在内置校验通过后触发；此处再跑前端 [法] 门槛。 */
 async function onFinish(): Promise<void> {
   // 首付硬下限 15%：用未舍入原值比较（P-10），恰好 15% 放行（「以上」含本数）。
@@ -198,23 +225,24 @@ async function onFinish(): Promise<void> {
   // 硬下限必须阻断而不是放行（AGENTS.md §2.3「阈值即硬约束」、§9.5 不可计算姿态）。
   const floorText = formatDecimalPercent(MIN_DOWN_PAYMENT_RATIO, 0)
   if (downPaymentFloorBlocked(form.principal, collateral.value, MIN_DOWN_PAYMENT_RATIO)) {
-    localError.value =
+    blockRun(
       downPayment.value === null
         ? t('mortgage.gates.downPaymentFloorNotEvaluable', { min: floorText })
         : t('mortgage.gates.downPaymentFloor', {
             min: floorText,
             actual: formatDecimalPercent(downPayment.value),
-          })
+          }),
+    )
     return
   }
   // R109 兜底：期限 > 12 月时 BULLET_LOAN 不可能被提交（选项已禁用并被 watch 重置）。
   if (form.method === 'BULLET_LOAN' && !bulletAllowed.value) {
-    localError.value = t('mortgage.gates.bulletOnly', { max: BULLET_MAX_MONTHS })
+    blockRun(t('mortgage.gates.bulletOnly', { max: BULLET_MAX_MONTHS }))
     return
   }
   const composed = annualRate.value
   if (composed === null) {
-    localError.value = t('mortgage.gates.rateNotComposable')
+    blockRun(t('mortgage.gates.rateNotComposable'))
     return
   }
 
@@ -231,6 +259,25 @@ async function onFinish(): Promise<void> {
     loading.value = false
   }
 }
+
+/**
+ * 显式重置（Task 6 §2）：模型回到 defaults()、清掉校验态、清掉结果与两条错误提示，
+ * 依赖这次结果的读数（月供 / DTI / 全部负债 DTI）随之回到未计算的「—」。
+ * 抵押物价值 / 贷款成数 / 首付比例是活输入的实时派生，不是这次跑的结果：
+ * 它们回到与初次挂载相同的状态（默认要素 85.00% / 15.00%）。
+ * 重置只管这一份表单：不切 Tab、不碰语言偏好。
+ */
+function onReset(): void {
+  Object.assign(form, defaults())
+  result.value = null
+  submitError.value = null
+  localError.value = null
+  bulletResetNotice.value = false
+  // resetFields 而不是 clearValidate：AntD 的 resetField 会把字段标成「不再响应
+  // 这次写入触发的 change 校验」，否则刚被阻断的那次校验还在飞行中，
+  // 它回来时会给已经改回合法默认值的字段重新盖上错误。
+  formRef.value?.resetFields()
+}
 </script>
 
 <template>
@@ -239,11 +286,13 @@ async function onFinish(): Promise<void> {
     <Col :xs="24" :lg="10">
       <Card :title="t('mortgage.cardTitle')" data-test="mortgage-form-card">
         <Form
+          ref="formRef"
           :model="form"
           :rules="rules"
-          :label-col="{ style: { width: '116px' } }"
+          :label-col="{ style: { width: '92px' } }"
           class="compact-form"
           @finish="onFinish"
+          @finish-failed="onFinishFailed"
         >
           <Card
             :title="t('mortgage.basic.title')"
@@ -402,15 +451,21 @@ async function onFinish(): Promise<void> {
           />
 
           <FormItem style="margin-top: 16px">
-            <Button
-              type="primary"
-              html-type="submit"
-              :loading="loading"
-              size="large"
-              data-test="mortgage-submit-btn"
-            >
-              {{ loading ? t('form.submitting') : t('form.submit') }}
-            </Button>
+            <Space>
+              <Button
+                type="primary"
+                html-type="submit"
+                :loading="loading"
+                size="large"
+                data-test="mortgage-submit-btn"
+              >
+                {{ loading ? t('form.submitting') : t('form.submit') }}
+              </Button>
+              <!-- Task 6 §2：显式重置。面板只隐藏不销毁（R130），所以清空必须是表单自己的动作。 -->
+              <Button size="large" data-test="mortgage-reset-btn" @click="onReset()">
+                {{ t('form.reset') }}
+              </Button>
+            </Space>
           </FormItem>
         </Form>
 

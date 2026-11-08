@@ -7,6 +7,7 @@ import App from '@/App.vue'
 import MortgageForm from '@/components/MortgageForm.vue'
 import { setLocale } from '@/i18n'
 import { mountWithI18n } from '@/test-utils/mount'
+import { fieldHasError, settleFormState } from '@/test-utils/forms'
 import { activateTab, paneState } from '@/test-utils/tabs'
 
 vi.mock('@/api/client', () => ({
@@ -27,7 +28,7 @@ vi.mock('echarts', () => ({
   init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
 }))
 
-import { calculate } from '@/api/client'
+import { ApiError, calculate } from '@/api/client'
 
 /** 最小房贷响应：只关心 rentDue（月供/DTI 的输入），其余列给稳定占位值。 */
 function mortgageResult(rents: string[]): CalculationResult {
@@ -658,5 +659,175 @@ describe('MortgageForm 监管仪表配色 (Task 6 §3: LTV / 首付 / DTI 阈值
     expect(readout.classes()).not.toContain('ratio-ok')
     expect(readout.text()).toContain('无法判断')
     expect(wrapper.find('[data-test="mortgage-dti-status"]').exists()).toBe(false)
+  })
+})
+
+/**
+ * Task 6 §2：显式重置。R130 让面板在场景切换之间存活，所以一次测算跑完之后，
+ * ResultPanel 与 DTI/LTV 读数会一直留在那里 —— 清空必须是表单自己的一个显式动作。
+ * 重置只清表单：不切 Tab、不碰语言偏好。
+ */
+describe('MortgageForm 显式重置 (Task 6 §2)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+    setLocale('zh-CN')
+  })
+
+  it('reset removes the ResultPanel and returns the run-derived readouts to 「—」', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await wrapper.find('[data-test="mortgage-other-debt"]').setValue('1600')
+    await submit(wrapper)
+
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="mortgage-monthly-payment"]').text()).toContain('8,000.00')
+    expect(wrapper.find('[data-test="mortgage-dti-value"]').text()).toContain('50.00%')
+
+    await wrapper.find('[data-test="mortgage-reset-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
+    // 依赖这次跑结果的读数（月供 / DTI / 全部负债 DTI）回到未计算态。
+    expect(wrapper.find('[data-test="mortgage-monthly-payment"]').text()).toBe('—')
+    expect(wrapper.find('[data-test="mortgage-dti-value"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="mortgage-all-debt-value"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="mortgage-dti-readout"]').classes()).toContain('ratio-neutral')
+  })
+
+  it('reset restores the form defaults including the 收入与债务 inputs', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('123456')
+    await wrapper.find('[data-test="mortgage-periods"]').setValue('120')
+    await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await wrapper.find('[data-test="mortgage-other-debt"]').setValue('1600')
+    await submit(wrapper)
+
+    await wrapper.find('[data-test="mortgage-reset-btn"]').trigger('click')
+    await flushPromises()
+
+    const value = (hook: string) => (wrapper.find(`[data-test="${hook}"]`).element as HTMLInputElement).value
+    expect(value('mortgage-principal')).toBe('2380000')
+    expect(value('mortgage-lpr')).toBe('3.5')
+    expect(value('mortgage-spread')).toBe('0')
+    expect(value('mortgage-periods')).toBe('360')
+    expect(value('mortgage-transaction-price')).toBe('3000000')
+    expect(value('mortgage-appraisal-value')).toBe('2800000')
+    expect(value('mortgage-monthly-income')).toBe('')
+    expect(value('mortgage-other-debt')).toBe('')
+    expect((wrapper.find('input[value="EQUAL_INSTALLMENT"]').element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('reset clears the 前端门槛 alert and the field-level validation state', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    const wrapper = mountWithI18n(MortgageForm)
+    const root = wrapper.element as HTMLElement
+
+    // 前端门槛：首付 14.99% → mortgage-local-error。
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('2380280')
+    await submit(wrapper)
+    expect(wrapper.find('[data-test="mortgage-local-error"]').exists()).toBe(true)
+
+    // 表单规则：贷款金额 0 → 字段级校验状态。
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('0')
+    await flushPromises()
+    await submit(wrapper)
+    await settleFormState()
+    expect(fieldHasError(root, '[data-test="mortgage-principal"]')).toBe(true)
+
+    await wrapper.find('[data-test="mortgage-reset-btn"]').trigger('click')
+    await settleFormState()
+
+    expect(wrapper.find('[data-test="mortgage-local-error"]').exists()).toBe(false)
+    expect(fieldHasError(root, '[data-test="mortgage-principal"]')).toBe(false)
+  })
+
+  it('reset clears the backend error alert too (R77 统一错误体)', async () => {
+    vi.mocked(calculate).mockRejectedValue(new ApiError('FCS-DOM-1001', '贷款金额必须为正数', 400))
+    const wrapper = mountWithI18n(MortgageForm)
+    await submit(wrapper)
+
+    expect(wrapper.find('[data-test="mortgage-error-alert"]').text()).toContain('FCS-DOM-1001')
+
+    await wrapper.find('[data-test="mortgage-reset-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="mortgage-error-alert"]').exists()).toBe(false)
+  })
+
+  it('reset does not switch the active scenario tab', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    const wrapper = mountWithI18n(App)
+    await activateTab(wrapper, '房贷计算器')
+    await submit(wrapper)
+
+    await wrapper.find('[data-test="mortgage-reset-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(paneState(wrapper, '[data-test="scenario-mortgage"]')).toBe('active')
+    expect(paneState(wrapper, '[data-test="scenario-lease"]')).toBe('hidden')
+    expect(localStorage.getItem('fcs.scenario')).toBe('mortgage')
+  })
+
+  it('reset does not clear the language preference', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    setLocale('en-US')
+    const wrapper = mountWithI18n(MortgageForm)
+    await submit(wrapper)
+
+    await wrapper.find('[data-test="mortgage-reset-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(localStorage.getItem('fcs.locale')).toBe('en-US')
+    expect(wrapper.find('[data-test="mortgage-form-card"]').text()).toContain('Mortgage Calculation Form')
+  })
+
+  it('a 首付 15% floor block clears the previous run and its stale readouts first', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await submit(wrapper)
+
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="mortgage-dti-value"]').text()).toContain('50.00%')
+
+    // 阻断这次提交：首付 14.99%。
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('2380280')
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(calculate).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-test="mortgage-local-error"]').text()).toContain('15%')
+    // 上一次跑的结果与读数必须已经不在（Task 5 评审点出的 stale readout 路径）。
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="mortgage-dti-value"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="mortgage-monthly-payment"]').text()).toBe('—')
+  })
+
+  it('a 贷款金额 > 0 rule block clears the previous run and its stale readouts too', async () => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('16000')
+    await submit(wrapper)
+
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(true)
+
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('0')
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(calculate).toHaveBeenCalledTimes(1)
+    // 字段级校验状态（settleFormState：FormItem 的校验类经 setTimeout 收尾）。
+    await settleFormState()
+    expect(fieldHasError(wrapper.element as HTMLElement, '[data-test="mortgage-principal"]')).toBe(true)
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="mortgage-dti-value"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="mortgage-monthly-payment"]').text()).toBe('—')
   })
 })

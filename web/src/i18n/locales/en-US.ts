@@ -98,6 +98,8 @@ const enUS: typeof zhCN = {
     submit: 'Calculate',
     submitting: 'Calculating…',
     submitFailed: 'Calculation failed ({code})',
+    // Task 6 §2: explicit reset (both forms have their own reset button, shared copy).
+    reset: 'Reset form',
     validation: {
       principal: 'Please enter the lease principal',
       nominalRate: 'Please enter the nominal annual rate',

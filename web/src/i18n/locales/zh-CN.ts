@@ -99,6 +99,8 @@ const zhCN = {
     submit: '开始测算',
     submitting: '测算中…',
     submitFailed: '测算失败（{code}）',
+    // Task 6 §2：显式重置（两个表单各有一个重置按钮，共用这条文案）。
+    reset: '重置表单',
     validation: {
       principal: '请输入租赁本金',
       nominalRate: '请输入名义年利率',

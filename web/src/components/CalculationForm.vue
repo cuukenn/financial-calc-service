@@ -13,8 +13,10 @@ import {
   RadioGroup,
   Row,
   Select,
+  Space,
   Typography,
 } from 'ant-design-vue'
+import type { FormInstance } from 'ant-design-vue'
 import type { Rule } from 'ant-design-vue/es/form'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -155,30 +157,35 @@ interface FormState {
 }
 
 /**
- * 默认值 = Task-21 黄金要素（Fixtures.leaseElement）：1M @ 6%，2024-01-01 起租、
- * 2024-02-01 首期租金，12 期月付、期末付、30/360，等额本息 —— 开箱提交即复现
- * 黄金 TOTAL_RENT 1 032 797.15。利率字段持有百分数口径展示值（6 → 提交 0.06）。
+ * 初始要素 = Task-21 黄金要素（Fixtures.leaseElement，一份 defaults() 工厂，
+ * 重置与初始态共用，不重复写第二遍）：1M @ 6%，2024-01-01 起租、2024-02-01 首期租金，
+ * 12 期月付、期末付、30/360，等额本息 —— 开箱提交即复现黄金 TOTAL_RENT 1 032 797.15。
+ * 利率字段持有百分数口径展示值（6 → 提交 0.06）。
  */
-const form = reactive<FormState>({
-  principal: '1000000',
-  nominalRate: '6',
-  commenceDate: '2024-01-01',
-  firstRentDate: '2024-02-01',
-  periods: 12,
-  frequency: 'MONTHLY',
-  timing: 'IN_ARREARS',
-  currency: 'CNY',
-  dayCountCode: 'THIRTY_360',
-  dateRollCode: 'NONE',
-  rateChangePolicy: 'RESOLVE',
-  method: 'EQUAL_INSTALLMENT',
-  residualValue: '0',
-  residualHandling: 'SEPARATE',
-  deposit: '0',
-  vatRate: '6',
-  interestOnlyPeriods: 0,
-  fullGracePeriods: 0,
-})
+function defaults(): FormState {
+  return {
+    principal: '1000000',
+    nominalRate: '6',
+    commenceDate: '2024-01-01',
+    firstRentDate: '2024-02-01',
+    periods: 12,
+    frequency: 'MONTHLY',
+    timing: 'IN_ARREARS',
+    currency: 'CNY',
+    dayCountCode: 'THIRTY_360',
+    dateRollCode: 'NONE',
+    rateChangePolicy: 'RESOLVE',
+    method: 'EQUAL_INSTALLMENT',
+    residualValue: '0',
+    residualHandling: 'SEPARATE',
+    deposit: '0',
+    vatRate: '6',
+    interestOnlyPeriods: 0,
+    fullGracePeriods: 0,
+  }
+}
+
+const form = reactive<FormState>(defaults())
 
 // dayCountCode/dateRollCode/method/periods 是后端必填字段：表单始终持有默认值，
 // 规则仅作兜底（清空时提示阻断提交）。校验文案随语言切换响应式更新。
@@ -216,16 +223,18 @@ const explicitRents = ref<string[]>([])
 const ruleRows = ref<RuleRowDraft[]>([])
 const fees = ref<FeeDraft[]>([])
 
-watch(
-  () => form.periods,
-  (periods) => {
-    const count = Math.max(periods ?? 0, 0)
-    const rents = explicitRents.value.slice(0, count)
-    while (rents.length < count) rents.push('')
-    explicitRents.value = rents
-  },
-  { immediate: true },
-)
+/** AntD Form 实例：重置时要 resetFields()，否则上一次被阻断的字段错误会留着。 */
+const formRef = ref<FormInstance | null>(null)
+
+/** 逐期租金的长度跟着期数走（初次全空 = 初次挂载的状态，重置后同样如此）。 */
+function syncRentsLength(): void {
+  const count = Math.max(form.periods ?? 0, 0)
+  const rents = explicitRents.value.slice(0, count)
+  while (rents.length < count) rents.push('')
+  explicitRents.value = rents
+}
+
+watch(() => form.periods, syncRentsLength, { immediate: true })
 
 const loading = ref(false)
 const result = ref<CalculationResult | null>(null)
@@ -321,9 +330,9 @@ function buildRequest(): CalculationRequest {
 /** AntD Form 的 @finish 仅在内置校验通过后触发（无效表单被阻断）。 */
 async function onFinish(): Promise<void> {
   if (form.method === 'EXPLICIT_RENT' && explicitRents.value.some((rent) => rent.trim() === '')) {
-    localError.value = t('form.rentStructure.explicitRents.incomplete', {
-      periods: form.periods ?? 0,
-    })
+    blockRun(
+      t('form.rentStructure.explicitRents.incomplete', { periods: form.periods ?? 0 }),
+    )
     return
   }
 
@@ -333,7 +342,7 @@ async function onFinish(): Promise<void> {
     (row) => row.annualRate.trim() !== '' && parseRateInput(row.annualRate) === null,
   )
   if (badRateIdx !== -1) {
-    localError.value = t('form.rentStructure.ruleRows.rateFormatRow', { n: badRateIdx + 1 })
+    blockRun(t('form.rentStructure.ruleRows.rateFormatRow', { n: badRateIdx + 1 }))
     return
   }
 
@@ -350,6 +359,42 @@ async function onFinish(): Promise<void> {
     loading.value = false
   }
 }
+
+/**
+ * 被提交闸门阻断（Task 6 §2）：先清掉上一次跑的结果与 API 错误，再给阻断文案 ——
+ * 被阻断的一次提交不得把上一次的结果留在屏幕上。
+ */
+function blockRun(message: string): void {
+  result.value = null
+  submitError.value = null
+  localError.value = message
+}
+
+/** 表单规则把提交拦下：同样不得留下上一次跑的结果。 */
+function onFinishFailed(): void {
+  result.value = null
+  submitError.value = null
+}
+
+/**
+ * 显式重置（Task 6 §2）：模型回到 defaults()，规则行 / 费用 / 逐期租金回到初次
+ * 挂载时的空集合，清校验态与两条错误提示，结果区随之消失。
+ * 重置只管这一份表单：不切 Tab、不碰语言偏好。
+ */
+function onReset(): void {
+  Object.assign(form, defaults())
+  ruleRows.value = []
+  fees.value = []
+  explicitRents.value = []
+  syncRentsLength()
+  result.value = null
+  submitError.value = null
+  localError.value = null
+  // resetFields 而不是 clearValidate：AntD 的 resetField 会把字段标成「不再响应
+  // 这次写入触发的 change 校验」，否则刚被阻断的那次校验还在飞行中，
+  // 它回来时会给已经改回合法默认值的字段重新盖上错误。
+  formRef.value?.resetFields()
+}
 </script>
 
 <template>
@@ -358,11 +403,13 @@ async function onFinish(): Promise<void> {
     <Col :xs="24" :lg="10">
       <Card :title="t('form.cardTitle')" data-test="calc-form-card">
         <Form
+          ref="formRef"
           :model="form"
           :rules="rules"
           :label-col="{ style: { width: '92px' } }"
           class="compact-form"
           @finish="onFinish"
+          @finish-failed="onFinishFailed"
         >
           <!-- 大块 1：租赁要素（基础字段 + 口径 + 还款方式）。 -->
           <Card
@@ -632,15 +679,21 @@ async function onFinish(): Promise<void> {
           </Card>
 
           <FormItem style="margin-top: 16px">
-            <Button
-              type="primary"
-              html-type="submit"
-              :loading="loading"
-              size="large"
-              data-test="submit-btn"
-            >
-              {{ loading ? t('form.submitting') : t('form.submit') }}
-            </Button>
+            <Space>
+              <Button
+                type="primary"
+                html-type="submit"
+                :loading="loading"
+                size="large"
+                data-test="submit-btn"
+              >
+                {{ loading ? t('form.submitting') : t('form.submit') }}
+              </Button>
+              <!-- Task 6 §2：显式重置。面板只隐藏不销毁（R130），所以清空必须是表单自己的动作。 -->
+              <Button size="large" data-test="calc-form-reset-btn" @click="onReset()">
+                {{ t('form.reset') }}
+              </Button>
+            </Space>
           </FormItem>
         </Form>
 

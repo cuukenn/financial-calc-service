@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client'
 import type { CalculationRequest, CalculationResult } from '@/api/types'
 import { setLocale } from '@/i18n'
 import { mountWithI18n } from '@/test-utils/mount'
+import { fieldHasError, settleFormState } from '@/test-utils/forms'
 import { activateTab } from '@/test-utils/tabs'
 import CalculationForm from './CalculationForm.vue'
 
@@ -566,5 +567,114 @@ describe('CalculationForm', () => {
       .filter((input) => (input.element as HTMLInputElement).placeholder === '规则 ID')
       .map((input) => (input.element as HTMLInputElement).value)
     expect(ids).toEqual(['R2', 'R3'])
+  })
+})
+
+/**
+ * Task 6 §2：租赁表单的显式重置。面板只隐藏不销毁（R130），所以跑完一次的
+ * ResultPanel 会留在原地 —— 清空是表单自己的显式动作，不切 Tab、不碰语言。
+ */
+describe('CalculationForm 显式重置 (Task 6 §2)', () => {
+  beforeEach(() => {
+    vi.mocked(calculate).mockResolvedValue(goldenResult())
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+    setLocale('zh-CN')
+  })
+
+  it('reset removes the ResultPanel, restores the default elements and empties the editors', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await submit(wrapper)
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(true)
+
+    await wrapper.find('[data-test="principal"]').setValue('123456.78')
+    await wrapper.find('[data-test="nominal-rate"]').setValue('9%')
+    await wrapper.find('[data-test="rule-add"]').trigger('click')
+    await wrapper.find('[data-test="fee-add"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-test="rule-row"]').length).toBe(1)
+    expect(wrapper.findAll('[data-test="fee-row"]').length).toBe(1)
+
+    await wrapper.find('[data-test="calc-form-reset-btn"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="error-alert"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="local-error-alert"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-test="rule-row"]').length).toBe(0)
+    expect(wrapper.findAll('[data-test="fee-row"]').length).toBe(0)
+
+    const value = (hook: string) => (wrapper.find(`[data-test="${hook}"]`).element as HTMLInputElement).value
+    // 默认要素 = Task-21 黄金样例：重置后开箱提交仍复现黄金 TOTAL_RENT。
+    expect(value('principal')).toBe('1000000')
+    expect(value('nominal-rate')).toBe('6')
+    expect(value('periods')).toBe('12')
+    expect(wrapper.find('[data-test="day-count-code"]').text()).toContain('30/360')
+    expect(value('residual-value')).toBe('0')
+    expect(value('deposit')).toBe('0')
+    expect(value('vat-rate')).toBe('6')
+    expect((wrapper.find('input[value="EQUAL_INSTALLMENT"]').element as HTMLInputElement).checked).toBe(true)
+
+    await submit(wrapper)
+    expect(calculate).toHaveBeenCalledTimes(2)
+    const req = vi.mocked(calculate).mock.calls[1]![0] as CalculationRequest
+    expect(req.principal).toBe('1000000')
+    expect(req.nominalRate).toBe('0.06')
+    expect(req).not.toHaveProperty('ruleRows')
+    expect(req).not.toHaveProperty('fees')
+  })
+
+  it('reset clears the local block alert and the backend error alert', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="rule-add"]').trigger('click')
+    await wrapper.findAll('[data-test="rule-annual-rate"]')[0].setValue('6bp%')
+    await submit(wrapper)
+    expect(wrapper.find('[data-test="local-error-alert"]').exists()).toBe(true)
+
+    await wrapper.find('[data-test="calc-form-reset-btn"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="local-error-alert"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="rule-rate-error"]').exists()).toBe(false)
+
+    vi.mocked(calculate).mockRejectedValue(new ApiError('FCS-DOM-1001', '租赁本金必须为正数', 400))
+    await submit(wrapper)
+    expect(wrapper.find('[data-test="error-alert"]').text()).toContain('FCS-DOM-1001')
+
+    await wrapper.find('[data-test="calc-form-reset-btn"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-test="error-alert"]').exists()).toBe(false)
+  })
+
+  it('a blocked submit clears the previous run before the block message appears', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await submit(wrapper)
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(true)
+
+    // EXPLICIT_RENT 但逐期租金没填满 → 本地阻断。
+    await wrapper.find('input[value="EXPLICIT_RENT"]').setValue()
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(calculate).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-test="local-error-alert"]').text()).toContain('须填满全部 12 期')
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
+  })
+
+  it('a failed field validation clears the previous run too', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await submit(wrapper)
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(true)
+
+    await wrapper.find('[data-test="principal"]').setValue('')
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(calculate).toHaveBeenCalledTimes(1)
+    // 字段级校验状态（settleFormState：FormItem 的校验类经 setTimeout 收尾）。
+    await settleFormState()
+    expect(fieldHasError(wrapper.element as HTMLElement, '[data-test="principal"]')).toBe(true)
+    expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
   })
 })
