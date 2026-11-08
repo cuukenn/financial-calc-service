@@ -171,6 +171,8 @@ const zhCN = {
     },
     validation: {
       principal: '请输入贷款金额',
+      // R101：principal 是正十进制串 —— '0' 与负数在这里就拦住，不做无谓的引擎往返。
+      principalPositive: '贷款金额须大于 0（本金为 0 或负数不是合法的测算要素）',
       money: '金额格式无效：请输入非负十进制数（如 2380000）',
       lpr: '请输入当前 LPR',
       lprFormat: 'LPR 格式无效：请输入百分数口径的十进制数（如 3.5）',

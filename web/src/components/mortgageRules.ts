@@ -13,7 +13,7 @@
 import type { Rule } from 'ant-design-vue/es/form'
 
 import { isLprStepAligned } from '@/utils/rate'
-import { isNonNegativeDecimal } from '@/utils/ratio'
+import { isDecimalText, isNonNegativeDecimal, isPositiveDecimal } from '@/utils/ratio'
 
 /** AGENTS.md §2.3 房贷期限 ≤ 40 年 = 480 个月；引擎上限仍是 1200（R107）。 */
 export const MAX_LOAN_MONTHS = 480
@@ -66,6 +66,22 @@ export function isSpreadStepAligned(value: unknown): boolean {
 }
 
 /**
+ * 贷款金额必须 > 0（R101：principal 是正十进制串；AGENTS.md 补充口径 3 金额恒为非负，
+ * 而本金 0 / 负数连测算要素都不成立 —— 引擎的 PRINCIPAL_MUST_BE_POSITIVE 是最后一道，
+ * 让 '0' 走到引擎只是一次无谓的网络往返）。
+ *
+ * 判定只在十进制串上做（isPositiveDecimal，无 Number() 算术）。空值返回 true ——
+ * 「缺失」由 required 规则给文案；不可解析的字面量（'1,000'）也返回 true ——
+ * 「格式非法」由金额格式规则给文案，本闸门不抢文案。
+ */
+export function isLoanAmountPositive(value: unknown): boolean {
+  if (typeof value !== 'string') return true
+  const text = value.trim()
+  if (text === '' || !isDecimalText(text)) return true
+  return isPositiveDecimal(text)
+}
+
+/**
  * 首期还款日不得早于放款日（引擎同样拒绝该组合，所以先在前端拦住）。
  * ISO-8601 的 yyyy-MM-dd 串按字典序比较即按日期比较。留空由 required 规则负责。
  */
@@ -87,6 +103,16 @@ function amountFormatRule(t: Translate, messageKey: string): Rule {
   }
 }
 
+/** 贷款金额 > 0 的闸门：文案点名「贷款金额」，让用户知道是哪一个要素不成立。 */
+function loanAmountPositiveRule(t: Translate): Rule {
+  const message = t('mortgage.validation.principalPositive')
+  return {
+    trigger: 'change',
+    validator: (_rule, value) =>
+      isLoanAmountPositive(value) ? Promise.resolve() : Promise.reject(new Error(message)),
+  }
+}
+
 /**
  * 房贷表单的规则集。字段名与 MortgageForm 的表单模型一一对应 ——
  * 收入/债务两个字段虽然由 MortgageIncomePanel 渲染，但仍在同一个 Form 的
@@ -99,6 +125,8 @@ export function buildMortgageRules(
   return {
     principal: [
       { required: true, message: t('mortgage.validation.principal'), trigger: 'change' },
+      // > 0 闸门排在格式规则之前：负数既非法又非正，必须点名「贷款金额」。
+      loanAmountPositiveRule(t),
       amountFormatRule(t, 'mortgage.validation.money'),
     ],
     lprPercent: [

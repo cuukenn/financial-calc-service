@@ -152,8 +152,24 @@ describe('buildMortgageRules (validators reject on raw values, never silently fi
   })
 
   it('rejects a malformed amount and leaves the empty case to the required rule', async () => {
-    expect(await runValidator('principal', 1, '1,000,000')).toContain('mortgage.validation.money')
-    expect(await runValidator('principal', 1, '1000000')).toBeNull()
+    // 第 2 条是金额格式规则（第 1 条是贷款金额须 > 0 的数值门槛）。
+    expect(await runValidator('principal', 2, '1,000,000')).toContain('mortgage.validation.money')
+    expect(await runValidator('principal', 2, '1000000')).toBeNull()
     expect(await runValidator('monthlyIncome', 0, '1e5')).toContain('mortgage.validation.money')
+  })
+
+  it('rejects a 贷款金额 that is not greater than 0, naming the element in the message', async () => {
+    // R101：principal 是正十进制串。'0' 与负数若放行，会一路走到引擎才报错（无谓往返）。
+    expect(await runValidator('principal', 1, '0')).toContain('mortgage.validation.principalPositive')
+    expect(await runValidator('principal', 1, '0.00')).toContain('mortgage.validation.principalPositive')
+    expect(await runValidator('principal', 1, '-1')).toContain('mortgage.validation.principalPositive')
+    expect(await runValidator('principal', 1, '-2380000.01')).toContain(
+      'mortgage.validation.principalPositive',
+    )
+    expect(await runValidator('principal', 1, '0.01')).toBeNull()
+    expect(await runValidator('principal', 1, '1000000')).toBeNull()
+    // 空值仍归 required 规则，不可解析的字面量仍归格式规则 —— 门槛不抢文案。
+    expect(await runValidator('principal', 1, '')).toBeNull()
+    expect(await runValidator('principal', 1, '1,000,000')).toBeNull()
   })
 })

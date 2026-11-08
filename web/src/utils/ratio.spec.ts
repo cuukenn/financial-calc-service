@@ -15,6 +15,7 @@ import {
   downPaymentRatio,
   exceedsLimit,
   formatDecimalPercent,
+  isDecimalText,
   loanToValue,
   pickMonthlyPayment,
 } from './ratio'
@@ -59,6 +60,18 @@ describe('compareDecimal (P-10: compare unrounded values)', () => {
 
   it('throws on unparseable input instead of returning a silent 0', () => {
     expect(() => compareDecimal('abc', '1')).toThrow(/unparseable/)
+  })
+})
+
+describe('isDecimalText (可解析与否：决定哪条规则负责文案)', () => {
+  it('accepts any signed decimal literal and refuses everything else', () => {
+    expect(isDecimalText('2380000')).toBe(true)
+    expect(isDecimalText('3.5')).toBe(true)
+    expect(isDecimalText('0')).toBe(true)
+    expect(isDecimalText('-1')).toBe(true)
+    expect(isDecimalText('1,000')).toBe(false)
+    expect(isDecimalText('1e5')).toBe(false)
+    expect(isDecimalText('')).toBe(false)
   })
 })
 

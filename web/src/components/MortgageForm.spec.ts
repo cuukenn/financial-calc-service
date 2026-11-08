@@ -228,6 +228,49 @@ describe('MortgageForm payload mapping (R101)', () => {
   })
 })
 
+describe('MortgageForm 贷款金额 gate (R101: principal > 0 在表单层就把住)', () => {
+  beforeEach(() => {
+    vi.mocked(calculate).mockResolvedValue(mortgageResult(['8000.00']))
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+    setLocale('zh-CN')
+  })
+
+  it('blocks a 0 贷款金额 instead of sending it to the engine', async () => {
+    const wrapper = mountWithI18n(MortgageForm)
+    // '0' 过格式规则、也过首付闸门（首付 100%），所以必须有一道明确的 > 0 闸门。
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('0')
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(calculate).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('贷款金额须大于 0')
+  })
+
+  it('blocks a negative 贷款金额 with the same message', async () => {
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('-2380000')
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(calculate).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('贷款金额须大于 0')
+  })
+
+  it('keeps a positive 贷款金额 submitting', async () => {
+    const wrapper = mountWithI18n(MortgageForm)
+    await wrapper.find('[data-test="mortgage-principal"]').setValue('1')
+    await flushPromises()
+    await submit(wrapper)
+
+    // 1 元贷款：首付闸门（1 − 1/2 800 000 ≈ 99.99%）不会阻断，闸门只拦非正数。
+    expect(calculate).toHaveBeenCalledTimes(1)
+    expect(lastRequest().principal).toBe('1')
+  })
+})
+
 describe('MortgageForm 还款方式 gate (R109: ≤ 12 期 才可选到期一次还本付息)', () => {
   beforeEach(() => {
     vi.mocked(calculate).mockResolvedValue(mortgageResult(['1010000.00']))

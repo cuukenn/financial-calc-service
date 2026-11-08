@@ -164,6 +164,14 @@ export function isPositiveDecimal(raw: string): boolean {
 }
 
 /**
+ * 可解析性谓词（任意符号）：表单用它把「字面量非法」交给格式规则、
+ * 把「可解析但非正」交给数值门槛规则，两条文案不会互相串台。
+ */
+export function isDecimalText(raw: string): boolean {
+  return parseDecimal(raw) !== null
+}
+
+/**
  * 抵押物价值 = min(成交价, 评估价)
  * （AGENTS.md §2.2 / 金规〔2026〕5号第十九条：成交价与评估价孰低）。
  */

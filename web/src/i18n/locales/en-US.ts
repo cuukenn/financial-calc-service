@@ -171,6 +171,8 @@ const enUS: typeof zhCN = {
     },
     validation: {
       principal: 'Please enter the loan amount',
+      // R101: principal is a positive decimal string — 0 and negatives stop here, no needless engine round trip.
+      principalPositive: 'The loan amount must be greater than 0 (a zero or negative principal is not a valid calculation element)',
       money: 'Invalid amount format: enter a non-negative decimal number (e.g. 2380000)',
       lpr: 'Please enter the current LPR',
       lprFormat: 'Invalid LPR format: enter a percent-scale decimal number (e.g. 3.5)',
