@@ -40,7 +40,8 @@ public class AlgorithmController {
         DESCRIPTIONS.put(RepaymentMethodId.PRINCIPAL_FIRST,
                 "先本后息：每期归还本金 P/n，利息于末期支付");
         DESCRIPTIONS.put(RepaymentMethodId.BULLET_LOAN,
-                "到期一次还本付息：期内不付本息，到期日一次性结清本金与累计利息");
+                "到期一次还本付息：每期照常计提利息并递延（不复利、不进余额），期内每期本息实付为 0，"
+                        + "到期日一次性结清本金与累计递延利息");
         DESCRIPTIONS.put(RepaymentMethodId.RULE_DRIVEN,
                 "规则驱动：按编译后的规则集（请求携带 ruleRows）逐期解析租金/利率/本金计划");
         DESCRIPTIONS.put(RepaymentMethodId.EXPLICIT_RENT,
