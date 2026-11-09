@@ -80,7 +80,14 @@ function lastRequest(): CalculationRequest {
   return calls[calls.length - 1]![0] as CalculationRequest
 }
 
-/** 归还给引擎的房贷请求只允许这 11 个键（§3），其余租赁专属键必须缺席。 */
+/**
+ * 归还给引擎的房贷请求只允许这 14 个键（R101 + R137），其余租赁专属键必须缺席。
+ * `residualValue` / `residualHandling` / `rateChangePolicy` 在这里而不是缺席清单里：
+ * 它们是 `LeaseElement` 的必填要素，服务端不为它们补默认（AGENTS.md §3.1 输入要素
+ * 必须显式提供、缺失即报错），所以表单显式发送。与
+ * `calc-server` 的 `MortgagePayloadContractTest` 同步：那份测试把同一个键集合
+ * 真的 POST 给引擎并要求 200。
+ */
 const MORTGAGE_KEYS = [
   'principal',
   'nominalRate',
@@ -93,18 +100,19 @@ const MORTGAGE_KEYS = [
   'dateRollCode',
   'currency',
   'method',
-]
-
-const ABSENT_LEASE_ONLY_KEYS = [
   'residualValue',
   'residualHandling',
+  'rateChangePolicy',
+]
+
+/** 真正缺席的租赁专属键（9 个）：缺席 = 该要素不存在，引擎侧为空/无。 */
+const ABSENT_LEASE_ONLY_KEYS = [
   'deposit',
   'fees',
   'ruleRows',
   'explicitRents',
   'explicitPeriods',
   'gracePeriod',
-  'rateChangePolicy',
   'allowPartialRuleSet',
   'rounding',
   'vatRate',
@@ -172,7 +180,7 @@ describe('MortgageForm payload mapping (R101)', () => {
     setLocale('zh-CN')
   })
 
-  it('submits exactly the 11 mortgage keys and omits every lease-only key', async () => {
+  it('submits exactly the 14 mortgage keys and omits every lease-only key', async () => {
     const wrapper = mountWithI18n(MortgageForm)
     await submit(wrapper)
 
@@ -191,7 +199,12 @@ describe('MortgageForm payload mapping (R101)', () => {
       dateRollCode: 'NONE',
       currency: 'CNY',
       method: 'EQUAL_INSTALLMENT',
+      // R137：这三个是 `LeaseElement` 必填要素，显式发送而非让服务端补默认。
+      residualValue: '0',
+      residualHandling: 'SEPARATE',
+      rateChangePolicy: 'RESOLVE',
     })
+    expect(Object.keys(req)).toHaveLength(14)
     expect(Object.keys(req).sort()).toEqual([...MORTGAGE_KEYS].sort())
     for (const key of ABSENT_LEASE_ONLY_KEYS) {
       expect(req, `lease-only key ${key} must be absent`).not.toHaveProperty(key)
@@ -301,6 +314,14 @@ describe('MortgageForm 还款方式 gate (R109: ≤ 12 期 才可选到期一次
     await submit(wrapper)
 
     expect(lastRequest().method).toBe('BULLET_LOAN')
+    // R137：到期一次还本付息走的是同一份 14 键 payload —— 三个必填要素照旧显式发送，
+    // 与 calc-server 的 MortgagePayloadContractTest 的 BULLET 用例同一形状。
+    expect(lastRequest()).toMatchObject({
+      residualValue: '0',
+      residualHandling: 'SEPARATE',
+      rateChangePolicy: 'RESOLVE',
+    })
+    expect(Object.keys(lastRequest())).toHaveLength(14)
   })
 
   it('disables BULLET_LOAN at 13 months, resets a prior selection and never sends it', async () => {

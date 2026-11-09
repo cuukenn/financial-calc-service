@@ -186,8 +186,14 @@ watch(
   },
 )
 
-// ============ 提交（R101 字段映射：11 个键，租赁专属键一律缺席） ============
-
+/**
+ * 提交（R101 字段映射：14 个键）。R137：`residualHandling` / `rateChangePolicy` 是
+ * `LeaseElement` 的必填要素（`LeaseElement.requireField`），`CalculationRequestAssembler`
+ * 只给 `rounding` / `gracePeriod` 补默认 —— AGENTS.md §3.1 也规定输入要素必须显式提供、
+ * 缺失即报错、不得静默取默认值，所以这两键连同 `residualValue` 一律由表单**显式发送**，
+ * 不在服务端补默认。住房按揭没有残值/留购价：`SEPARATE` + `0` 让 §3.4 校验一与校验二
+ * 严格成立（Σ本金 = 合同本金、末期余额 = 0）。`RESOLVE` 是重定价的既有姿态（自变更日重算）。
+ */
 function buildRequest(annualRateDecimal: string): CalculationRequest {
   return {
     principal: form.principal.trim(),
@@ -202,6 +208,9 @@ function buildRequest(annualRateDecimal: string): CalculationRequest {
     dateRollCode: 'NONE',
     currency: 'CNY',
     method: form.method,
+    residualValue: '0',
+    residualHandling: 'SEPARATE',
+    rateChangePolicy: 'RESOLVE',
   }
 }
 
