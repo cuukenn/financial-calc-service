@@ -45,9 +45,13 @@ npm run lint       # ESLint（脚手架默认规则）
   （等额本息、等额本金、到期一次还本付息仅 ≤ 12 期可选）。抵押物价值、贷款成数（LTV）、
   首付比例、DTI 是前端十进制串上的实时派生读数（阈值配色在未舍入原值上判定），
   不进 payload、不进引擎指标目录；首付比例未达 15% 时提交被阻断并清掉上一次结果。
-  **Task 7 实测（2026-11-09）**：这份 payload 在真实 `calc-server` 前被 400 拒收
-  （`FCS-COM-0001: 参数 residualHandling 非法: 必填`，补上后又缺 `rateChangePolicy`），
-  组件测试把 API 全 mock 所以此前未暴露 —— 登记为缺陷 D-1，见仓库根 `README.md`「已知缺陷」。
+  Task 7 实测（2026-11-09）曾发现这份 payload 在真实 `calc-server` 前被 400 拒收
+  （`FCS-COM-0001: 参数 residualHandling 非法: 必填`，补上后又缺 `rateChangePolicy`）——
+  缺陷 D-1，已在 Task 7 修复轮 1 按 R137 修掉：表单显式发送 `residualValue "0"` /
+  `residualHandling "SEPARATE"` / `rateChangePolicy "RESOLVE"`（payload 11 → 14 键），
+  服务端不为必填要素补默认（AGENTS.md §3.1）。同一 payload 由 `calc-server` 的
+  `MortgagePayloadContractTest` 打给真实引擎钉住；组件测试仍是 mock 姿态，但键清单与服务端
+  测试同源。此前未被发现的原因正是组件测试把 API 全 mock。
 - **结果区块**（Tabs：指标 / 摊销计划 / 现金流 / 实际利率法，R84）：
   - 指标 Statistic 卡（总租金/总利息/总费用/总税额/租金率/IRR 年化/XIRR；金额字符串原样直显，
     null 指标渲染「—」；其余全量指标在下方键值表）；指标卡与指标表行头悬浮显示指标目录

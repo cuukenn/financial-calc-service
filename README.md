@@ -66,10 +66,16 @@ IRR_ANNUAL_SIMPLE` **数值逐位相等**（测试里直接断言相等）。`BO
 视角由 `new CalculationRequest(element, ruleSet, options, CashFlowPerspective.LESSEE)` 选择，
 缺省与三参数构造均为 `CashFlowPerspective.LESSOR`。**默认的 LESSOR 运行与 v1 完全一致**，
 只是多出 4 个显式 `null` 的 `BORROWER_*` 条目（不可计算即为 `null`，字段不省略）；
-`LESSEE` 运行下这 4 项才有值。视角只作用于指标层：计划表、现金流表、校验器一律不变（R109）。
+`LESSEE` 运行下这 4 项才有值。视角只作用于指标层：计划表、现金流表、校验器一律不变（R103/R119）。
 
 `BORROWER_*` 是**展示辅助指标**（[实]），不是监管指标，也不得与「租赁内含利率 / 增量借款利率」
 等 §2.1 规范名混用。
+
+**两族 IRR 年化共有的一个陷阱**：零额租金不生成现金流条目，所以现金流被挤稀的形态（典型是
+`BULLET_LOAN`：放款与到期结清两条）里，周期 IRR 会把多期间隔当成一期，年化值随之失真——
+出租方与借款方两族**同样**失真（它们本来就逐位相等）。这种形态下不得把 `IRR_ANNUAL` /
+`BORROWER_IRR_ANNUAL*` 当成资金成本读数，年度成本请用 `XIRR` / `TRUE_ANNUAL_RATE`
+（详见文末「已知缺陷 D-2」）。
 
 ## 还款算法 code 对照表
 
@@ -221,14 +227,14 @@ cd web && npm install && npm run dev    # 前置：calc-server 运行于 8080
 抵押物成交价、抵押物评估价、月可支配收入、其他月债务支出、还款方式（等额本息 / 等额本金 /
 到期一次还本付息，最后一项仅在期限 ≤ 12 个月时可选，R109）。
 
-**前端闸门不是引擎校验**（R107/R109）：首付比例 ≥ 15% 与 DTI（月房贷支出/收入比 ≤ 50%、
+**前端闸门不是引擎校验**（R101/R107）：首付比例 ≥ 15% 与 DTI（月房贷支出/收入比 ≤ 50%、
 月所有债务支出/收入比 ≤ 60%）只做在前端的实时仪表与提交闸门上，阈值在未舍入原值上比较
 （P-10），恰好达标放行（「以上」含本数）；引擎不校验这些监管比率，也没有任何房贷专属要素。
 期限 480 个月同样是 UI 闸门，引擎上限仍是 1200 期（R104/R107）。
 
 ### 房贷字段 → 引擎参数映射（R101）
 
-房贷 Tab 提交恰好 11 个 payload 键（`MortgageForm.buildRequest`），租赁专属键一律缺席：
+房贷 Tab 提交恰好 14 个 payload 键（`MortgageForm.buildRequest`），其余租赁专属键缺席：
 
 | 房贷字段（前端） | 引擎参数 |
 |---|---|
@@ -241,25 +247,37 @@ cd web && npm install && npm run dev    # 前置：calc-server 运行于 8080
 | 抵押物成交价 / 评估价 | 不发送：抵押物价值 = 成交价与评估价孰低，只在前端算，驱动贷款成数（LTV）与首付比例 |
 | 首付比例 ≥ 15% | 不发送：前端提交闸门（AGENTS.md §2.3） |
 | 月可支配收入 / 其他月债务支出 | 不发送：前端 DTI 仪表的输入（50% / 60%） |
-| 租赁专属要素 | `explicitRents` / `ruleRows` / `fees` / `deposit` / `vatRate` / `residualValue` 一律不发送（缺席 = 该要素不存在；空串会被当成真实要素写进摊销表的费用/税列）。两个例外须留意：`gracePeriod` / `rounding` 缺席时由 `CalculationRequestAssembler` 补默认（`GracePeriod.none()` / `RoundingPolicy.defaults()`），而 `residualHandling` 与 `rateChangePolicy` 是 `LeaseElement` 的必填项、缺席即 400 —— 见文末「已知缺陷 D-1」 |
+| 残值 / 留购价（住房按揭没有这一项） | 显式发送 `residualValue = "0"` 与 `residualHandling = "SEPARATE"`：`SEPARATE` + 0 让 §3.4 校验一（Σ本金 = 合同本金）与校验二（末期余额 = 0）严格成立，不把任何残值摊进租金 |
+| 分段利率姿态 | 显式发送 `rateChangePolicy = "RESOLVE"`（重定价的既有姿态：自变更日重算）；仍未建模 3/6/12 个月的重定价周期 |
+| 其余租赁专属要素 | `explicitRents` / `ruleRows` / `fees` / `deposit` / `vatRate` 一律不发送（缺席 = 该要素不存在；空串会被当成真实要素写进摊销表的费用/税列）。`gracePeriod` / `rounding` 缺席时由 `CalculationRequestAssembler` 补默认（`GracePeriod.none()` / `RoundingPolicy.defaults()`）；`residualHandling` 与 `rateChangePolicy` **不在**补默认之列 —— 它们是 `LeaseElement` 的必填要素（AGENTS.md §3.1：输入要素必须显式提供、缺失即报错、不得静默取默认值），缺席即 400 `FCS-COM-0001 … 必填`，所以必须由表单显式发送（R137，缺陷 D-1 的根因） |
 
-## 已知缺陷（Task 7 全量验证实测发现，2026-11-09，未修）
+## 已知缺陷（Task 7 全量验证实测发现，2026-11-09）
 
-本节的编号 D-n 与收尾报告 `.superpowers/sdd/2026-11-08-domain-expansion/task-7-report.md` 对应。
-Task 7 的范围是文档与验证，不含行为改动，所以以下两条只登记、不修。
+本节的编号 D-n 与报告 `.superpowers/sdd/2026-11-08-domain-expansion/task-7-report.md`（含
+「Fix round 1」一节）对应。Task 7 首轮的范围是文档与验证，只登记不修；修复轮 1 按控制器裁决
+修掉了 D-1 与 D-4，D-2 按 R135 留在引擎侧另案处理。
 
-- **D-1 房贷 Tab 的 11 键 payload 被 REST 契约拒收。** `POST /api/v1/calculations` 用房贷 Tab
-  实际发送的那 11 个键提交 → HTTP 400 `FCS-COM-0001: 参数 residualHandling 非法: 必填`；补上
-  `residualHandling` 后接着报 `rateChangePolicy 非法: 必填`；两者都补上（`SEPARATE` / `RESOLVE`）
-  即 200 并返回完整结果。原因：`residualHandling` 与 `rateChangePolicy` 落在 `LeaseElement` 的
+- **D-1 房贷 Tab 的 payload 被 REST 契约拒收 —— 已修复（Task 7 修复轮 1，R137）。**
+  原现象：11 键提交 → HTTP 400 `FCS-COM-0001: 参数 residualHandling 非法: 必填`，补上后又缺
+  `rateChangePolicy`。根因：`residualHandling` 与 `rateChangePolicy` 落在 `LeaseElement` 的
   `requireField` 必填清单里，而 `CalculationRequestAssembler` 只对 `rounding` / `gracePeriod` 补默认。
-  同一 payload 经 Vite 的 `/api` 代理同样 400，所以房贷 Tab 在真实后端前无法跑通一次测算
-  （前端测试把 API 全 mock，故此前未被发现）。
-- **D-2 递延型现金流失稀 IRR 族的年化。** `BULLET_LOAN` 的现金流表只有两条（放款 + 到期结清），
-  `IrrCalculator.periodIrr` 按现金流序号折现，把 12 期的间隔当成 1 期：实测 100 万 @ 3.5%、12 期
-  到期一次还本付息返回 `IRR_PERIOD 0.03500004`、`IRR_ANNUAL 51.106936%`、
-  `IRR_ANNUAL_SIMPLE 42.000048%`，而同期 `XIRR` 与 `TRUE_ANNUAL_RATE` 都是 `0.03500004`（正确值）。
-  房贷 Tab 的「IRR 年化」卡因此会把一笔 3.5% 的一年期到期一次还本付息显示成 51.11%。
+  修法在**前端**（R137：AGENTS.md §3.1 规定输入要素必须显式提供、缺失即报错、不得静默取默认值，
+  所以不在 assembler 补默认）：`MortgageForm.buildRequest` 现在显式发送 `residualValue "0"` /
+  `residualHandling "SEPARATE"` / `rateChangePolicy "RESOLVE"`，payload 11 → 14 键。契约由
+  `calc-server` 的 `MortgagePayloadContractTest` 用**真实引擎**钉住（等额本息 360 期 200 且
+  Σ本金守恒、末期余额 0.00；到期一次还本付息 12 期 200 且递延利息到期结清；少发必填要素仍 400）。
+- **D-2 递延型现金流失稀 IRR 族的年化 —— 未修，owner 是引擎 §9.5 指标装配线（R135）。**
+  `BULLET_LOAN` 的现金流表只有两条（放款 + 到期结清）：`StandardCashFlowBuilder.addFlow` 丢弃
+  零额租金、`sorted()` 按列表序号重编号、`IrrCalculator.npv` 按 `flow.sequence()` 折现，于是
+  12 期的间隔被当成 1 期。实测（2 380 000 @ 3.5%、12 期到期一次还本付息）
+  `IRR_ANNUAL 0.511068951676`、`XIRR = TRUE_ANNUAL_RATE = 0.0350000168`（后者是正确值）。
+  **房贷 Tab 的「IRR 年化」卡与 `BORROWER_IRR_*` 读数在这种稀疏现金流上没有参考价值**：
+  一笔 3.5% 的一年期到期一次还本付息会被显示成 51.11%，核对年度成本请用 `XIRR` /
+  `TRUE_ANNUAL_RATE`。稠密现金流（如等额本息、先本后息）不受影响。
+- **D-4 `AlgorithmController` 的 `BULLET_LOAN` 说明与引擎口径矛盾 —— 已修复（R136，一行文案）。**
+  服务端文案原写「期内不付本息」，与引擎实际的「每期计提利息 + 递延 + 到期结清」矛盾；
+  现在服务端说明、README 对照表与 `MortgagePayloadContractTest` 三处同口径。code、错误码、
+  `AlgorithmsApiTest` 的条目数契约均未动。
 
 ## 构建
 
