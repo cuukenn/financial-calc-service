@@ -10,6 +10,7 @@ import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
 import io.github.cuukenn.fincalc.domain.model.CashFlowType;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
+import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
 import io.github.cuukenn.fincalc.domain.model.PaymentFrequency;
@@ -63,19 +64,32 @@ class CalculationFacadeTest {
         assertThat(r.schedule().issues()).noneMatch(i -> i.level() == IssueLevel.ERROR);
     }
 
+    /**
+     * R116 (Task 7): the metric-set invariant is enforced for <em>every</em> built-in, including
+     * {@code BULLET_LOAN} and {@code EXPLICIT_RENT} — the two the loop used to skip. Every built-in
+     * run goes through the same {@link io.github.cuukenn.fincalc.domain.metric.MetricRegistry}, so
+     * the bag must carry the same 25 codes in the same insertion order whatever the method; a
+     * generator may leave a code {@code null} (not computable), it may not drop one.
+     */
     @Test
     void every_generator_produces_the_same_metric_set() {
         Set<String> expected = null;
         for (RepaymentMethodId method : List.of(RepaymentMethodId.EQUAL_INSTALLMENT,
                 RepaymentMethodId.EQUAL_PRINCIPAL, RepaymentMethodId.INTEREST_FIRST,
-                RepaymentMethodId.PRINCIPAL_FIRST)) {
+                RepaymentMethodId.PRINCIPAL_FIRST, RepaymentMethodId.BULLET_LOAN,
+                RepaymentMethodId.EXPLICIT_RENT)) {
             CalculationResult r = CalculationFacade.defaults().calculate(
-                    new CalculationRequest(baseElement().toBuilder().method(method).build(), null,
+                    new CalculationRequest(elementFor(method), null,
                             CalculationOptions.defaults()));
+            // Every fixture amortizes: the §3.4 chain must stay clean for all six built-ins.
+            assertThat(r.schedule().hasErrors()).isFalse();
+            FinancialMetrics metrics = r.schedule().header().metrics();
+            assertThat(metrics.codes()).hasSize(25);
+            assertThat(metrics.find(MetricCodes.TOTAL_RENT)).isNotNull();
             if (expected == null) {
-                expected = r.schedule().header().metrics().codes();
+                expected = metrics.codes();
             } else {
-                assertThat(r.schedule().header().metrics().codes()).isEqualTo(expected);
+                assertThat(metrics.codes()).isEqualTo(expected);
             }
         }
     }
@@ -299,7 +313,104 @@ class CalculationFacadeTest {
         assertThat(r.schedule().hasErrors()).isFalse();
     }
 
+    /**
+     * R118 (Task 7): the deferred-interest bucket under a day count that actually rounds. The
+     * existing bullet fixtures all run THIRTY_360 monthly, where every period accrues exactly
+     * {@code 5000.00} — a clean 2-dp figure, so nothing flows through the bucket as a tail. Under
+     * ACT_360 the 31-day and 29-day periods accrue 5166.66̅ and 4833.33̅, each rounded to the cent
+     * per P-06, and the year contains 366 actual days.
+     *
+     * <p>What this pins, and why it is not the same assertion as the 30/360 case:
+     * <ol>
+     *   <li>the maturity settlement is the sum of the <b>rounded</b> per-period accruals
+     *       (61 000.02), not a re-derived term-exact figure (1 000 000 × 6% × 366/360 = 61 000.00);
+     *       the deferral carries the rounding, it does not undo it;</li>
+     *   <li>Σ {@code interestPaid} still equals Σ {@code interestAccrued} exactly, and the §3.4
+     *       chain stays clean — the +0.02 tail is a disclosed excess over the term-exact accrual,
+     *       visible in the period rows, not an absorbed discrepancy between the two columns;</li>
+     *   <li>the balance tail reported by the header ({@code roundingDifference}) stays 0.00: the
+     *       principal leg is untouched by the interest rounding, and the two tails are separate
+     *       disclosures (P-09).</li>
+     * </ol>
+     */
+    @Test
+    void bullet_loan_defers_rounded_accruals_without_drift_under_act_360() {
+        LeaseElement element = baseElement().toBuilder()
+                .method(RepaymentMethodId.BULLET_LOAN)
+                .dayCountCode("ACT_360")
+                .build();
+
+        CalculationResult r = CalculationFacade.defaults().calculate(
+                new CalculationRequest(element, null, CalculationOptions.defaults()));
+
+        List<Installment> rows = r.schedule().installments();
+        assertThat(rows).hasSize(12);
+        assertThat(r.schedule().hasErrors()).isFalse();
+
+        // Rounding genuinely happened: 31 days × 6% / 360 = 5166.66̅ -> 5166.67, and 29 days
+        // (2024 is a leap year) -> 4833.33. Both residues are sub-cent.
+        assertThat(rows.get(0).days()).isEqualTo(31);
+        assertThat(rows.get(0).interestAccrued()).isEqualByComparingTo("5166.67");
+        assertThat(rows.get(1).days()).isEqualTo(29);
+        assertThat(rows.get(1).interestAccrued()).isEqualByComparingTo("4833.33");
+        assertThat(rows.subList(0, 11)).allSatisfy(row -> {
+            assertThat(row.openingBalance()).isEqualByComparingTo("1000000.00");
+            assertThat(row.interestPaid()).isEqualByComparingTo("0.00");
+            assertThat(row.principalDue()).isEqualByComparingTo("0.00");
+        });
+
+        BigDecimal accruedSum = sum(rows, Installment::interestAccrued);
+        BigDecimal paidSum = sum(rows, Installment::interestPaid);
+        Installment last = rows.get(11);
+        assertThat(paidSum).isEqualByComparingTo(accruedSum);
+        assertThat(last.interestPaid()).isEqualByComparingTo("61000.02");
+        assertThat(last.rentDue()).isEqualByComparingTo("1061000.02");
+        assertThat(last.closingBalance()).isEqualByComparingTo("0.00");
+
+        // The signed tail the deferral produces: rounded sum minus the term-exact accrual. It is
+        // positive (+0.02) and disclosed by the metric, not absorbed.
+        BigDecimal termExact = new BigDecimal("1000000").multiply(new BigDecimal("0.06"))
+                .multiply(new BigDecimal("366")).divide(new BigDecimal("360"));
+        assertThat(paidSum.subtract(termExact)).isEqualByComparingTo("0.02");
+        assertThat(r.schedule().header().metrics().find(MetricCodes.TOTAL_INTEREST))
+                .isEqualByComparingTo("61000.02");
+        assertThat(r.schedule().header().roundingDifference()).isEqualByComparingTo("0.00");
+    }
+
+    private static BigDecimal sum(List<Installment> rows,
+            java.util.function.Function<Installment, BigDecimal> field) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (Installment row : rows) {
+            total = total.add(field.apply(row));
+        }
+        return total;
+    }
+
     // ---- Helpers (R6: per-class fixtures; mirror the calc-domain generator tests) ----
+
+    /**
+     * The 12-period rent sequence {@code EXPLICIT_RENT} consumes: the golden equal-installment
+     * rents (11 × 86 066.43 plus the tail-adjusted 86 066.42). Fed back verbatim as an input, the
+     * generator splits them without any last-period clamp (R69) and must land on the same zero
+     * closing balance — which is what makes the metric-set loop above a clean run.
+     */
+    private static List<BigDecimal> explicitRentSequence() {
+        List<BigDecimal> rents = new java.util.ArrayList<>();
+        for (int i = 0; i < 11; i++) {
+            rents.add(new BigDecimal("86066.43"));
+        }
+        rents.add(new BigDecimal("86066.42"));
+        return rents;
+    }
+
+    /** Element for one built-in method; {@code EXPLICIT_RENT} additionally carries its rents. */
+    private static LeaseElement elementFor(RepaymentMethodId method) {
+        LeaseElement.Builder builder = baseElement().toBuilder().method(method);
+        if (method == RepaymentMethodId.EXPLICIT_RENT) {
+            builder.explicitRents(explicitRentSequence());
+        }
+        return builder.build();
+    }
 
     private static LeaseElement baseElement() {
         return LeaseElement.builder()
