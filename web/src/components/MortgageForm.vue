@@ -7,8 +7,10 @@
  * R101 映射：贷款金额→principal、LPR+加点→nominalRate、放款日→commenceDate、
  * 首期还款日→firstRentDate、期限（月）→periods，固定 MONTHLY / IN_ARREARS /
  * THIRTY_360 / NONE / CNY（P-03：30/360 使月利率 = 年利率 ÷ 12）。
- * 租赁专属键（残值、保证金、费用、规则行、显式租金、宽限期、分段策略、舍入、税率）
- * 一律缺席 —— 空串会被后端当成真实要素写进摊销表的 费用/税 列。
+ * payload 共 14 键（R101 + R137）：11 个房贷要素 + 三个 `LeaseElement` 必填要素
+ * （`residualValue` / `residualHandling` / `rateChangePolicy`，见下方 `buildRequest`）。
+ * 其余租赁专属键（保证金、费用、规则行、显式租金、宽限期、舍入、税率）一律缺席 ——
+ * 空串会被后端当成真实要素写进摊销表的 费用/税 列。
  *
  * R103：抵押物成交价、评估价、月可支配收入、其他月债务支出、首付比例都是前端派生
  * 与前端校验，不进 payload、不进引擎指标目录；贷款成数（LTV）与 DTI 全程在十进制
