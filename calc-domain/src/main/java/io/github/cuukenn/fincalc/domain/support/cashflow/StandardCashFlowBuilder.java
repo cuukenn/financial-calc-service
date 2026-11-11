@@ -32,13 +32,14 @@ import java.util.Objects;
  * under the deposit basis, one rent leg per period on the schedule's own payment dates, and the
  * closing settlement leg.
  *
- * <p>Residual money is listed exactly once, following how the schedule actually settles it
- * (ledger ruling R28): under {@link ResidualHandling#SEPARATE} the option price is an extra
+ * <p>Terminal receipts follow how the schedule actually settles them (ledger ruling R28, CAS 21
+ * 第三十七条): under {@link ResidualHandling#SEPARATE} the purchase option price is an extra
  * maturity inflow while the rents amortize the full principal; under
- * {@link ResidualHandling#BALLOON_IN_RENT} the schedule is required to end with the residual as
- * its closing balance (design document §9.6, {@code TAIL_BALANCE}), so that outstanding amount —
- * not the raw residual — is appended as the maturity settlement. Dropping it would erase money
- * the lessor receives and silently misprice every yield metric.
+ * {@link ResidualHandling#BALLOON_IN_RENT} the schedule is required to end with that price as its
+ * closing balance (design document §9.6, {@code TAIL_BALANCE}), so the outstanding amount — not the
+ * raw input — is appended as the maturity settlement. The guaranteed residual is added on top in
+ * both modes because it is a separate receipt line. Dropping either would erase money the lessor
+ * receives and silently misprice every yield metric.
  *
  * <p>Known v1 gaps: a {@link FeeChargeMode#DEDUCT_FROM_PRINCIPAL} fee or a deposit netted against
  * the t0 principal would have no leg because v1 does not net anything — the {@code FeeAllocator}
@@ -139,28 +140,37 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
         addFlow(flows, t0, money(total, rounding), CashFlowType.FEE, CashFlowDirection.INFLOW);
     }
 
-    /** SEPARATE lists the option price; BALLOON lists whatever the schedule actually left outstanding. */
+    /**
+     * Terminal receipts, listed once each (CAS 21 第三十七条 租赁收款额):
+     *
+     * <ul>
+     *   <li><b>购买选择权行权价 / 留购价</b> — under {@link ResidualHandling#BALLOON_IN_RENT} it *is*
+     *       the schedule's closing balance (the rents amortise principal minus the option price),
+     *       so the outstanding amount is listed; under {@link ResidualHandling#SEPARATE} the rents
+     *       amortise the full principal and the option price is listed as an extra maturity
+     *       receipt.</li>
+     *   <li><b>担保余值</b> — always an extra maturity receipt on top of the option price; it is a
+     *       separate CAS 21 receipt line, not another name for the same money.</li>
+     * </ul>
+     *
+     * <p>The unguaranteed residual is deliberately absent: it never becomes cash. It enters only
+     * the lease implicit-rate equation.
+     */
     private void addClosingResidual(List<CashFlow> flows, LeaseElement element,
             RoundingPolicy rounding, List<Installment> installments, LocalDate maturity) {
         if (maturity == null) {
             return;
         }
-        if (element.residualHandling() == ResidualHandling.SEPARATE) {
-            addFlow(flows, maturity, money(element.residualValue(), rounding),
-                    CashFlowType.RESIDUAL, CashFlowDirection.INFLOW);
-            return;
-        }
         if (element.residualHandling() == ResidualHandling.BALLOON_IN_RENT) {
             BigDecimal outstanding = installments.get(installments.size() - 1).closingBalance();
             addFlow(flows, maturity, outstanding, CashFlowType.RESIDUAL, CashFlowDirection.INFLOW);
-            return;
-        }
-        // CAS 21: the guaranteed residual (incl. purchase option price) is a terminal receipt
-        // even when it is not a balloon in the schedule.
-        if (element.guaranteedResidual() != null && element.guaranteedResidual().signum() > 0) {
-            addFlow(flows, maturity, money(element.guaranteedResidual(), rounding),
+        } else {
+            addFlow(flows, maturity, money(element.residualValue(), rounding),
                     CashFlowType.RESIDUAL, CashFlowDirection.INFLOW);
         }
+        // CAS 21 担保余值: a distinct terminal receipt, so it never replaces the option price.
+        addFlow(flows, maturity, money(element.guaranteedResidual(), rounding),
+                CashFlowType.RESIDUAL, CashFlowDirection.INFLOW);
     }
 
     /**

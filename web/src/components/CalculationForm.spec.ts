@@ -176,6 +176,25 @@ describe('CalculationForm', () => {
     expect(req.initialDirectCosts).toBe('10000')
   })
 
+  it('sends the guaranteed residual without the asset-value chain', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="guaranteed-residual"]').setValue('30000')
+    await submit(wrapper)
+
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.guaranteedResidual).toBe('30000')
+    expect(req.assetValue).toBeUndefined()
+    expect(req.principal).toBe('1000000')
+  })
+
+  it('blocks the unguaranteed residual without an asset value (FCS-DOM-1017)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="unguaranteed-residual"]').setValue('20000')
+    await submit(wrapper)
+
+    expect(calculate).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-test="local-error-alert"]').text()).toContain('资产价值')
+  })
   it('shows the English localized names in en-US (R89)', () => {
     setLocale('en-US')
     const wrapper = mountWithI18n(CalculationForm)

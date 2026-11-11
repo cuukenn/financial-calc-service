@@ -102,7 +102,9 @@ const zhCN = {
       amountPh: '如 0',
       initialDirectCosts: '初始直接费用（IDC）',
       guaranteedResidual: '担保余值',
+      guaranteedResidualHint: '期末实际收取的担保金额（CAS 21 租赁收款额），进现金流表',
       unguaranteedResidual: '未担保余值',
+      unguaranteedResidualHint: '只参与租赁内含利率的求解，不产生现金流',
       vatRate: '增值税率',
       // R92-5：百分数口径输入（6 或 6% → 0.06），附中国增值税档次快选。
       vatRatePh: '如 6 或 6%',
@@ -110,6 +112,7 @@ const zhCN = {
     },
     submit: '开始测算',
     submitting: '测算中…',
+    chainRequiresAssetValue: '填写首付款 / 初始直接费用 / 未担保余值时，必须同时填写资产价值',
     submitFailed: '测算失败（{code}）',
     // Task 6 §2：显式重置（两个表单各有一个重置按钮，共用这条文案）。
     reset: '重置表单',

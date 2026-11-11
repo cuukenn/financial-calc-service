@@ -223,6 +223,33 @@ class LeaseElementTest {
                 .isInstanceOf(BusinessException.class);
     }
 
+    /**
+     * M-01: 首付款 / IDC / 未担保余值 cannot move any number without the asset value (the chain
+     * has no denominator), so a lone amount is rejected instead of being silently ignored.
+     */
+    @Test
+    void chain_amounts_require_the_asset_value() {
+        assertThatThrownBy(() -> baseBuilder()
+                .downPayment(new BigDecimal("400000"))
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1017");
+        assertThatThrownBy(() -> baseBuilder()
+                .initialDirectCosts(new BigDecimal("10000"))
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1017");
+        assertThatThrownBy(() -> baseBuilder()
+                .unguaranteedResidual(new BigDecimal("70000"))
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1017");
+
+        // The guaranteed residual is a standalone receipt, so it needs no chain.
+        assertThat(baseBuilder().guaranteedResidual(new BigDecimal("30000")).build()
+                .guaranteedResidual()).isEqualByComparingTo("30000");
+    }
+
     private LeaseElement.Builder baseBuilder() {
         return LeaseElement.builder()
                 .principal(new BigDecimal("1000000"))

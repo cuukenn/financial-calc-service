@@ -122,6 +122,56 @@ class StandardCashFlowBuilderTest {
     }
 
     @Test
+    void guaranteed_residual_is_a_terminal_receipt_on_top_of_the_option_price() {
+        LeaseElement withGuarantee = element().toBuilder()
+                .residualValue(new BigDecimal("100000"))
+                .guaranteedResidual(new BigDecimal("30000"))
+                .build();
+
+        List<CashFlow> flows = builder.build(generate(withGuarantee), withGuarantee,
+                CalculationOptions.defaults());
+
+        List<CashFlow> terminal = flows.stream()
+                .filter(f -> f.type() == CashFlowType.RESIDUAL).collect(toList());
+        assertThat(terminal).hasSize(2);
+        assertThat(terminal.get(0).amount().add(terminal.get(1).amount()))
+                .isEqualByComparingTo("130000.00");
+    }
+
+    @Test
+    void guaranteed_residual_stacks_on_the_balloon_without_relisting_the_option_price() {
+        LeaseElement balloon = element().toBuilder()
+                .residualValue(new BigDecimal("100000"))
+                .residualHandling(ResidualHandling.BALLOON_IN_RENT)
+                .guaranteedResidual(new BigDecimal("30000"))
+                .build();
+
+        List<CashFlow> flows = builder.build(generate(balloon), balloon,
+                CalculationOptions.defaults());
+
+        // 100 000 of ballooned option price + 30 000 of guarantee, each exactly once.
+        BigDecimal terminal = flows.stream()
+                .filter(f -> f.type() == CashFlowType.RESIDUAL)
+                .map(CashFlow::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertThat(terminal).isEqualByComparingTo("130000.00");
+    }
+
+    @Test
+    void unguaranteed_residual_never_becomes_cash() {
+        LeaseElement withUnguaranteed = element().toBuilder()
+                .assetValue(new BigDecimal("1000000"))
+                .unguaranteedResidual(new BigDecimal("70000"))
+                .build();
+
+        List<CashFlow> flows = builder.build(generate(withUnguaranteed), withUnguaranteed,
+                CalculationOptions.defaults());
+
+        assertThat(flows).noneMatch(f -> f.type() == CashFlowType.RESIDUAL);
+    }
+
+
+    @Test
     void deposit_only_appears_when_basis_includes_it() {
         LeaseElement withDeposit = element().toBuilder().deposit(new BigDecimal("50000")).build();
 

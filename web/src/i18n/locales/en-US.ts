@@ -100,7 +100,9 @@ const enUS: typeof zhCN = {
       amountPh: 'e.g. 0',
       initialDirectCosts: 'Initial direct costs (IDC)',
       guaranteedResidual: 'Guaranteed residual',
+      guaranteedResidualHint: 'Cash actually collected at maturity (CAS 21 lease receipts)',
       unguaranteedResidual: 'Unguaranteed residual',
+      unguaranteedResidualHint: 'Feeds the lease implicit rate only; it never becomes cash',
       vatRate: 'VAT rate',
       // R92-5: percent-style input (6 or 6% → 0.06), with China VAT bracket quick picks.
       vatRatePh: 'e.g. 6 or 6%',
@@ -108,6 +110,7 @@ const enUS: typeof zhCN = {
     },
     submit: 'Calculate',
     submitting: 'Calculating…',
+    chainRequiresAssetValue: 'Down payment / IDC / unguaranteed residual require an asset value',
     submitFailed: 'Calculation failed ({code})',
     // Task 6 §2: explicit reset (both forms have their own reset button, shared copy).
     reset: 'Reset form',

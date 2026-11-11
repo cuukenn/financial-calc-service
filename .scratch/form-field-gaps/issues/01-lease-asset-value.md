@@ -1,6 +1,6 @@
 # 01. 融资租赁补「租赁物价值」与首付款
 
-Status: needs-triage（实现已撤回，见下）
+Status: resolved（2026-11-11 按标准计量链落地）
 Type: task
 Priority: P1
 数据角色: A 参与测算 —— 改变租赁内含利率的分母与首付款
@@ -56,3 +56,29 @@ principal=1,000,000  assetValue=1,200,000  →  LEASE_IMPLICIT_RATE = -23.77%
 
 `web/src/components/CalculationForm.vue`、`web/src/i18n/locales/*.ts`、
 `calc-domain`（`LeaseElement`）、`calc-engine`（内含利率计算）、`calc-server`（DTO）。
+
+
+## 落地记录（2026-11-11）
+
+三个领域决策由 `docs/superpowers/specs/2026-11-11-lease-measurement-standard.md` 回答后完成：
+
+- 计量链：`资产价值 + IDC = PV(租赁收款额) + PV(未担保余值)`，`融资额 = 价值 + IDC − 首付`；
+  租金按**融资额**生成（不是按资产价值）。
+- 首付款是 `租赁收款额` 的一项，作为 t0 收款进入现金流（不是利息的减项）。
+- 内含利率只在 IDC 或未担保余值 > 0 时才与 `IRR_ANNUAL` 分离；否则两者恒等，UI 已注明。
+
+实现落点：
+
+| 层 | 内容 |
+|---|---|
+| 领域 | `LeaseElement.assetValue / downPayment / initialDirectCosts / guaranteedResidual / unguaranteedResidual`，恒等式 `FCS-DOM-1016`（容差 `MoneyTolerance.MONEY_COMPARE`） |
+| 契约 | `CalculationRequestDto` + `CalculationRequestAssembler` 五字段，缺省不发送 |
+| 表单 | 资产价值 + 首付款 + IDC + 两项余值；实时派生「融资额」并在提交时替换 `principal` |
+| 现金流 | t0 流出 = 资产价值 + IDC；首付款 t0 流入；担保余值期末流入；未担保余值不进现金流 |
+| 指标 | `LEASE_IMPLICIT_RATE`（第 26 个 code），分母 = 资产价值 + IDC |
+
+真机校验：`principal=2010000 / 价值 2400000 + IDC 10000 − 首付 400000` → 200；
+`principal=1900000` → 400 `FCS-DOM-1016`。
+
+残余项：担保余值目前只影响现金流、不影响摊销表（与「留购价单独支付」一致）；若要变成气球
+式，应复用 `residualHandling` 而不是新增字段。

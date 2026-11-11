@@ -348,6 +348,41 @@ class CashFlowPerspectiveMetricsTest {
                 .isEqualByComparingTo("101530.00");
     }
 
+    /**
+     * CAS 21 担保余值 is a separate receipt line, so it is paid on top in both modes — the
+     * balloon only folds the <em>option price</em> into the rents.
+     */
+    @Test
+    void total_repayment_always_adds_the_guaranteed_residual() {
+        LeaseElement separate = element().toBuilder()
+                .periods(3)
+                .residualValue(new BigDecimal("5000"))
+                .residualHandling(ResidualHandling.SEPARATE)
+                .guaranteedResidual(new BigDecimal("3000"))
+                .build();
+        LeaseElement balloon = element().toBuilder()
+                .periods(3)
+                .residualValue(new BigDecimal("5000"))
+                .residualHandling(ResidualHandling.BALLOON_IN_RENT)
+                .guaranteedResidual(new BigDecimal("3000"))
+                .build();
+        Schedule schedule = handWrittenSchedule();
+
+        BigDecimal separateTotal = totalRepayment(schedule, separate);
+        BigDecimal balloonTotal = totalRepayment(schedule, balloon);
+
+        // 101 530.00 + 5 000.00 option + 3 000.00 guarantee.
+        assertThat(separateTotal).isEqualByComparingTo("109530.00");
+        // 101 530.00 rents (option already inside) + 3 000.00 guarantee.
+        assertThat(balloonTotal).isEqualByComparingTo("104530.00");
+    }
+
+    private static BigDecimal totalRepayment(Schedule schedule, LeaseElement element) {
+        return MetricRegistry.defaults().computeAll(new MetricContext(
+                Collections.<CashFlow>emptyList(), schedule, element, 12, null, null, null,
+                CashFlowPerspective.LESSEE)).find(MetricCodes.BORROWER_TOTAL_REPAYMENT);
+    }
+
     /** Null-safety mirrors {@code TotalMetrics}: no schedule, no total — never a fabricated 0.00. */
     @Test
     void total_repayment_is_absent_without_a_schedule_and_on_a_lessor_run() {

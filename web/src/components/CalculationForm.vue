@@ -312,18 +312,26 @@ function buildRequest(): CalculationRequest {
     // 金额以 JSON 字符串传输（R76：保留 BigDecimal 精度）。
     // CAS 21：填了资产价值时，融资额由 价值 + IDC − 首付 派生（引擎会再校验恒等式）。
     principal: financedPrincipal.value ?? form.principal.trim(),
+    // CAS 21 计量链：每个键独立选填，未填就不发送（引擎把缺省视为 0）。
+    // 资产价值决定「融资额是否派生」，首付与 IDC 只有伴随资产价值才有意义。
     ...(form.assetValue.trim() === ''
       ? {}
       : {
           assetValue: form.assetValue.trim(),
-          downPayment: form.downPayment.trim() === '' ? '0' : form.downPayment.trim(),
-          initialDirectCosts:
-            form.initialDirectCosts.trim() === '' ? '0' : form.initialDirectCosts.trim(),
-          guaranteedResidual:
-            form.guaranteedResidual.trim() === '' ? '0' : form.guaranteedResidual.trim(),
-          unguaranteedResidual:
-            form.unguaranteedResidual.trim() === '' ? '0' : form.unguaranteedResidual.trim(),
+          ...(form.downPayment.trim() === ''
+            ? {}
+            : { downPayment: form.downPayment.trim() }),
+          ...(form.initialDirectCosts.trim() === ''
+            ? {}
+            : { initialDirectCosts: form.initialDirectCosts.trim() }),
         }),
+    // 两项余值独立于计量链：担保余值是期末真实收款，未担保余值只进内含利率。
+    ...(form.guaranteedResidual.trim() === ''
+      ? {}
+      : { guaranteedResidual: form.guaranteedResidual.trim() }),
+    ...(form.unguaranteedResidual.trim() === ''
+      ? {}
+      : { unguaranteedResidual: form.unguaranteedResidual.trim() }),
     // R92-6：名义年利率为百分数口径展示值（6 / 6% / 600bp），提交前换算为小数字符串。
     nominalRate: parseRateInput(form.nominalRate) ?? form.nominalRate.trim(),
     // 日期为 ISO-8601 字符串（DatePicker value-format 绑定）。
@@ -379,6 +387,18 @@ async function onFinish(): Promise<void> {
     blockRun(
       t('form.rentStructure.explicitRents.incomplete', { periods: form.periods ?? 0 }),
     )
+    return
+  }
+
+  // M-01：首付款 / IDC / 未担保余值没有资产价值就没有分母，引擎会拒绝（FCS-DOM-1017），
+  // 前端先拦一次，别把一个必然 400 的请求发出去。
+  if (
+    form.assetValue.trim() === '' &&
+    (form.downPayment.trim() !== '' ||
+      form.initialDirectCosts.trim() !== '' ||
+      form.unguaranteedResidual.trim() !== '')
+  ) {
+    blockRun(t('form.chainRequiresAssetValue'))
     return
   }
 
@@ -715,9 +735,15 @@ function onReset(): void {
                 </FormItem>
                 <FormItem :label="t('form.feesOther.guaranteedResidual')" name="guaranteedResidual">
                   <Input v-model:value="form.guaranteedResidual" :placeholder="t('form.feesOther.amountPh')" data-test="guaranteed-residual" />
+                  <Typography.Text type="secondary" style="display: block; margin-top: 4px">
+                    {{ t('form.feesOther.guaranteedResidualHint') }}
+                  </Typography.Text>
                 </FormItem>
                 <FormItem :label="t('form.feesOther.unguaranteedResidual')" name="unguaranteedResidual">
                   <Input v-model:value="form.unguaranteedResidual" :placeholder="t('form.feesOther.amountPh')" data-test="unguaranteed-residual" />
+                  <Typography.Text type="secondary" style="display: block; margin-top: 4px">
+                    {{ t('form.feesOther.unguaranteedResidualHint') }}
+                  </Typography.Text>
                 </FormItem>
               </Col>
               <Col :span="12">

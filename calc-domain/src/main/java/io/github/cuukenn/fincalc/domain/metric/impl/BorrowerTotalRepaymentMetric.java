@@ -69,15 +69,23 @@ public final class BorrowerTotalRepaymentMetric implements FinancialMetric {
         for (Installment installment : MetricSupport.rows(context)) {
             amounts.add(installment.rentDue());
         }
-        amounts.add(separateResidual(context.element()));
+        amounts.add(terminalReceipts(context.element()));
         return MoneyUtils.out(MoneyUtils.sum(amounts));
     }
 
-    /** The option price the lessee pays at maturity on top of the rents; 0 when it is inside them. */
-    private static BigDecimal separateResidual(LeaseElement element) {
-        if (element == null || element.residualHandling() != ResidualHandling.SEPARATE) {
+    /**
+     * Money the lessee pays at maturity on top of the rents (CAS 21 第三十七条 租赁收款额): the
+     * purchase option price when it is settled separately (under
+     * {@link ResidualHandling#BALLOON_IN_RENT} it is already inside the rents) plus the guaranteed
+     * residual, which is always a distinct receipt.
+     */
+    private static BigDecimal terminalReceipts(LeaseElement element) {
+        if (element == null) {
             return MoneyUtils.ZERO;
         }
-        return MoneyUtils.zeroIfNull(element.residualValue());
+        BigDecimal option = element.residualHandling() == ResidualHandling.SEPARATE
+                ? MoneyUtils.zeroIfNull(element.residualValue())
+                : MoneyUtils.ZERO;
+        return option.add(MoneyUtils.zeroIfNull(element.guaranteedResidual()));
     }
 }

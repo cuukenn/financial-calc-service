@@ -170,6 +170,27 @@ curl -s -X POST http://localhost:8080/api/v1/calculations \
 字符串；不可计算的指标序列化为显式 `null`（字段不省略）。请求字段与枚举取值的完整说明见
 `/v3/api-docs` 的 `CalculationRequestDto` schema。
 
+### CAS 21 计量链（选填）
+
+在不发送 `assetValue` 的请求里，`principal` 就是融资额（既有口径）。同时发送下面五项时，引擎按
+`docs/superpowers/specs/2026-11-11-lease-measurement-standard.md` 的计量链工作：
+
+```
+资产价值 + 初始直接费用 = PV(租赁收款额) + PV(未担保余值)
+融资额   = 资产价值 + 初始直接费用 − 首付款        (= principal，容差 0.01 元，FCS-DOM-1016)
+```
+
+| 字段 | 现金流角色 |
+|---|---|
+| `assetValue` | t0 流出改为 `资产价值 + 初始直接费用`；也是 `LEASE_IMPLICIT_RATE` 的分母 |
+| `downPayment` | t0 流入（属于租赁收款额）；单独发送会被拒：`FCS-DOM-1017` |
+| `initialDirectCosts` | 计入 t0 流出；单独发送会被拒：`FCS-DOM-1017` |
+| `guaranteedResidual` | 期末 `RESIDUAL` 流入，可独立于计量链发送 |
+| `unguaranteedResidual` | **不进现金流**，只进 `LEASE_IMPLICIT_RATE` 方程；无 `assetValue` 时拒绝（`FCS-DOM-1017`） |
+
+无未担保余值时 `LEASE_IMPLICIT_RATE` 与 `IRR_ANNUAL` 恒等（同一个根的两端写法）；有未担保余值
+时两者分离。
+
 ### 错误体契约
 
 所有失败返回统一错误体 `{code, message}`（R77），无其他形态：
@@ -249,7 +270,7 @@ cd web && npm install && npm run dev    # 前置：calc-server 运行于 8080
 | 抵押物成交价 / 评估价 | 不发送：抵押物价值 = 成交价与评估价孰低，只在前端算，驱动贷款成数（LTV）与首付比例 |
 | 首付比例 ≥ 15% | 不发送：前端提交闸门（AGENTS.md §2.3） |
 | 月可支配收入 / 其他月债务支出 | 不发送：前端 DTI 仪表的输入（50% / 60%） |
-| 残值 / 留购价（住房按揭没有这一项） | 显式发送 `residualValue = "0"` 与 `residualHandling = "SEPARATE"`：`SEPARATE` + 0 让 §3.4 校验一（Σ本金 = 合同本金）与校验二（末期余额 = 0）严格成立，不把任何残值摊进租金 |
+| 留购价（住房按揭没有这一项） | 显式发送 `residualValue = "0"` 与 `residualHandling = "SEPARATE"`：`SEPARATE` + 0 让 §3.4 校验一（Σ本金 = 合同本金）与校验二（末期余额 = 0）严格成立，不把任何留购价摊进租金 |
 | 分段利率姿态 | 显式发送 `rateChangePolicy = "RESOLVE"`（重定价的既有姿态：自变更日重算）；仍未建模 3/6/12 个月的重定价周期 |
 | 其余租赁专属要素 | `explicitRents` / `ruleRows` / `fees` / `deposit` / `vatRate` 一律不发送（缺席 = 该要素不存在；空串会被当成真实要素写进摊销表的费用/税列）。`gracePeriod` / `rounding` 缺席时由 `CalculationRequestAssembler` 补默认（`GracePeriod.none()` / `RoundingPolicy.defaults()`）；`residualHandling` 与 `rateChangePolicy` **不在**补默认之列 —— 它们是 `LeaseElement` 的必填要素（AGENTS.md §3.1：输入要素必须显式提供、缺失即报错、不得静默取默认值），缺席即 400 `FCS-COM-0001 … 必填`，所以必须由表单显式发送（R137，缺陷 D-1 的根因） |
 

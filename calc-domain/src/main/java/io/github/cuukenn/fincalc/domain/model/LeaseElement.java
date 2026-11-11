@@ -180,6 +180,12 @@ public final class LeaseElement {
         requireNonNegative("guaranteedResidual", guaranteedResidual);
         requireNonNegative("unguaranteedResidual", unguaranteedResidual);
         if (assetValue == null) {
+            // M-01: an amount that cannot move any cash flow or balance is a decoration, not an
+            // input. Without an asset value the chain has no denominator, so these three would be
+            // silently ignored (the down payment would even enter as a lone t0 inflow).
+            requireAssetValueWhenPositive("downPayment", downPayment);
+            requireAssetValueWhenPositive("initialDirectCosts", initialDirectCosts);
+            requireAssetValueWhenPositive("unguaranteedResidual", unguaranteedResidual);
             return;
         }
         if (assetValue.signum() <= 0
@@ -197,6 +203,13 @@ public final class LeaseElement {
     private static void requireNonNegative(String name, BigDecimal value) {
         if (value != null && value.signum() < 0) {
             throw new BusinessException(DomainErrorCode.NON_NEGATIVE_AMOUNT, name, value);
+        }
+    }
+
+    private static void requireAssetValueWhenPositive(String name, BigDecimal value) {
+        if (value != null && value.signum() > 0) {
+            throw new BusinessException(DomainErrorCode.CHAIN_AMOUNT_REQUIRES_ASSET_VALUE,
+                    name, value);
         }
     }
 

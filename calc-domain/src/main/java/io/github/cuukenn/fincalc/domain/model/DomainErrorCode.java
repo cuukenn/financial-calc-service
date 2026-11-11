@@ -56,6 +56,9 @@ public enum DomainErrorCode implements ErrorCode {
     PRINCIPAL_NOT_BALANCED("FCS-DOM-1016",
             "FCS-DOM-1016: 融资额须等于 资产价值 + 初始直接费用 - 首付款: %s"),
 
+    CHAIN_AMOUNT_REQUIRES_ASSET_VALUE("FCS-DOM-1017",
+            "FCS-DOM-1017: %s 必须与资产价值同时提供（CAS 21 计量链）: %s"),
+
     PERIOD_SEQUENCE_INVALID("FCS-DOM-2001",
             "FCS-DOM-2001: 期次日期必须严格递增且 start < end: 第 %s 期 [%s, %s]"),
 

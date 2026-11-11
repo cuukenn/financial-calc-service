@@ -45,7 +45,7 @@ describe('metric catalog (R86)', () => {
     expect([...METRIC_CODES]).toEqual(EXPECTED_CODES)
   })
 
-  it('every metric carries name / formula / description in both locales (25 × 6 fields)', () => {
+  it('every metric carries name / formula / description in both locales (26 × 6 fields)', () => {
     const fields = ['nameZh', 'nameEn', 'formulaZh', 'formulaEn', 'descZh', 'descEn'] as const
     for (const code of EXPECTED_CODES) {
       const info = METRIC_CATALOG[code as keyof typeof METRIC_CATALOG]
@@ -122,7 +122,7 @@ describe('metric primary display classification (R92-4/R92-8)', () => {
   it('shows custom-code metrics by the catalog localized name (zh-CN)', () => {
     expect(metricPrimaryLabel('TOTAL_RENT', 'zh-CN')).toBe('租金合计')
     expect(metricPrimaryLabel('TOTAL_PRINCIPAL', 'zh-CN')).toBe('本金合计')
-    expect(metricPrimaryLabel('RESIDUAL_VALUE', 'zh-CN')).toBe('残值')
+    expect(metricPrimaryLabel('RESIDUAL_VALUE', 'zh-CN')).toBe('留购价（名义货价）')
     expect(metricPrimaryLabel('PAYBACK_PERIOD', 'zh-CN')).toBe('静态回收期（年）')
     expect(metricPrimaryLabel('CONVEXITY', 'zh-CN')).toBe('凸性')
     expect(metricPrimaryLabel('TRUE_ANNUAL_RATE', 'zh-CN')).toBe('真实年化')

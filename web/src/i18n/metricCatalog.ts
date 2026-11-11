@@ -94,12 +94,12 @@ export const METRIC_CATALOG: Record<MetricCode, MetricInfo> = {
     descEn: 'Sum of rent (principal + interest + fee + tax) across periods (scale 2)',
   },
   RESIDUAL_VALUE: {
-    nameZh: '残值',
-    nameEn: 'Residual Value',
-    formulaZh: 'residualValue',
-    formulaEn: 'residualValue',
-    descZh: '合同约定的留购价/残值，期末按残值处理方式支付（scale 2）',
-    descEn: 'The contractual purchase price / residual value, settled at end of term per residual handling (scale 2)',
+    nameZh: '留购价（名义货价）',
+    nameEn: 'Purchase Option Price',
+    formulaZh: '合同约定的留购价',
+    formulaEn: 'Contractual purchase option price',
+    descZh: '期末取得所有权的对价；期末单独支付或在租期内摊还（看留购价处理）',
+    descEn: 'Price of obtaining ownership at maturity; paid separately or amortised into the rents',
   },
   LEASE_IMPLICIT_RATE: {
     nameZh: '租赁内含利率',
