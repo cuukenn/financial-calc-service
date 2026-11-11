@@ -243,7 +243,7 @@ class CalculationFacadeTest {
     }
 
     @Test
-    void effective_interest_table_closes_for_a_separate_residual_schedule() {
+    void effective_interest_table_prices_and_closes_at_a_separately_settled_option_price() {
         LeaseElement element = baseElement().toBuilder()
                 .residualValue(new BigDecimal("100000"))
                 .residualHandling(ResidualHandling.SEPARATE)
@@ -255,8 +255,87 @@ class CalculationFacadeTest {
         assertThat(r.schedule().hasErrors()).isFalse();
         assertThat(r.effectiveInterest()).isNotNull();
         assertThat(r.effectiveInterest().rows()).hasSize(12);
+        // CAS 21 第三十八条（三）/第三十九条: a separately settled option price is part of the
+        // lease receipts, so the chain prices it and stops at it. Pricing the pure rent stream
+        // instead (the pre-chain wiring) understated the lessor's yield: the rents amortize the
+        // whole principal while 100 000.00 arrives on top at maturity.
         assertThat(r.effectiveInterest().rows().get(11).closingNetInvestment())
-                .isEqualByComparingTo("0.00");
+                .isEqualByComparingTo("100000.00");
+        // The metric IRR_PERIOD is the event-table rate scaled to P-11's 10 places; the chain
+        // solves to full internal precision, so equality holds to the metric's own scale.
+        assertThat(r.effectiveInterest().eir().setScale(10, java.math.RoundingMode.HALF_UP))
+                .isEqualByComparingTo(r.schedule().header().metrics().find(MetricCodes.IRR_PERIOD));
+    }
+
+    /**
+     * The residual money the schedule never amortizes — the guaranteed and unguaranteed residual
+     * (CAS 21 第三十八条（四）/（五）) — must reach the terminal target too. Neither appears in
+     * {@code rentDue} nor in the schedule's closing balance, so a chain that ignored them would
+     * price a stream shorter than the deal and stop short of the lessor's real net investment.
+     * With an {@code assetValue} present the principal-balance rule demands
+     * {@code principal = assetValue + IDC − downPayment}, hence the explicit asset value here.
+     */
+    @Test
+    void effective_interest_table_prices_guaranteed_and_unguaranteed_residuals() {
+        LeaseElement element = baseElement().toBuilder()
+                .assetValue(new BigDecimal("1000000"))
+                .guaranteedResidual(new BigDecimal("60000"))
+                .unguaranteedResidual(new BigDecimal("40000"))
+                .build();
+
+        CalculationResult r = CalculationFacade.defaults().calculate(
+                new CalculationRequest(element, null, CalculationOptions.defaults()));
+
+        assertThat(r.schedule().hasErrors()).isFalse();
+        assertThat(r.effectiveInterest()).isNotNull();
+        assertThat(r.effectiveInterest().rows()).hasSize(12);
+        // Terminal target = closing balance 0 + 60 000.00 + 40 000.00 — the §9.7 chain stops at
+        // the full residual money. The stream (rents amortizing the whole principal plus
+        // 100 000.00 at maturity) is identical to the separately settled option-price deal above,
+        // so the chain's EIR must land on the same root.
+        assertThat(r.effectiveInterest().rows().get(11).closingNetInvestment())
+                .isEqualByComparingTo("100000.00");
+        assertThat(r.effectiveInterest().eir())
+                .isEqualByComparingTo(new BigDecimal("0.018330355206960317887095484105732990671974"));
+        // Pinned divergence (documented, deliberate): the IRR_PERIOD metric prices the §9.4 event
+        // table, where the guaranteed residual is a real receipt but the unguaranteed residual is
+        // not (the lessor recovers it by keeping the asset, not in cash). The §9.7 chain prices
+        // the full net investment including it, so the two rates differ here — bringing the
+        // unguaranteed residual into the event table is a metric-definition ruling, not wiring.
+        assertThat(r.schedule().header().metrics().find(MetricCodes.IRR_PERIOD))
+                .isEqualByComparingTo(new BigDecimal("0.0132986777"));
+        assertThat(r.effectiveInterest().eir())
+                .isGreaterThan(r.schedule().header().metrics().find(MetricCodes.IRR_PERIOD));
+    }
+
+    /**
+     * Every residual leg at once: a ballooned 留购价 inside the rent (the schedule's own closing
+     * balance), a separately settled option price and a guaranteed residual on top. The chain must
+     * stop at exactly their sum — 50 000.00 + 30 000.00 + 20 000.00 — with no double counting of
+     * the ballooned part.
+     */
+    @Test
+    void effective_interest_terminal_target_sums_balloon_separate_and_guaranteed_residuals() {
+        LeaseElement element = baseElement().toBuilder()
+                .residualValue(new BigDecimal("50000"))
+                .residualHandling(ResidualHandling.BALLOON_IN_RENT)
+                .guaranteedResidual(new BigDecimal("30000"))
+                .unguaranteedResidual(new BigDecimal("20000"))
+                .assetValue(new BigDecimal("1000000"))
+                .build();
+
+        CalculationResult r = CalculationFacade.defaults().calculate(
+                new CalculationRequest(element, null, CalculationOptions.defaults()));
+
+        assertThat(r.schedule().hasErrors()).isFalse();
+        assertThat(r.effectiveInterest()).isNotNull();
+        assertThat(r.effectiveInterest().rows().get(11).closingNetInvestment())
+                .isEqualByComparingTo("100000.00");
+        // Same pinned divergence as above: the ballooned 留购价 and the guaranteed residual are in
+        // the event table, the unguaranteed residual is only in the §9.7 target, so the metric
+        // IRR_PERIOD (event-table rate) sits below the chain's EIR (full net investment).
+        assertThat(r.effectiveInterest().eir())
+                .isGreaterThan(r.schedule().header().metrics().find(MetricCodes.IRR_PERIOD));
     }
 
     // ---- Step 2 of the orchestration: RULE_DRIVEN without a rule set fails loudly ----

@@ -110,6 +110,19 @@ public final class EffectiveInterestCalculator {
      *         close to the schedule's terminal balance within {@code 0.01 × periods}
      */
     public static EffectiveInterestTable calculate(Schedule schedule, BigDecimal periodIrr) {
+        return calculate(schedule, periodIrr, null);
+    }
+
+    /**
+     * Same chain with a terminal target the schedule itself does not carry. CAS 21 第三十八条/
+     * 第三十九条 allocates finance income over the lessor's net investment, and that investment
+     * is only recovered by <em>all</em> the receipts: the separately settled 留购价, the
+     * guaranteed residual and the unguaranteed residual never appear in {@code rentDue} nor in the
+     * schedule's closing balance, so they are passed here and the chain stops at their sum on top
+     * of the schedule's own closing balance. Null keeps the schedule-only target.
+     */
+    public static EffectiveInterestTable calculate(Schedule schedule, BigDecimal periodIrr,
+            BigDecimal closingTargetExtra) {
         Objects.requireNonNull(schedule, "schedule");
         if (periodIrr == null) {
             throw new BusinessException(CalcErrorCode.IRR_NOT_CONVERGED);
@@ -146,7 +159,8 @@ public final class EffectiveInterestCalculator {
 
         EffectiveInterestRow lastRow = rows.get(rows.size() - 1);
         BigDecimal target = MoneyUtils.scale(
-                installments.get(installments.size() - 1).closingBalance(), MoneyScale.OUTPUT);
+                installments.get(installments.size() - 1).closingBalance()
+                        .add(MoneyUtils.zeroIfNull(closingTargetExtra)), MoneyScale.OUTPUT);
         BigDecimal adjustment = target.subtract(lastRow.closingNetInvestment());
         BigDecimal tolerance = CLOSING_TOLERANCE_PER_PERIOD.multiply(
                 BigDecimal.valueOf(installments.size()));

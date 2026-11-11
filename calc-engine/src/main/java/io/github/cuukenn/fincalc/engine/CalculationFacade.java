@@ -18,6 +18,7 @@ import io.github.cuukenn.fincalc.domain.model.EffectiveInterestTable;
 import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
+import io.github.cuukenn.fincalc.domain.model.ResidualHandling;
 import io.github.cuukenn.fincalc.domain.model.RepaymentMethodId;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
 import io.github.cuukenn.fincalc.domain.model.ValidationIssue;
@@ -104,10 +105,13 @@ import java.util.stream.Stream;
  * <ul>
  *   <li>{@code t0}: the schedule's first opening balance (the net investment, out);</li>
  *   <li>{@code t1..tn}: each installment's {@code rentDue} (in);</li>
- *   <li>{@code tn}: the schedule's terminal closing balance re-dated to the last rent's index
- *       (in), when it is nonzero — under {@code BALLOON_IN_RENT} the outstanding residual the
- *       chain is required to stop at; under {@code SEPARATE} the schedule amortizes the full
- *       principal, the terminal balance is zero and the stream is the pure rent stream.</li>
+ *   <li>{@code tn}: the terminal net investment re-dated to the last rent's index (in), when it is
+ *       nonzero — the schedule's own closing balance (the ballooned 留购价) <b>plus the residual
+ *       money the schedule never amortizes</b>: a separately settled 留购价, the guaranteed
+ *       residual and the unguaranteed residual. CAS 21 第三十八条/第三十九条 allocates finance
+ *       income over the lessor's net investment, and that investment unwinds into exactly those
+ *       amounts at maturity, so pricing the chain without them (the pre-R147 wiring) priced a
+ *       stream the deal does not have.</li>
  * </ul>
  * With that root the chain closes exactly for both shapes: the IRR equation
  * {@code P = Σ rentᵢ/(1+r)ⁱ + T/(1+r)ⁿ} rearranges to
@@ -269,7 +273,7 @@ public final class CalculationFacade {
 
         // Step 7: the §9.7 effective-interest table (nullable, never thrown).
         EffectiveInterestTable effectiveInterest =
-                effectiveInterest(schedule, metrics, engineIssues);
+                effectiveInterest(schedule, element, metrics, engineIssues);
 
         // The engine's findings join the schedule's own issues in one rebuild.
         if (!engineIssues.isEmpty()) {
@@ -289,21 +293,22 @@ public final class CalculationFacade {
      * decision). Every refusal path answers {@code null} and records a WARN issue carrying the
      * stable code of the refusal — the run itself never fails here.
      */
-    private EffectiveInterestTable effectiveInterest(Schedule schedule, FinancialMetrics metrics,
-            List<ValidationIssue> issues) {
+    private EffectiveInterestTable effectiveInterest(Schedule schedule, LeaseElement element,
+            FinancialMetrics metrics, List<ValidationIssue> issues) {
         if (metrics.find(MetricCodes.IRR_PERIOD) == null) {
             issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
                     "FCS-CALC-3003: IRR_PERIOD 不收敛, 实际利率法摊销表未生成", null));
             return null;
         }
-        BigDecimal periodIrr = rentConsistentPeriodIrr(schedule);
+        BigDecimal residualExtra = unrecoveredResiduals(element, schedule);
+        BigDecimal periodIrr = netInvestmentPeriodIrr(schedule, residualExtra);
         if (periodIrr == null) {
             issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
                     "FCS-CALC-3003: 租金口径现金流无内部收益率, 实际利率法摊销表未生成", null));
             return null;
         }
         try {
-            return EffectiveInterestCalculator.calculate(schedule, periodIrr);
+            return EffectiveInterestCalculator.calculate(schedule, periodIrr, residualExtra);
         } catch (BusinessException ex) {
             issues.add(new ValidationIssue(IssueLevel.WARN, ex.errorCode().code(),
                     "实际利率法摊销表未生成: " + ex.getMessage(), null));
@@ -312,12 +317,31 @@ public final class CalculationFacade {
     }
 
     /**
-     * The rent-consistent periodic rate of the R52 wiring: the IRR of the stream the §9.7 chain
-     * itself prices — the first opening balance at t0, the rent legs, and the schedule's terminal
-     * closing balance re-dated to the last rent's index when nonzero. See the class javadoc for
-     * the closing arithmetic and the shapes this closes exactly.
+     * The terminal net investment the §9.7 chain must stop at (CAS 21 第三十八条 / 第三十九条):
+     * the schedule's own closing balance (the ballooned 留购价) plus the money the schedule never
+     * amortizes — a separately settled 留购价, the guaranteed residual, and the unguaranteed
+     * residual, which the lessor recovers by keeping the asset rather than as cash. The rate
+     * search prices exactly this target, which is what makes the chain close (R52's identity).
      */
-    private BigDecimal rentConsistentPeriodIrr(Schedule schedule) {
+    private static BigDecimal unrecoveredResiduals(LeaseElement element, Schedule schedule) {
+        if (element == null) {
+            return MoneyUtils.ZERO;
+        }
+        BigDecimal separateOption = element.residualHandling() == ResidualHandling.SEPARATE
+                ? MoneyUtils.zeroIfNull(element.residualValue()) : MoneyUtils.ZERO;
+        return separateOption
+                .add(MoneyUtils.zeroIfNull(element.guaranteedResidual()))
+                .add(MoneyUtils.zeroIfNull(element.unguaranteedResidual()));
+    }
+
+    /**
+     * The net-investment periodic rate of the R52 wiring (renamed once the terminal target learned
+     * about residual money): the IRR of the stream the §9.7 chain itself prices — the first opening
+     * balance at t0, the rent legs, and the terminal net investment re-dated to the last rent's
+     * index when nonzero. See the class javadoc for the closing arithmetic and the shapes this
+     * closes exactly.
+     */
+    private BigDecimal netInvestmentPeriodIrr(Schedule schedule, BigDecimal residualExtra) {
         List<Installment> installments = schedule.installments();
         if (installments.isEmpty()) {
             return null;
@@ -336,7 +360,8 @@ public final class CalculationFacade {
             }
         }
         Installment last = installments.get(installments.size() - 1);
-        BigDecimal terminal = MoneyUtils.scale(last.closingBalance(), MoneyScale.OUTPUT);
+        BigDecimal terminal = MoneyUtils.scale(
+                last.closingBalance().add(MoneyUtils.zeroIfNull(residualExtra)), MoneyScale.OUTPUT);
         if (terminal.signum() != 0) {
             stream.add(new CashFlow(last.periodNo(), last.endDate(), terminal,
                     CashFlowType.RESIDUAL, CashFlowDirection.INFLOW));
