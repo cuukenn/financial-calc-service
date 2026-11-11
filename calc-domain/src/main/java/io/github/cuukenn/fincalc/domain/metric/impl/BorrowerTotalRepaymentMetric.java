@@ -45,6 +45,13 @@ import java.util.List;
  * <p>Present-but-null on a {@link CashFlowPerspective#LESSOR} run and when the context carries no
  * schedule — mirroring {@code TotalMetrics}' null-safety instead of fabricating a 0.00. This is a
  * 借款方视角 presentation aid, not a regulatory metric.
+ *
+ * <p><b>Guaranteed residual 的口径（ADR-0001）.</b> The lessee's side is added at full value,
+ * which is the CAS 21 第三十八条（五）/ IFRS 16 Appendix A <em>lessor</em> rule. CAS 21
+ * 第十八条（五） counts only the amounts <em>expected to be payable</em> under a residual value
+ * guarantee on the lessee's side, so this figure is a deliberately conservative lessee reading and
+ * must be labelled as such (AGENTS.md §5 M-04). Closing that gap needs an expected-payable input,
+ * which would change a cash flow and is therefore an A-class field (M-01) - not added.
  */
 public final class BorrowerTotalRepaymentMetric implements FinancialMetric {
 

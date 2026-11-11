@@ -189,7 +189,11 @@ curl -s -X POST http://localhost:8080/api/v1/calculations \
 | `unguaranteedResidual` | **不进现金流**，只进 `LEASE_IMPLICIT_RATE` 方程；无 `assetValue` 时拒绝（`FCS-DOM-1017`） |
 
 无未担保余值时 `LEASE_IMPLICIT_RATE` 与 `IRR_ANNUAL` 恒等（同一个根的两端写法）；有未担保余值
-时两者分离。
+时两者分离。内含利率是**计量结果**而不是定价输入：`nominalRate` 只负责生成租金，宣告残值后内含
+利率高于名义利率是 CAS 21 第三十九条 / IFRS 16.74–75 预期的结果，引擎**不**为使两者相等而重解
+租金（见 `docs/adr/0001-lease-implicit-rate-is-a-measurement-output.md`）。`BORROWER_TOTAL_REPAYMENT`
+把担保余值按**出租方全额**计入，CAS 21 第十八条（五）对承租方只计预计应付部分，故该读数是保守
+口径（AGENTS.md §5 M-04）。
 
 ### 错误体契约
 

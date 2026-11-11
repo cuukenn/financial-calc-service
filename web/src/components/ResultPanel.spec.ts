@@ -393,7 +393,7 @@ describe('ResultPanel', () => {
     expect(values).toEqual(['0.5000%', '6.1700%', '6.2000%', '1,032,797.15'])
     // 指标目录的 hover 解释照旧挂着（既有 tooltip helper）。
     const titles = wrapper.findAllComponents(Tooltip).map((tp) => tp.props('title') as string)
-    expect(titles.join('\n')).toContain('Σ rentDue + 单独结算的留购价')
+    expect(titles.join('\n')).toContain('Σ rentDue + 期末单独收取的留购价 + 担保余值')
   })
 
   it('keeps every borrower code out of the lessor metric cards and the lessor metric list', () => {

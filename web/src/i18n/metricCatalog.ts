@@ -106,8 +106,8 @@ export const METRIC_CATALOG: Record<MetricCode, MetricInfo> = {
     nameEn: 'Lease Implicit Rate',
     formulaZh: 'PV(首付+租金+留购价)+PV(未担保余值)=资产价值+IDC',
     formulaEn: 'PV(receipts)+PV(unguaranteed residual)=asset value+IDC',
-    descZh: 'CAS 21 口径；无未担保余值时与 IRR 年化恒等',
-    descEn: 'CAS 21; equals IRR annual when the unguaranteed residual is zero',
+    descZh: 'CAS 21 口径的计量结果：名义利率只管生成租金，宣告残值后内含利率会高于名义利率；无未担保余值时与 IRR 年化恒等',
+    descEn: 'A CAS 21 measurement output: the nominal rate only sizes the rents, so a declared residual lifts the implicit rate above it; equal to the annual IRR when the unguaranteed residual is zero',
   },
   RENTAL_RATE: {
     nameZh: '租费率',
@@ -259,12 +259,12 @@ export const METRIC_CATALOG: Record<MetricCode, MetricInfo> = {
   BORROWER_TOTAL_REPAYMENT: {
     nameZh: '借款方还款总额',
     nameEn: 'Borrower Total Repayment',
-    formulaZh: 'Σ rentDue + 单独结算的留购价',
-    formulaEn: 'Σ rentDue + separately settled residual',
+    formulaZh: 'Σ rentDue + 期末单独收取的留购价 + 担保余值',
+    formulaEn: 'Σ rentDue + separately settled option price + guaranteed residual',
     descZh:
-      '承租方需偿付的合计（scale 2）：rentDue 已含本金/利息/费用/税，不再重复相加；留购价仅在单独结算时计入，可退还的保证金不计入',
+      '承租方偿付合计（scale 2）：rentDue 已含本金/利息/费用/税，不再重复相加；留购价仅单独结算时计入，担保余值按出租方全额口径计入（CAS 21 第十八条对承租方只计预计应付部分，见 ADR-0001），可退还保证金不计入',
     descEn:
-      'Amount the lessee must repay (scale 2); rentDue already contains principal, interest, fee and tax, so they are not added again. The residual counts only when settled separately; a refundable deposit is not a repayment',
+      'Amount the lessee repays (scale 2); rentDue already contains principal, interest, fee and tax. The option price counts only when settled separately; the guaranteed residual counts at the lessor-side full amount, while CAS 21 第十八条 counts only the expected-payable part for the lessee (ADR-0001). A refundable deposit is not a repayment',
   },
 }
 

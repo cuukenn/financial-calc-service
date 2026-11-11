@@ -303,7 +303,7 @@ const enUS: typeof zhCN = {
     borrowerSection: {
       title: 'Borrower-side view (funding-cost indicators, not contract interest rates)',
       note:
-        'These are labels of the same schedule read from the borrower-side cash-flow direction. They are funding-cost display aids: not interest the contract charges, and never summed with any lessor figure.',
+        'These are labels of the same schedule read from the borrower-side cash-flow direction. They are funding-cost display aids: not interest the contract charges, and never summed with any lessor figure. The guaranteed residual is included at the lessor-side full amount, whereas CAS 21 第十八条 counts only the expected-payable part for the lessee.',
     },
     issues: {
       title: 'Issues',

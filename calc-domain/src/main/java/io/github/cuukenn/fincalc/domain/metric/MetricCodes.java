@@ -82,11 +82,13 @@ public final class MetricCodes {
     public static final String TRUE_ANNUAL_RATE = "TRUE_ANNUAL_RATE";
 
     /**
-     * Borrower-view repayment total, scale 2: Σ {@code rentDue} + the residual the lessee settles
-     * separately ({@code LeaseElement#residualValue()} under {@code ResidualHandling#SEPARATE},
-     * else 0). The rent already contains principal, interest, fee and tax, and a refundable deposit
-     * is not a repayment, so neither is added. Null on a {@code LESSOR} run. A presentation aid,
-     * not a regulatory metric.
+     * Borrower-view repayment total, scale 2: Σ {@code rentDue} + the terminal receipts the lessee
+     * pays on top of the rents (the option price when {@code ResidualHandling#SEPARATE}, else 0,
+     * plus {@code LeaseElement#guaranteedResidual} at full value). The rent already contains
+     * principal, interest, fee and tax, and a refundable deposit is not a repayment, so neither is
+     * added. Null on a {@code LESSOR} run. A presentation aid, not a regulatory metric: the
+     * guaranteed residual is added at the lessor-side full amount, where CAS 21 第十八条（五）
+     * counts only the expected-payable part on the lessee's side (ADR-0001).
      */
     public static final String BORROWER_TOTAL_REPAYMENT = "BORROWER_TOTAL_REPAYMENT";
 
