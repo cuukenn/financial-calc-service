@@ -38,8 +38,6 @@ import RentsEditor from './editors/RentsEditor.vue'
 import type { FeeDraft, RuleRowDraft } from './editors/types'
 import ResultPanel from './ResultPanel.vue'
 import { nextRuleId } from './ruleIds'
-import { compareDecimal, decimalSubtract, isDecimalText, isPositiveDecimal } from '@/utils/ratio'
-import { formatMoney } from '@/utils/format'
 import { parseRateInput } from '@/utils/rate'
 
 const { t } = useI18n()
@@ -137,8 +135,6 @@ const VAT_RATE_PRESETS = ['13', '9', '6', '0'] as const
 
 interface FormState {
   principal: string
-  /** 租赁物价值（公允价值，可选）；有值时派生首付款并驱动租赁内含利率。 */
-  assetValue: string
   /** 名义年利率的展示值（R92-6 百分数口径：6 / 6% / 600bp），提交前换算为小数字符串。 */
   nominalRate: string
   commenceDate: string
@@ -169,7 +165,6 @@ interface FormState {
 function defaults(): FormState {
   return {
     principal: '1000000',
-    assetValue: '',
     nominalRate: '6',
     commenceDate: '2024-01-01',
     firstRentDate: '2024-02-01',
@@ -192,22 +187,6 @@ function defaults(): FormState {
 
 const form = reactive<FormState>(defaults())
 
-/**
- * 首付款 = 租赁物价值 − 租赁本金（B 类派生读数，M-02：由输入直接推出，不二次建模）。
- * 价值未填、不可解析、或小于本金时不显示 —— 引擎侧同样会以 FCS-DOM-1013 拒绝。
- */
-const downPayment = computed(() => {
-  const asset = form.assetValue.trim()
-  const principal = form.principal.trim()
-  if (asset === '' || !isDecimalText(asset) || !isDecimalText(principal)) {
-    return null
-  }
-  if (compareDecimal(asset, principal) < 0) {
-    return null
-  }
-  return decimalSubtract(asset, principal)
-})
-
 // dayCountCode/dateRollCode/method/periods 是后端必填字段：表单始终持有默认值，
 // 规则仅作兜底（清空时提示阻断提交）。校验文案随语言切换响应式更新。
 // R92-5/R92-6：利率字段为百分数口径展示值，附格式校验（6 / 6% / 600bp 可解析）。
@@ -223,23 +202,6 @@ function rateFormatRule(message: string): Rule {
 
 const rules = computed<Record<string, Rule[]>>(() => ({
   principal: [{ required: true, message: t('form.validation.principal') }],
-  assetValue: [
-    {
-      validator: (_rule: unknown, value: unknown) => {
-        const text = typeof value === 'string' ? value.trim() : ''
-        if (text === '') return Promise.resolve()
-        if (!isDecimalText(text) || !isPositiveDecimal(text)) {
-          return Promise.reject(new Error(t('form.validation.assetValueFormat')))
-        }
-        const principal = form.principal.trim()
-        if (isDecimalText(principal) && compareDecimal(text, principal) < 0) {
-          return Promise.reject(new Error(t('form.validation.assetValueBelowPrincipal')))
-        }
-        return Promise.resolve()
-      },
-      trigger: 'change',
-    },
-  ],
   nominalRate: [
     { required: true, message: t('form.validation.nominalRate') },
     rateFormatRule(t('form.validation.nominalRateFormat')),
@@ -316,9 +278,6 @@ function buildRequest(): CalculationRequest {
   const req: CalculationRequest = {
     // 金额以 JSON 字符串传输（R76：保留 BigDecimal 精度）。
     principal: form.principal.trim(),
-    // M-01：资产价值是租赁内含利率的分母，只有用户真的提供时才发送；
-    // 缺省即「本金 = 价值」的既有口径（向后兼容）。
-    ...(form.assetValue.trim() === '' ? {} : { assetValue: form.assetValue.trim() }),
     // R92-6：名义年利率为百分数口径展示值（6 / 6% / 600bp），提交前换算为小数字符串。
     nominalRate: parseRateInput(form.nominalRate) ?? form.nominalRate.trim(),
     // 日期为 ISO-8601 字符串（DatePicker value-format 绑定）。
@@ -467,23 +426,6 @@ function onReset(): void {
                     data-test="principal"
                     :placeholder="t('form.basic.principalPh')"
                   />
-                </FormItem>
-              </Col>
-              <Col :span="12">
-                <FormItem :label="t('form.basic.assetValue')" name="assetValue">
-                  <Input
-                    v-model:value="form.assetValue"
-                    :placeholder="t('form.basic.assetValuePh')"
-                    data-test="asset-value"
-                  />
-                  <Typography.Text
-                    v-if="downPayment !== null"
-                    type="secondary"
-                    style="display: block; margin-top: 4px"
-                    data-test="down-payment"
-                  >
-                    {{ t('form.basic.downPayment', { value: formatMoney(downPayment) }) }}
-                  </Typography.Text>
                 </FormItem>
               </Col>
               <Col :span="12">

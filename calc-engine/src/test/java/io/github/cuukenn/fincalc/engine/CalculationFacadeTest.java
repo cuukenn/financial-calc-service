@@ -68,7 +68,7 @@ class CalculationFacadeTest {
      * R116 (Task 7): the metric-set invariant is enforced for <em>every</em> built-in, including
      * {@code BULLET_LOAN} and {@code EXPLICIT_RENT} — the two the loop used to skip. Every built-in
      * run goes through the same {@link io.github.cuukenn.fincalc.domain.metric.MetricRegistry}, so
-     * the bag must carry the same 26 codes in the same insertion order whatever the method; a
+     * the bag must carry the same 25 codes in the same insertion order whatever the method; a
      * generator may leave a code {@code null} (not computable), it may not drop one.
      */
     @Test
@@ -84,7 +84,7 @@ class CalculationFacadeTest {
             // Every fixture amortizes: the §3.4 chain must stay clean for all six built-ins.
             assertThat(r.schedule().hasErrors()).isFalse();
             FinancialMetrics metrics = r.schedule().header().metrics();
-            assertThat(metrics.codes()).hasSize(26);
+            assertThat(metrics.codes()).hasSize(25);
             assertThat(metrics.find(MetricCodes.TOTAL_RENT)).isNotNull();
             if (expected == null) {
                 expected = metrics.codes();

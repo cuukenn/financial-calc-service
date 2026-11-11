@@ -87,7 +87,6 @@ public final class CalculationRequestAssembler {
                         .build();
         LeaseElement.Builder builder = LeaseElement.builder()
                 .principal(dto.principal())
-                .assetValue(dto.assetValue())
                 .nominalRate(dto.nominalRate())
                 .commenceDate(dto.commenceDate())
                 .firstRentDate(dto.firstRentDate())

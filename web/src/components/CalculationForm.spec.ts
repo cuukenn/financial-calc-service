@@ -159,32 +159,6 @@ describe('CalculationForm', () => {
     expect(wrapper.find('[data-test="residual-handling"]').text()).not.toContain('SEPARATE')
   })
 
-  it('sends 租赁物价值 only when provided and derives the down payment (R146)', async () => {
-    const wrapper = mountWithI18n(CalculationForm)
-    await submit(wrapper)
-    // 未填 → 键缺席（向后兼容：本金即价值）。
-    expect((vi.mocked(calculate).mock.calls[0][0] as CalculationRequest).assetValue).toBeUndefined()
-
-    await wrapper.find('[data-test="asset-value"]').setValue('1200000')
-    await flushPromises()
-    expect(wrapper.find('[data-test="down-payment"]').text()).toContain('200,000.00')
-
-    await submit(wrapper)
-    const calls = vi.mocked(calculate).mock.calls
-    const sent = calls[calls.length - 1][0] as CalculationRequest
-    expect(sent.assetValue).toBe('1200000')
-  })
-
-  it('rejects a 租赁物价值 below the principal (the gap would be a negative down payment)', async () => {
-    const wrapper = mountWithI18n(CalculationForm)
-    await wrapper.find('[data-test="asset-value"]').setValue('900000')
-    await flushPromises()
-    await submit(wrapper)
-
-    expect(calculate).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('不得小于租赁本金')
-  })
-
   it('shows the English localized names in en-US (R89)', () => {
     setLocale('en-US')
     const wrapper = mountWithI18n(CalculationForm)

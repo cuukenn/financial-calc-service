@@ -152,7 +152,7 @@ class CalculationRequestAssemblerTest {
                 BigDecimal.ZERO, io.github.cuukenn.fincalc.domain.model.ResidualHandling.SEPARATE,
                 BigDecimal.ZERO, new BigDecimal("0.06"), "CNY", "EQUAL_INSTALLMENT",
                 null, io.github.cuukenn.fincalc.domain.model.RateChangePolicy.RESOLVE,
-                null, null, null, null, null);
+                null, null, null, null);
     }
 
     private static CalculationRequestDto withFrequency(CalculationRequestDto source,
@@ -164,7 +164,7 @@ class CalculationRequestAssemblerTest {
                 source.residualHandling(), source.deposit(), source.vatRate(), source.currency(),
                 source.method(), source.gracePeriod(), source.rateChangePolicy(),
                 source.explicitRents(), source.fees(), source.ruleRows(),
-                source.allowPartialRuleSet(), source.assetValue());
+                source.allowPartialRuleSet());
     }
 
     private static CalculationRequestDto withExplicitPeriods(CalculationRequestDto source,
@@ -176,7 +176,7 @@ class CalculationRequestAssemblerTest {
                 source.residualHandling(), source.deposit(), source.vatRate(), source.currency(),
                 source.method(), source.gracePeriod(), source.rateChangePolicy(),
                 source.explicitRents(), source.fees(), source.ruleRows(),
-                source.allowPartialRuleSet(), source.assetValue());
+                source.allowPartialRuleSet());
     }
 
     private static CalculationRequestDto withFees(CalculationRequestDto source,
@@ -188,7 +188,7 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), source.method(), source.gracePeriod(),
                 source.rateChangePolicy(), source.explicitRents(), fees, source.ruleRows(),
-                source.allowPartialRuleSet(), source.assetValue());
+                source.allowPartialRuleSet());
     }
 
     private static CalculationRequestDto withGracePeriod(CalculationRequestDto source,
@@ -200,7 +200,7 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), source.method(), gracePeriod,
                 source.rateChangePolicy(), source.explicitRents(), source.fees(),
-                source.ruleRows(), source.allowPartialRuleSet(), source.assetValue());
+                source.ruleRows(), source.allowPartialRuleSet());
     }
 
     private static CalculationRequestDto withAllowPartial(CalculationRequestDto source,
@@ -212,7 +212,7 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), source.method(), source.gracePeriod(),
                 source.rateChangePolicy(), source.explicitRents(), source.fees(),
-                source.ruleRows(), allowPartial, source.assetValue());
+                source.ruleRows(), allowPartial);
     }
 
     private static CalculationRequestDto withRuleRows(CalculationRequestDto source,
@@ -224,7 +224,7 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), source.method(), source.gracePeriod(),
                 source.rateChangePolicy(), source.explicitRents(), source.fees(), ruleRows,
-                source.allowPartialRuleSet(), source.assetValue());
+                source.allowPartialRuleSet());
     }
 
     private static CalculationRequestDto withMethod(CalculationRequestDto source,
@@ -236,6 +236,6 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), method, source.gracePeriod(),
                 source.rateChangePolicy(), source.explicitRents(), source.fees(),
-                source.ruleRows(), source.allowPartialRuleSet(), source.assetValue());
+                source.ruleRows(), source.allowPartialRuleSet());
     }
 }

@@ -72,14 +72,6 @@ public final class MetricCodes {
     /** Convexity in years squared, scale 10. */
     public static final String CONVEXITY = "CONVEXITY";
 
-    /**
-     * Lease implicit rate (CAS 21), annual at {@link MoneyScale#CALC} (scale 12, like {@link #IRR_ANNUAL}):
-     * the rate that discounts the lease receipts
-     * to the asset value. {@code null} when the run carries no asset value — the rate is defined
-     * against it, so a principal-only run has nothing to solve against.
-     */
-    public static final String LEASE_IMPLICIT_RATE = "LEASE_IMPLICIT_RATE";
-
     /** Day-weighted average outstanding principal, scale 2. */
     public static final String AVG_OUTSTANDING_BALANCE = "AVG_OUTSTANDING_BALANCE";
 
@@ -128,9 +120,8 @@ public final class MetricCodes {
                     RESIDUAL_VALUE, RENTAL_RATE, NPV, XNPV, IRR_PERIOD, IRR_ANNUAL,
                     IRR_ANNUAL_SIMPLE, XIRR, MIRR, PAYBACK_PERIOD, DISCOUNTED_PAYBACK,
                     DURATION_MACAULAY, DURATION_MODIFIED, CONVEXITY, AVG_OUTSTANDING_BALANCE,
-                    TRUE_ANNUAL_RATE, LEASE_IMPLICIT_RATE, BORROWER_IRR_PERIOD,
-                    BORROWER_IRR_ANNUAL, BORROWER_IRR_ANNUAL_SIMPLE,
-                    BORROWER_TOTAL_REPAYMENT)));
+                    TRUE_ANNUAL_RATE, BORROWER_IRR_PERIOD, BORROWER_IRR_ANNUAL,
+                    BORROWER_IRR_ANNUAL_SIMPLE, BORROWER_TOTAL_REPAYMENT)));
 
     private MetricCodes() {
     }

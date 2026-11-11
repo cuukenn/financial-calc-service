@@ -7,7 +7,6 @@ import io.github.cuukenn.fincalc.domain.metric.impl.BorrowerIrrPeriodMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.BorrowerTotalRepaymentMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.DurationMetrics;
 import io.github.cuukenn.fincalc.domain.metric.impl.IrrMetrics;
-import io.github.cuukenn.fincalc.domain.metric.impl.LeaseImplicitRateMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.MirrMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.NpvMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.PaybackMetric;
@@ -75,8 +74,8 @@ public final class MetricRegistry {
     }
 
     /**
-     * A registry with the full built-in set: the 26 codes of {@link MetricCodes#ALL} — the §9.5
-     * table, the R103 borrower family and the R146 lease implicit rate — nothing else.
+     * A registry with the full built-in set: the 25 codes of {@link MetricCodes#ALL} — the §9.5
+     * table plus the R103 borrower family — nothing else.
      *
      * @return a fresh registry; registering a metric with an existing code replaces it
      */
@@ -93,9 +92,6 @@ public final class MetricRegistry {
         for (FinancialMetric metric : IrrMetrics.instances()) {
             registry.register(metric);
         }
-        // R146 / M-01: the asset value's only real consumer — without it the field would be a
-        // decorative input, which AGENTS.md §5 forbids.
-        registry.register(new LeaseImplicitRateMetric());
         registry.register(new BorrowerIrrPeriodMetric());
         for (FinancialMetric metric : BorrowerIrrMetrics.instances()) {
             registry.register(metric);

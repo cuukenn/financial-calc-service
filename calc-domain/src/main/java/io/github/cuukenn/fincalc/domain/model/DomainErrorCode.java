@@ -44,9 +44,6 @@ public enum DomainErrorCode implements ErrorCode {
     DEPOSIT_MUST_BE_NON_NEGATIVE("FCS-DOM-1012",
             "FCS-DOM-1012: 保证金必须不小于 0: %s"),
 
-    ASSET_VALUE_OUT_OF_RANGE("FCS-DOM-1013",
-            "FCS-DOM-1013: 租赁物价值必须大于 0 且不小于租赁本金: %s"),
-
     PERIOD_SEQUENCE_INVALID("FCS-DOM-2001",
             "FCS-DOM-2001: 期次日期必须严格递增且 start < end: 第 %s 期 [%s, %s]"),
 

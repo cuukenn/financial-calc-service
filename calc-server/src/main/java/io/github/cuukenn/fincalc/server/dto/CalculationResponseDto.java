@@ -110,7 +110,7 @@ public final class CalculationResponseDto {
     }
 
     /** Header summary; {@code metrics} carries every computed code, null when not computable. */
-    @Schema(description = "表头摘要；metrics 为全部 26 项金融指标的 code → 值映射：设计 §9.5 的 21 项"
+    @Schema(description = "表头摘要；metrics 为全部 25 项金融指标的 code → 值映射：设计 §9.5 的 21 项"
             + "加 R103 借款方视角的 4 项 BORROWER_*（仅 LESSEE 视角有值，LESSOR 下为 null）"
             + "（值为字符串，不可计算时为显式 null）")
     public static final class HeaderDto {

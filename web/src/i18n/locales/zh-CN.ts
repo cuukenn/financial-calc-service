@@ -25,9 +25,6 @@ const zhCN = {
       title: '租赁要素',
       principal: '租赁本金',
       principalPh: '如 1000000',
-      assetValue: '租赁物价值',
-      assetValuePh: '选填；如 1200000（须 ≥ 租赁本金）',
-      downPayment: '首付款：{value}',
       nominalRate: '名义年利率',
       // R92-6：百分数口径输入（6 或 6% → 0.06，600bp → 0.06），提交前由表单层换算为小数字符串。
       nominalRatePh: '如 6% 或 600bp',
@@ -109,8 +106,6 @@ const zhCN = {
     reset: '重置表单',
     validation: {
       principal: '请输入租赁本金',
-      assetValueFormat: '租赁物价值格式无效：请输入大于 0 的十进制数（如 1200000）',
-      assetValueBelowPrincipal: '租赁物价值不得小于租赁本金（差额即首付款，不能为负）',
       nominalRate: '请输入名义年利率',
       nominalRateFormat: '格式无效：请输入如 6% 或 600bp 的名义年利率',
       commenceDate: '请选择起租日',
