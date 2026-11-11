@@ -177,3 +177,13 @@
 - **会计**：CAS 21（2018 修订）为租赁计量的现行准则。
 
 > 本轮硬约束到此为止：只覆盖精度、指标名称、标准要素与强制阈值；不包含实现状态、项目结构、构建方式和待办清单。
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live as markdown files under `.scratch/`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` at the repo root plus `docs/adr/`. See `docs/agents/domain.md`.
