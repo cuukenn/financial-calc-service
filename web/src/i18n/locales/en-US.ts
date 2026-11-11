@@ -19,6 +19,11 @@ const enUS: typeof zhCN = {
     basic: {
       title: 'Lease Elements',
       principal: 'Lease principal',
+      assetValue: 'Asset value (fair value)',
+      assetValuePh: 'Optional; the financed principal is derived from it',
+      financedPrincipal: 'Financed principal: {value}',
+      downPayment: 'Down payment',
+      downPaymentPh: 'e.g. 400000',
       principalPh: 'e.g. 1000000',
       nominalRate: 'Nominal annual rate',
       // R92-6: percent-style input (6 or 6% → 0.06, 600bp → 0.06); converted to a
@@ -92,6 +97,10 @@ const enUS: typeof zhCN = {
       residualValueHint: 'Paid at maturity to acquire the asset; 0 when there is no purchase option',
       residualHandling: 'Purchase option handling',
       deposit: 'Deposit',
+      amountPh: 'e.g. 0',
+      initialDirectCosts: 'Initial direct costs (IDC)',
+      guaranteedResidual: 'Guaranteed residual',
+      unguaranteedResidual: 'Unguaranteed residual',
       vatRate: 'VAT rate',
       // R92-5: percent-style input (6 or 6% → 0.06), with China VAT bracket quick picks.
       vatRatePh: 'e.g. 6 or 6%',

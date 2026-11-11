@@ -159,6 +159,23 @@ describe('CalculationForm', () => {
     expect(wrapper.find('[data-test="residual-handling"]').text()).not.toContain('SEPARATE')
   })
 
+  it('derives the financed principal from asset value, down payment and IDC (CAS 21)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="asset-value"]').setValue('2400000')
+    await wrapper.find('[data-test="down-payment"]').setValue('400000')
+    await wrapper.find('[data-test="initial-direct-costs"]').setValue('10000')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="financed-principal"]').text()).toContain('2010000')
+
+    await submit(wrapper)
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.principal).toBe('2010000')
+    expect(req.assetValue).toBe('2400000')
+    expect(req.downPayment).toBe('400000')
+    expect(req.initialDirectCosts).toBe('10000')
+  })
+
   it('shows the English localized names in en-US (R89)', () => {
     setLocale('en-US')
     const wrapper = mountWithI18n(CalculationForm)

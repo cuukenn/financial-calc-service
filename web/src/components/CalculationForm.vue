@@ -38,6 +38,7 @@ import RentsEditor from './editors/RentsEditor.vue'
 import type { FeeDraft, RuleRowDraft } from './editors/types'
 import ResultPanel from './ResultPanel.vue'
 import { nextRuleId } from './ruleIds'
+import { decimalAdd, decimalSubtract, isDecimalText } from '@/utils/ratio'
 import { parseRateInput } from '@/utils/rate'
 
 const { t } = useI18n()
@@ -135,6 +136,12 @@ const VAT_RATE_PRESETS = ['13', '9', '6', '0'] as const
 
 interface FormState {
   principal: string
+  /** CAS 21 计量链（全部选填）：价值 + IDC − 首付 = 融资额。 */
+  assetValue: string
+  downPayment: string
+  initialDirectCosts: string
+  guaranteedResidual: string
+  unguaranteedResidual: string
   /** 名义年利率的展示值（R92-6 百分数口径：6 / 6% / 600bp），提交前换算为小数字符串。 */
   nominalRate: string
   commenceDate: string
@@ -165,6 +172,11 @@ interface FormState {
 function defaults(): FormState {
   return {
     principal: '1000000',
+    assetValue: '',
+    downPayment: '',
+    initialDirectCosts: '',
+    guaranteedResidual: '',
+    unguaranteedResidual: '',
     nominalRate: '6',
     commenceDate: '2024-01-01',
     firstRentDate: '2024-02-01',
@@ -186,6 +198,27 @@ function defaults(): FormState {
 }
 
 const form = reactive<FormState>(defaults())
+
+/** 金额字段的空值视作 0（选填字段），不可解析则视为不可派生。 */
+function amountOrZero(text: string): string | null {
+  const trimmed = text.trim()
+  if (trimmed === '') return '0'
+  return isDecimalText(trimmed) ? trimmed : null
+}
+
+/**
+ * 融资额 = 资产价值 + 初始直接费用 − 首付款（CAS 21）。
+ * 未填资产价值时返回 null，沿用「本金直接录入」的既有口径。
+ */
+const financedPrincipal = computed<string | null>(() => {
+  if (form.assetValue.trim() === '') return null
+  const asset = amountOrZero(form.assetValue)
+  const dp = amountOrZero(form.downPayment)
+  const idc = amountOrZero(form.initialDirectCosts)
+  if (asset === null || dp === null || idc === null || !isDecimalText(asset)) return null
+  const withIdc = decimalAdd(asset, idc)
+  return withIdc === null ? null : decimalSubtract(withIdc, dp)
+})
 
 // dayCountCode/dateRollCode/method/periods 是后端必填字段：表单始终持有默认值，
 // 规则仅作兜底（清空时提示阻断提交）。校验文案随语言切换响应式更新。
@@ -277,7 +310,20 @@ function mapRuleRows(): RuleRow[] {
 function buildRequest(): CalculationRequest {
   const req: CalculationRequest = {
     // 金额以 JSON 字符串传输（R76：保留 BigDecimal 精度）。
-    principal: form.principal.trim(),
+    // CAS 21：填了资产价值时，融资额由 价值 + IDC − 首付 派生（引擎会再校验恒等式）。
+    principal: financedPrincipal.value ?? form.principal.trim(),
+    ...(form.assetValue.trim() === ''
+      ? {}
+      : {
+          assetValue: form.assetValue.trim(),
+          downPayment: form.downPayment.trim() === '' ? '0' : form.downPayment.trim(),
+          initialDirectCosts:
+            form.initialDirectCosts.trim() === '' ? '0' : form.initialDirectCosts.trim(),
+          guaranteedResidual:
+            form.guaranteedResidual.trim() === '' ? '0' : form.guaranteedResidual.trim(),
+          unguaranteedResidual:
+            form.unguaranteedResidual.trim() === '' ? '0' : form.unguaranteedResidual.trim(),
+        }),
     // R92-6：名义年利率为百分数口径展示值（6 / 6% / 600bp），提交前换算为小数字符串。
     nominalRate: parseRateInput(form.nominalRate) ?? form.nominalRate.trim(),
     // 日期为 ISO-8601 字符串（DatePicker value-format 绑定）。
@@ -426,6 +472,19 @@ function onReset(): void {
                     data-test="principal"
                     :placeholder="t('form.basic.principalPh')"
                   />
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem :label="t('form.basic.assetValue')" name="assetValue">
+                  <Input v-model:value="form.assetValue" :placeholder="t('form.basic.assetValuePh')" data-test="asset-value" />
+                  <Typography.Text v-if="financedPrincipal !== null" type="secondary" style="display: block; margin-top: 4px" data-test="financed-principal">
+                    {{ t('form.basic.financedPrincipal', { value: financedPrincipal }) }}
+                  </Typography.Text>
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem :label="t('form.basic.downPayment')" name="downPayment">
+                  <Input v-model:value="form.downPayment" :placeholder="t('form.basic.downPaymentPh')" data-test="down-payment" />
                 </FormItem>
               </Col>
               <Col :span="12">
@@ -650,6 +709,15 @@ function onReset(): void {
               <Col :span="12">
                 <FormItem :label="t('form.feesOther.deposit')" name="deposit">
                   <Input v-model:value="form.deposit" data-test="deposit" />
+                </FormItem>
+                <FormItem :label="t('form.feesOther.initialDirectCosts')" name="initialDirectCosts">
+                  <Input v-model:value="form.initialDirectCosts" :placeholder="t('form.feesOther.amountPh')" data-test="initial-direct-costs" />
+                </FormItem>
+                <FormItem :label="t('form.feesOther.guaranteedResidual')" name="guaranteedResidual">
+                  <Input v-model:value="form.guaranteedResidual" :placeholder="t('form.feesOther.amountPh')" data-test="guaranteed-residual" />
+                </FormItem>
+                <FormItem :label="t('form.feesOther.unguaranteedResidual')" name="unguaranteedResidual">
+                  <Input v-model:value="form.unguaranteedResidual" :placeholder="t('form.feesOther.amountPh')" data-test="unguaranteed-residual" />
                 </FormItem>
               </Col>
               <Col :span="12">

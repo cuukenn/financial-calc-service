@@ -25,6 +25,11 @@ const zhCN = {
       title: '租赁要素',
       principal: '租赁本金',
       principalPh: '如 1000000',
+      assetValue: '资产价值（公允价值）',
+      assetValuePh: '选填；填后融资额自动派生',
+      financedPrincipal: '融资额：{value}',
+      downPayment: '首付款',
+      downPaymentPh: '如 400000',
       nominalRate: '名义年利率',
       // R92-6：百分数口径输入（6 或 6% → 0.06，600bp → 0.06），提交前由表单层换算为小数字符串。
       nominalRatePh: '如 6% 或 600bp',
@@ -94,6 +99,10 @@ const zhCN = {
       residualValueHint: '期末承租人取得租赁物所有权时支付的对价；无留购安排填 0',
       residualHandling: '留购价处理',
       deposit: '保证金',
+      amountPh: '如 0',
+      initialDirectCosts: '初始直接费用（IDC）',
+      guaranteedResidual: '担保余值',
+      unguaranteedResidual: '未担保余值',
       vatRate: '增值税率',
       // R92-5：百分数口径输入（6 或 6% → 0.06），附中国增值税档次快选。
       vatRatePh: '如 6 或 6%',

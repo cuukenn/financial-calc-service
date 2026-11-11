@@ -89,6 +89,12 @@ export interface RuleRow {
 export interface CalculationRequest {
   /** 租赁本金，必须为正数（FCS-DOM-1001）。 */
   principal: string
+  /** CAS 21 计量链（选填）：融资额 = assetValue + initialDirectCosts − downPayment。 */
+  assetValue?: string
+  downPayment?: string
+  initialDirectCosts?: string
+  guaranteedResidual?: string
+  unguaranteedResidual?: string
   /** 名义年利率，小数形式（0.06 = 6%）。 */
   nominalRate: string
   /** 起租日，ISO-8601（yyyy-MM-dd）。 */
