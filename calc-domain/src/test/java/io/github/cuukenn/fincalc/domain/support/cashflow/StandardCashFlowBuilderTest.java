@@ -218,8 +218,11 @@ class StandardCashFlowBuilderTest {
 
         assertThat(flows).extracting(CashFlow::type).containsExactly(
                 CashFlowType.PRINCIPAL, CashFlowType.RENT, CashFlowType.RESIDUAL, CashFlowType.RENT);
-        for (int i = 0; i < flows.size(); i++) {
-            assertThat(flows.get(i).sequence()).isEqualTo(i);
+        assertThat(flows.get(0).sequence()).isZero();
+        for (int i = 1; i < flows.size(); i++) {
+            boolean sameDay = flows.get(i).date().equals(flows.get(i - 1).date());
+            assertThat(flows.get(i).sequence())
+                    .isEqualTo(flows.get(i - 1).sequence() + (sameDay ? 0 : 1));
         }
         for (int i = 1; i < flows.size(); i++) {
             assertThat(flows.get(i).date()).isAfterOrEqualTo(flows.get(i - 1).date());
@@ -230,8 +233,11 @@ class StandardCashFlowBuilderTest {
     void sequence_is_contiguous_and_ordering_is_stable() {
         List<CashFlow> flows = builder.build(schedule(), element(), CalculationOptions.defaults());
 
-        for (int i = 0; i < flows.size(); i++) {
-            assertThat(flows.get(i).sequence()).isEqualTo(i);
+        assertThat(flows.get(0).sequence()).isZero();
+        for (int i = 1; i < flows.size(); i++) {
+            boolean sameDay = flows.get(i).date().equals(flows.get(i - 1).date());
+            assertThat(flows.get(i).sequence())
+                    .isEqualTo(flows.get(i - 1).sequence() + (sameDay ? 0 : 1));
         }
         for (int i = 1; i < flows.size(); i++) {
             assertThat(flows.get(i).date()).isAfterOrEqualTo(flows.get(i - 1).date());

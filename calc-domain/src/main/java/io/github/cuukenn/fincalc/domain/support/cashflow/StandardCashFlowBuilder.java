@@ -89,8 +89,16 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
         LocalDate maturity = settled ? installments.get(installments.size() - 1).endDate() : null;
 
         List<CashFlow> flows = new ArrayList<>();
-        addFlow(flows, t0, money(element.principal(), rounding), CashFlowType.PRINCIPAL,
+        BigDecimal opening = element.assetValue() == null
+                ? element.principal()
+                : element.assetValue().add(element.initialDirectCosts() == null
+                        ? BigDecimal.ZERO : element.initialDirectCosts());
+        addFlow(flows, t0, money(opening, rounding), CashFlowType.PRINCIPAL,
                 CashFlowDirection.OUTFLOW);
+        if (element.downPayment() != null && element.downPayment().signum() > 0) {
+            addFlow(flows, t0, money(element.downPayment(), rounding),
+                    CashFlowType.PRINCIPAL, CashFlowDirection.INFLOW);
+        }
         addUpfrontFees(flows, element, rounding, t0);
         if (settled && depositIncluded(options, element)) {
             BigDecimal deposit = money(element.deposit(), rounding);
@@ -170,9 +178,16 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
                 .thenComparing(CashFlow::sequence));
 
         List<CashFlow> ordered = new ArrayList<>(flows.size());
-        for (int index = 0; index < flows.size(); index++) {
-            CashFlow flow = flows.get(index);
-            ordered.add(new CashFlow(index, flow.date(), flow.amount(), flow.type(),
+        int sequence = -1;
+        LocalDate previousDate = null;
+        for (CashFlow flow : flows) {
+            // Same-day flows share one discount index: npv() discounts by sequence, so two
+            // events on the same date must not be one period apart.
+            if (!flow.date().equals(previousDate)) {
+                sequence++;
+                previousDate = flow.date();
+            }
+            ordered.add(new CashFlow(sequence, flow.date(), flow.amount(), flow.type(),
                     flip(flow.direction(), perspective)));
         }
         return Collections.unmodifiableList(ordered);

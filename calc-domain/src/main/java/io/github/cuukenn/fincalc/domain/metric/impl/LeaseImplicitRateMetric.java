@@ -41,31 +41,14 @@ public final class LeaseImplicitRateMetric implements FinancialMetric {
         if (flows.isEmpty()) {
             return null;
         }
-        BigDecimal investment = context.element().assetValue()
-                .add(zeroIfNull(context.element().initialDirectCosts()));
-        BigDecimal down = zeroIfNull(context.element().downPayment());
-        BigDecimal unguaranteed = zeroIfNull(context.element().unguaranteedResidual());
-
-        CashFlow first = flows.get(0);
         CashFlow last = flows.get(flows.size() - 1);
-        List<CashFlow> priced = new ArrayList<>(flows.size() + 2);
-        boolean repriced = false;
-        for (CashFlow flow : flows) {
-            if (!repriced && flow.direction() == CashFlowDirection.OUTFLOW) {
-                priced.add(new CashFlow(flow.sequence(), flow.date(), investment,
-                        flow.type(), flow.direction()));
-                repriced = true;
-            } else {
-                priced.add(flow);
-            }
+        BigDecimal unguaranteed = context.element().unguaranteedResidual() == null
+                ? BigDecimal.ZERO : context.element().unguaranteedResidual();
+        List<CashFlow> priced = new ArrayList<>(flows);
+        if (unguaranteed.signum() > 0) {
+            priced.add(new CashFlow(last.sequence(), last.date(), unguaranteed,
+                    CashFlowType.RESIDUAL, CashFlowDirection.INFLOW));
         }
-        if (!repriced) {
-            return null;
-        }
-        priced.add(new CashFlow(first.sequence(), first.date(), down,
-                CashFlowType.PRINCIPAL, CashFlowDirection.INFLOW));
-        priced.add(new CashFlow(last.sequence(), last.date(), unguaranteed,
-                CashFlowType.RESIDUAL, CashFlowDirection.INFLOW));
 
         BigDecimal period = IrrCalculator.periodIrr(priced);
         return period == null ? null

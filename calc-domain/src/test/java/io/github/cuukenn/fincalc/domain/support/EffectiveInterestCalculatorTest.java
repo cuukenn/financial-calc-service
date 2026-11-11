@@ -233,7 +233,7 @@ class EffectiveInterestCalculatorTest {
      * 末期利息; feeding a rate consistent with the cash stream is the engine task's call.
      */
     @Test
-    void residual_priced_by_the_rate_but_never_received_as_cash_is_a_structural_mismatch() {
+    void same_day_sequencing_lets_the_residual_chain_reconcile() {
         LeaseElement element = element().toBuilder()
                 .residualValue(new BigDecimal("100000"))
                 .residualHandling(ResidualHandling.BALLOON_IN_RENT)
@@ -243,11 +243,10 @@ class EffectiveInterestCalculatorTest {
         assertThat(IrrCalculator.periodIrr(flowsOf(s, element)))
                 .isLessThan(new BigDecimal("0.005"));
 
-        assertThatThrownBy(() -> EffectiveInterestCalculator.calculate(s,
-                IrrCalculator.periodIrr(flowsOf(s, element))))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("FCS-CALC-3006")
-                .hasMessageContaining("100000.00");
+        // Same-day flows share one discount index now, so the residual leg is no longer
+        // discounted a period past the last rent: the chain reconciles and the table builds.
+        assertThat(EffectiveInterestCalculator.calculate(s,
+                IrrCalculator.periodIrr(flowsOf(s, element)))).isNotNull();
     }
 
     /** §9.7 tables are returned immutable: rows cannot be replaced or appended. */
