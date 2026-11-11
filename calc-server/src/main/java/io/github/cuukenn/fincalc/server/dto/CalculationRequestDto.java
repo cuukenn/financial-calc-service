@@ -99,6 +99,10 @@ public final class CalculationRequestDto {
     @Schema(description = "残值金额；缺省 = 无残值。BALLOON_IN_RENT 时须满足 0 ≤ 残值 < 本金（FCS-DOM-1007）")
     private final BigDecimal residualValue;
 
+    @Schema(description = "租赁物价值（公允价值）；缺省 = 未提供，此时租赁内含利率不可计算",
+            example = "1000000")
+    private final BigDecimal assetValue;
+
     @Schema(description = "残值处理：SEPARATE（残值期末单独回收）/ BALLOON_IN_RENT（摊入租金）",
             example = "SEPARATE")
     private final ResidualHandling residualHandling;
@@ -168,7 +172,8 @@ public final class CalculationRequestDto {
             @JsonProperty("explicitRents") List<BigDecimal> explicitRents,
             @JsonProperty("fees") List<FeeDto> fees,
             @JsonProperty("ruleRows") List<RuleRowDto> ruleRows,
-            @JsonProperty("allowPartialRuleSet") Boolean allowPartialRuleSet) {
+            @JsonProperty("allowPartialRuleSet") Boolean allowPartialRuleSet,
+            @JsonProperty("assetValue") BigDecimal assetValue) {
         this.principal = principal;
         this.nominalRate = nominalRate;
         this.commenceDate = commenceDate;
@@ -192,6 +197,7 @@ public final class CalculationRequestDto {
         this.fees = fees;
         this.ruleRows = ruleRows;
         this.allowPartialRuleSet = allowPartialRuleSet;
+        this.assetValue = assetValue;
     }
 
     public BigDecimal principal() {
@@ -236,6 +242,10 @@ public final class CalculationRequestDto {
 
     public RoundingDto rounding() {
         return rounding;
+    }
+
+    public BigDecimal assetValue() {
+        return assetValue;
     }
 
     public BigDecimal residualValue() {

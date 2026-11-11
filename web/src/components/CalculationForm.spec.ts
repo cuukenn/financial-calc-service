@@ -115,7 +115,7 @@ describe('CalculationForm', () => {
     expect(wrapper.text()).toContain('计息基准')
     expect(wrapper.text()).toContain('日期调整')
     expect(wrapper.text()).toContain('支付频率')
-    expect(wrapper.text()).toContain('残值 / 留购价')
+    expect(wrapper.text()).toContain('留购价（名义货价）')
     expect(wrapper.text()).not.toContain('天数口径')
     expect(wrapper.text()).not.toContain('还款频率')
     const methodRadio = wrapper.find('input[value="EQUAL_INSTALLMENT"]')
@@ -159,6 +159,32 @@ describe('CalculationForm', () => {
     expect(wrapper.find('[data-test="residual-handling"]').text()).not.toContain('SEPARATE')
   })
 
+  it('sends 租赁物价值 only when provided and derives the down payment (R146)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await submit(wrapper)
+    // 未填 → 键缺席（向后兼容：本金即价值）。
+    expect((vi.mocked(calculate).mock.calls[0][0] as CalculationRequest).assetValue).toBeUndefined()
+
+    await wrapper.find('[data-test="asset-value"]').setValue('1200000')
+    await flushPromises()
+    expect(wrapper.find('[data-test="down-payment"]').text()).toContain('200,000.00')
+
+    await submit(wrapper)
+    const calls = vi.mocked(calculate).mock.calls
+    const sent = calls[calls.length - 1][0] as CalculationRequest
+    expect(sent.assetValue).toBe('1200000')
+  })
+
+  it('rejects a 租赁物价值 below the principal (the gap would be a negative down payment)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="asset-value"]').setValue('900000')
+    await flushPromises()
+    await submit(wrapper)
+
+    expect(calculate).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('不得小于租赁本金')
+  })
+
   it('shows the English localized names in en-US (R89)', () => {
     setLocale('en-US')
     const wrapper = mountWithI18n(CalculationForm)
@@ -174,7 +200,7 @@ describe('CalculationForm', () => {
     expect(wrapper.text()).toContain('Business day convention')
     expect(wrapper.text()).toContain('Commencement date')
     expect(wrapper.text()).toContain('First rent payment date')
-    expect(wrapper.text()).toContain('Residual value / Purchase price')
+    expect(wrapper.text()).toContain('Purchase option price (nominal)')
   })
 
   it('renders the currency select with common currencies and submits the ISO code (R92-2)', async () => {

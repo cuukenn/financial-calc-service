@@ -20,6 +20,9 @@ const enUS: typeof zhCN = {
       title: 'Lease Elements',
       principal: 'Lease principal',
       principalPh: 'e.g. 1000000',
+      assetValue: 'Asset value',
+      assetValuePh: 'Optional; e.g. 1200000 (must be ≥ lease principal)',
+      downPayment: 'Down payment: {value}',
       nominalRate: 'Nominal annual rate',
       // R92-6: percent-style input (6 or 6% → 0.06, 600bp → 0.06); converted to a
       // decimal string in the form layer before submit.
@@ -85,10 +88,12 @@ const enUS: typeof zhCN = {
         remove: 'Remove',
         add: '+ Add fee',
       },
-      // R91: §9.6 semantics — the amount is the purchase-option price under
-      // SEPARATE and the balloon residual under BALLOON_IN_RENT.
-      residualValue: 'Residual value / Purchase price',
-      residualHandling: 'Residual handling',
+      // §2.1 / M-01: this field is the purchase option price (nominal) — a real terminal
+      // cash flow. The residual value (unguaranteed) is not modelled: its only consumer is the
+      // lease implicit rate (CAS 21), which is not implemented yet.
+      residualValue: 'Purchase option price (nominal)',
+      residualValueHint: 'Paid at maturity to acquire the asset; 0 when there is no purchase option',
+      residualHandling: 'Purchase option handling',
       deposit: 'Deposit',
       vatRate: 'VAT rate',
       // R92-5: percent-style input (6 or 6% → 0.06), with China VAT bracket quick picks.
@@ -102,6 +107,8 @@ const enUS: typeof zhCN = {
     reset: 'Reset form',
     validation: {
       principal: 'Please enter the lease principal',
+      assetValueFormat: 'Invalid asset value: enter a positive decimal like 1200000',
+      assetValueBelowPrincipal: 'The asset value must not be less than the lease principal (the gap is the down payment)',
       nominalRate: 'Please enter the nominal annual rate',
       nominalRateFormat: 'Invalid format: enter a nominal annual rate like 6% or 600bp',
       commenceDate: 'Please select the commencement date',

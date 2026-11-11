@@ -89,6 +89,8 @@ export interface RuleRow {
 export interface CalculationRequest {
   /** 租赁本金，必须为正数（FCS-DOM-1001）。 */
   principal: string
+  /** 租赁物价值（可选）：填写后驱动租赁内含利率与首付款（R146）。 */
+  assetValue?: string
   /** 名义年利率，小数形式（0.06 = 6%）。 */
   nominalRate: string
   /** 起租日，ISO-8601（yyyy-MM-dd）。 */

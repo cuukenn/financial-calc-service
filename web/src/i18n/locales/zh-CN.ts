@@ -25,6 +25,9 @@ const zhCN = {
       title: '租赁要素',
       principal: '租赁本金',
       principalPh: '如 1000000',
+      assetValue: '租赁物价值',
+      assetValuePh: '选填；如 1200000（须 ≥ 租赁本金）',
+      downPayment: '首付款：{value}',
       nominalRate: '名义年利率',
       // R92-6：百分数口径输入（6 或 6% → 0.06，600bp → 0.06），提交前由表单层换算为小数字符串。
       nominalRatePh: '如 6% 或 600bp',
@@ -87,9 +90,12 @@ const zhCN = {
         remove: '删除',
         add: '+ 添加费用',
       },
-      // R91：§9.6 语义 —— SEPARATE 下该金额即留购价，BALLOON_IN_RENT 下为气球残值。
-      residualValue: '残值 / 留购价',
-      residualHandling: '残值处理',
+      // §2.1 / M-01：这个字段就是**留购价（名义货价）** —— 承租人期末取得所有权的对价，
+      // 是真实现金流。残值（未担保余值）不参与本口径的现金流，唯一消费者是租赁内含利率
+      // （CAS 21），该指标尚未实现，故不设该字段。
+      residualValue: '留购价（名义货价）',
+      residualValueHint: '期末承租人取得租赁物所有权时支付的对价；无留购安排填 0',
+      residualHandling: '留购价处理',
       deposit: '保证金',
       vatRate: '增值税率',
       // R92-5：百分数口径输入（6 或 6% → 0.06），附中国增值税档次快选。
@@ -103,6 +109,8 @@ const zhCN = {
     reset: '重置表单',
     validation: {
       principal: '请输入租赁本金',
+      assetValueFormat: '租赁物价值格式无效：请输入大于 0 的十进制数（如 1200000）',
+      assetValueBelowPrincipal: '租赁物价值不得小于租赁本金（差额即首付款，不能为负）',
       nominalRate: '请输入名义年利率',
       nominalRateFormat: '格式无效：请输入如 6% 或 600bp 的名义年利率',
       commenceDate: '请选择起租日',

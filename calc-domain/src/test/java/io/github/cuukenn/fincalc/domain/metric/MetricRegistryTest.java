@@ -39,6 +39,25 @@ class MetricRegistryTest {
             MetricCodes.BORROWER_TOTAL_REPAYMENT, MetricCodes.BORROWER_IRR_PERIOD,
             MetricCodes.BORROWER_IRR_ANNUAL, MetricCodes.BORROWER_IRR_ANNUAL_SIMPLE));
 
+    /** R146: the one metric that reads {@code assetValue}; it must move with the asset value. */
+    @Test
+    void lease_implicit_rate_reads_the_asset_value_not_the_principal() {
+        Schedule schedule = flatLoanSchedule();
+        LeaseElement financed = element();
+        LeaseElement withAsset = financed.toBuilder().assetValue(new BigDecimal("1100000")).build();
+
+        MetricRegistry registry = MetricRegistry.defaults();
+        BigDecimal priced = registry.computeAll(
+                new MetricContext(flowsOf(schedule, withAsset), schedule, withAsset, 12, null, null, null))
+                .find(MetricCodes.LEASE_IMPLICIT_RATE);
+
+        assertThat(priced).isNotNull();
+        assertThat(priced.scale()).isEqualTo(12);
+        // 同一个现金流按更大的分母（资产价值 > 本金）贴现，内含利率必然低于对本金的 IRR。
+        BigDecimal onPrincipal = registry.computeAll(context(schedule)).find(MetricCodes.IRR_ANNUAL);
+        assertThat(priced).isLessThan(onPrincipal);
+    }
+
     @Test
     void computes_all_builtin_metrics() {
         MetricContext ctx = context(flatLoanSchedule());
@@ -89,15 +108,15 @@ class MetricRegistryTest {
                 .isEqualByComparingTo("42");
     }
 
-    /** {@link MetricCodes#ALL} and {@link MetricRegistry#defaults()} describe the same 25 codes. */
+    /** {@link MetricCodes#ALL} and {@link MetricRegistry#defaults()} describe the same 26 codes. */
     @Test
     void builtin_registry_covers_exactly_the_spec_metric_set() {
         Set<String> registered = new LinkedHashSet<>();
         for (FinancialMetric metric : MetricRegistry.defaults().metrics()) {
             registered.add(metric.code());
         }
-        assertThat(MetricCodes.ALL).hasSize(25);
-        assertThat(registered).hasSize(25);
+        assertThat(MetricCodes.ALL).hasSize(26);
+        assertThat(registered).hasSize(26);
         assertThat(registered).containsExactlyInAnyOrderElementsOf(MetricCodes.ALL);
     }
 
@@ -285,6 +304,13 @@ class MetricRegistryTest {
             if (BORROWER_CODES.contains(code)) {
                 // R103: the borrower family reads the lessee side, so a LESSOR run carries it
                 // present-but-null; CashFlowPerspectiveMetricsTest pins its scales on a LESSEE run.
+                assertThat(metrics.find(code)).as(code).isNull();
+                continue;
+            }
+            if (MetricCodes.LEASE_IMPLICIT_RATE.equals(code)) {
+                // R146: defined against the asset value; a principal-only element has nothing to
+                // solve against, so the flat-loan context carries it present-but-null too. The
+                // positive case is pinned by lease_implicit_rate_reads_the_asset_value.
                 assertThat(metrics.find(code)).as(code).isNull();
                 continue;
             }

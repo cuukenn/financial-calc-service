@@ -25,6 +25,8 @@ public final class LeaseElement {
     public static final int MAX_PERIODS = 1200;
 
     private final BigDecimal principal;
+    /** Asset value (fair value) the lease finances; {@code null} means "not provided". */
+    private final BigDecimal assetValue;
     private final BigDecimal nominalRate;
     private final LocalDate commenceDate;
     private final LocalDate firstRentDate;
@@ -48,6 +50,7 @@ public final class LeaseElement {
 
     private LeaseElement(Builder builder) {
         this.principal = builder.principal;
+        this.assetValue = builder.assetValue;
         this.nominalRate = builder.nominalRate;
         this.commenceDate = builder.commenceDate;
         this.firstRentDate = builder.firstRentDate;
@@ -83,6 +86,7 @@ public final class LeaseElement {
         if (principal == null || principal.compareTo(MoneyUtils.ZERO) <= 0) {
             throw new BusinessException(DomainErrorCode.PRINCIPAL_MUST_BE_POSITIVE, principal);
         }
+        validateAssetValue();
         if (nominalRate == null
                 || nominalRate.compareTo(MoneyUtils.ZERO) < 0
                 || nominalRate.compareTo(BigDecimal.ONE) > 0) {
@@ -145,6 +149,20 @@ public final class LeaseElement {
         }
     }
 
+    /**
+     * The asset value is the denominator of the lease implicit rate (CAS 21) and the source of the
+     * down payment ({@code assetValue - principal}). It is optional for backward compatibility:
+     * absent means "financed principal = asset value", the pre-R146 behaviour.
+     */
+    private void validateAssetValue() {
+        if (assetValue == null) {
+            return;
+        }
+        if (assetValue.compareTo(MoneyUtils.ZERO) <= 0 || assetValue.compareTo(principal) < 0) {
+            throw new BusinessException(DomainErrorCode.ASSET_VALUE_OUT_OF_RANGE, assetValue);
+        }
+    }
+
     private void validateBalloonResidual() {
         if (residualValue == null
                 || residualValue.compareTo(MoneyUtils.ZERO) < 0
@@ -201,6 +219,14 @@ public final class LeaseElement {
     /** Financed principal; strictly positive. */
     public BigDecimal principal() {
         return principal;
+    }
+
+    /**
+     * Asset value (fair value) the lease finances; {@code null} when the caller did not provide it.
+     * When present it must be at least {@link #principal()} — the gap is the down payment.
+     */
+    public BigDecimal assetValue() {
+        return assetValue;
     }
 
     /** Nominal annual rate as a fraction, e.g. {@code 0.06} for 6%; within [0, 1]. */
@@ -325,6 +351,7 @@ public final class LeaseElement {
     public static final class Builder {
 
         private BigDecimal principal;
+        private BigDecimal assetValue;
         private BigDecimal nominalRate;
         private LocalDate commenceDate;
         private LocalDate firstRentDate;
@@ -351,6 +378,7 @@ public final class LeaseElement {
 
         private Builder(LeaseElement source) {
             this.principal = source.principal;
+            this.assetValue = source.assetValue;
             this.nominalRate = source.nominalRate;
             this.commenceDate = source.commenceDate;
             this.firstRentDate = source.firstRentDate;
@@ -375,6 +403,11 @@ public final class LeaseElement {
 
         public Builder principal(BigDecimal principal) {
             this.principal = principal;
+            return this;
+        }
+
+        public Builder assetValue(BigDecimal assetValue) {
+            this.assetValue = assetValue;
             return this;
         }
 

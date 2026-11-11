@@ -35,7 +35,7 @@ module your.app {
 CalculationResult r = CalculationFacade.defaults().calculate(
         new CalculationRequest(leaseElement, null, CalculationOptions.defaults()));
 Schedule schedule = r.schedule();                       // 12 期租金表（含校验问题列表）
-BigDecimal totalRent = schedule.header().metrics()      // 25 项金融指标（TOTAL_RENT、IRR…）
+BigDecimal totalRent = schedule.header().metrics()      // 26 项金融指标（TOTAL_RENT、IRR…）
         .find(MetricCodes.TOTAL_RENT);
 EffectiveInterestTable eir = r.effectiveInterest();     // §9.7 实际利率法摊销表（可能为 null）
 ```
@@ -46,9 +46,11 @@ EffectiveInterestTable eir = r.effectiveInterest();     // §9.7 实际利率法
 
 ### 指标口径：视角（R103）
 
-`metrics` 中的 25 个 code 分两族，**同一包里共存、键不加前缀**：
+`metrics` 中的 26 个 code 分三族，**同一包里共存、键不加前缀**：
 
 - §9.5 的 21 项（`TOTAL_*`、`NPV`/`IRR*`、久期…）按出租方（lessor）视角读现金流，即 v1 口径；
+- `LEASE_IMPLICIT_RATE`（R146，CAS 21）：把期初流出换成**租赁物价值**后求解的年化内含利率，
+  只在请求携带 `assetValue` 时可得，否则该键为 `null`（不是 0）；
 - 借款方（承租方）视角的 4 项 `BORROWER_IRR_PERIOD`、`BORROWER_IRR_ANNUAL`、
   `BORROWER_IRR_ANNUAL_SIMPLE`、`BORROWER_TOTAL_REPAYMENT`：把同一份现金流的方向整体翻转
   （本金由流出变流入、租金由流入变流出）后读取。
