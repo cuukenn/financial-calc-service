@@ -512,7 +512,8 @@ function onReset(): void {
     </Col>
 
     <Col :xs="24" :lg="14">
-      <!-- 结果区共用未改动的 ResultPanel（Task 6 才负责其文案与样式）。 -->
+      <!-- 结果区：ResultPanel 只是外壳（Card + runId + ERROR 提示 + 四个 Tab），
+           各 Tab 的主体已拆成 `components/result/*Pane.vue`（D-6）。 -->
       <ResultPanel v-if="result" :result="result" />
     </Col>
   </Row>

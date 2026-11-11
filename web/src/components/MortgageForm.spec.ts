@@ -1,3 +1,4 @@
+import { DatePicker } from 'ant-design-vue'
 import { flushPromises } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -382,8 +383,9 @@ describe('MortgageForm 期限 cap (R107: UI-only 480 months, engine stays 1200)'
 
     expect(calculate).toHaveBeenCalledTimes(1)
     expect(lastRequest().periods).toBe(480)
+    // 归位是确定性的：481 被夹到上限，不是「随便一个 ≤ 480 的值」。
     for (const [req] of vi.mocked(calculate).mock.calls) {
-      expect((req as CalculationRequest).periods).toBeLessThanOrEqual(480)
+      expect((req as CalculationRequest).periods).toBe(480)
     }
   })
 
@@ -488,14 +490,18 @@ describe('MortgageForm DTI (AGENTS.md §2.2: 50% / 60%)', () => {
     expect(wrapper.find('[data-test="mortgage-dti-breach"]').exists()).toBe(false)
   })
 
-  it('flags 50.01% (0.5001) as a breach', async () => {
+  it('flags 50.01% (0.5001) as a warn — above the 50% limit but not yet a breach', async () => {
     vi.mocked(calculate).mockResolvedValue(mortgageResult(['8001.60']))
     const wrapper = mountWithI18n(MortgageForm)
     await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('16000')
     await submit(wrapper)
 
     expect(wrapper.find('[data-test="mortgage-dti-value"]').text()).toContain('50.01%')
-    expect(wrapper.find('[data-test="mortgage-dti-breach"]').exists()).toBe(true)
+    // AGENTS.md §2.2：月房贷支出/收入比 ≤ 50% 合规、> 50% 接近上限、> 60% 才是超限。
+    // 50.01% 落在 warn 档：类名与文案标记都必须是 warn，不能读成 breach。
+    expect(wrapper.find('[data-test="mortgage-dti-readout"]').classes()).toContain('ratio-warn')
+    expect(wrapper.find('[data-test="mortgage-dti-readout"]').classes()).not.toContain('ratio-breach')
+    expect(wrapper.find('[data-test="mortgage-dti-breach"]').text()).toBe('接近上限')
   })
 
   it('flags 月所有债务支出/收入比 at 60.00% as compliant and 60.01% as a breach', async () => {
@@ -767,18 +773,33 @@ describe('MortgageForm 显式重置 (Task 6 §2)', () => {
     await wrapper.find('[data-test="mortgage-periods"]').setValue('120')
     await wrapper.find('[data-test="mortgage-monthly-income"]').setValue('16000')
     await wrapper.find('[data-test="mortgage-other-debt"]').setValue('1600')
+    // 日期也要先改掉：否则「重置恢复默认值」对放款日/首期还款日是无从验证的。
+    // DatePicker 在 jsdom 里不认键盘输入（内部按 format 解析，setValue 不提交模型），
+    // 直接按 v-model 的契约改值：值格式由 `value-format="YYYY-MM-DD"` 决定。
+    const pickers = wrapper.findAllComponents(DatePicker)
+    await pickers[0].vm.$emit('update:value', '2027-01-05')
+    await pickers[1].vm.$emit('update:value', '2027-02-05')
+    await flushPromises()
     await submit(wrapper)
+
+    // 先确认改动确实进了 payload（value-format 生效），再验证重置能还原。
+    expect(lastRequest().commenceDate).toBe('2027-01-05')
+    expect(lastRequest().firstRentDate).toBe('2027-02-05')
 
     await wrapper.find('[data-test="mortgage-reset-btn"]').trigger('click')
     await flushPromises()
 
     const value = (hook: string) => (wrapper.find(`[data-test="${hook}"]`).element as HTMLInputElement).value
+    const dateValue = (hook: string) =>
+      (wrapper.find(`[data-test="${hook}"] input`).element as HTMLInputElement).value
     expect(value('mortgage-principal')).toBe('2380000')
     expect(value('mortgage-lpr')).toBe('3.5')
     expect(value('mortgage-spread')).toBe('0')
     expect(value('mortgage-periods')).toBe('360')
     expect(value('mortgage-transaction-price')).toBe('3000000')
     expect(value('mortgage-appraisal-value')).toBe('2800000')
+    expect(dateValue('mortgage-commence-date')).toBe('2026-11-01')
+    expect(dateValue('mortgage-first-repayment-date')).toBe('2026-12-01')
     expect(value('mortgage-monthly-income')).toBe('')
     expect(value('mortgage-other-debt')).toBe('')
     expect((wrapper.find('input[value="EQUAL_INSTALLMENT"]').element as HTMLInputElement).checked).toBe(true)
