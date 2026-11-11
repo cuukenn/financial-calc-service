@@ -1,5 +1,5 @@
 /**
- * 指标目录（R86）：全部 25 项金融指标的 code → 中文名 / 英文名 / 公式 / 一行说明。
+ * 指标目录（R86）：全部 26 项金融指标的 code → 中文名 / 英文名 / 公式 / 一行说明。
  *
  * 前 21 项对齐设计文档 §9.5 的指标表
  * （docs/superpowers/specs/2026-11-02-financial-calc-service-design.md），不在此发明公式；
@@ -42,6 +42,7 @@ export const METRIC_CODES = [
   'DURATION_MODIFIED',
   'CONVEXITY',
   'AVG_OUTSTANDING_BALANCE',
+  'LEASE_IMPLICIT_RATE',
   'TRUE_ANNUAL_RATE',
   'BORROWER_IRR_PERIOD',
   'BORROWER_IRR_ANNUAL',
@@ -99,6 +100,14 @@ export const METRIC_CATALOG: Record<MetricCode, MetricInfo> = {
     formulaEn: 'residualValue',
     descZh: '合同约定的留购价/残值，期末按残值处理方式支付（scale 2）',
     descEn: 'The contractual purchase price / residual value, settled at end of term per residual handling (scale 2)',
+  },
+  LEASE_IMPLICIT_RATE: {
+    nameZh: '租赁内含利率',
+    nameEn: 'Lease Implicit Rate',
+    formulaZh: 'PV(首付+租金+留购价)+PV(未担保余值)=资产价值+IDC',
+    formulaEn: 'PV(receipts)+PV(unguaranteed residual)=asset value+IDC',
+    descZh: 'CAS 21 口径；无未担保余值时与 IRR 年化恒等',
+    descEn: 'CAS 21; equals IRR annual when the unguaranteed residual is zero',
   },
   RENTAL_RATE: {
     nameZh: '租费率',

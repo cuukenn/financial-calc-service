@@ -9,7 +9,7 @@ import {
   metricTooltip,
 } from './metricCatalog'
 
-/** 全量 25 项：§9.5 指标表 21 项（与设计文档表格一一对应）+ R103 借款方视角家族 4 项。 */
+/** 全量 26 项：§9.5 指标表 21 项（与设计文档表格一一对应）+ R103 借款方视角家族 4 项。 */
 const EXPECTED_CODES = [
   'TOTAL_PRINCIPAL',
   'TOTAL_INTEREST',
@@ -31,6 +31,7 @@ const EXPECTED_CODES = [
   'DURATION_MODIFIED',
   'CONVEXITY',
   'AVG_OUTSTANDING_BALANCE',
+  'LEASE_IMPLICIT_RATE',
   'TRUE_ANNUAL_RATE',
   'BORROWER_IRR_PERIOD',
   'BORROWER_IRR_ANNUAL',
@@ -40,7 +41,7 @@ const EXPECTED_CODES = [
 
 describe('metric catalog (R86)', () => {
   it('covers exactly the 25 metric codes: §9.5 table order, then the R103 borrower family', () => {
-    expect(METRIC_CODES).toHaveLength(25)
+    expect(METRIC_CODES).toHaveLength(26)
     expect([...METRIC_CODES]).toEqual(EXPECTED_CODES)
   })
 

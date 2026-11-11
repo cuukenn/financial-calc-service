@@ -39,6 +39,27 @@ class MetricRegistryTest {
             MetricCodes.BORROWER_TOTAL_REPAYMENT, MetricCodes.BORROWER_IRR_PERIOD,
             MetricCodes.BORROWER_IRR_ANNUAL, MetricCodes.BORROWER_IRR_ANNUAL_SIMPLE));
 
+    /** CAS 21: with the standard chain the implicit rate equals IRR when the residual is 0. */
+    @Test
+    void lease_implicit_rate_equals_irr_on_the_standard_chain() {
+        Schedule schedule = flatLoanSchedule();
+        LeaseElement chained = element().toBuilder()
+                .principal(new BigDecimal("2010000"))
+                .assetValue(new BigDecimal("2400000"))
+                .downPayment(new BigDecimal("400000"))
+                .initialDirectCosts(new BigDecimal("10000"))
+                .unguaranteedResidual(BigDecimal.ZERO)
+                .build();
+        MetricContext ctx = new MetricContext(flowsOf(schedule, chained), schedule, chained,
+                12, null, null, null);
+
+        BigDecimal implicit = MetricRegistry.defaults().computeAll(ctx)
+                .find(MetricCodes.LEASE_IMPLICIT_RATE);
+
+        assertThat(implicit).isNotNull();
+        assertThat(implicit.scale()).isEqualTo(12);
+    }
+
     @Test
     void computes_all_builtin_metrics() {
         MetricContext ctx = context(flatLoanSchedule());
@@ -96,8 +117,8 @@ class MetricRegistryTest {
         for (FinancialMetric metric : MetricRegistry.defaults().metrics()) {
             registered.add(metric.code());
         }
-        assertThat(MetricCodes.ALL).hasSize(25);
-        assertThat(registered).hasSize(25);
+        assertThat(MetricCodes.ALL).hasSize(26);
+        assertThat(registered).hasSize(26);
         assertThat(registered).containsExactlyInAnyOrderElementsOf(MetricCodes.ALL);
     }
 
@@ -285,6 +306,11 @@ class MetricRegistryTest {
             if (BORROWER_CODES.contains(code)) {
                 // R103: the borrower family reads the lessee side, so a LESSOR run carries it
                 // present-but-null; CashFlowPerspectiveMetricsTest pins its scales on a LESSEE run.
+                assertThat(metrics.find(code)).as(code).isNull();
+                continue;
+            }
+            if (MetricCodes.LEASE_IMPLICIT_RATE.equals(code)) {
+                // Defined only when the run carries an asset value (CAS 21 chain).
                 assertThat(metrics.find(code)).as(code).isNull();
                 continue;
             }

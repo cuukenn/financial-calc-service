@@ -7,6 +7,7 @@ import io.github.cuukenn.fincalc.domain.metric.impl.BorrowerIrrPeriodMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.BorrowerTotalRepaymentMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.DurationMetrics;
 import io.github.cuukenn.fincalc.domain.metric.impl.IrrMetrics;
+import io.github.cuukenn.fincalc.domain.metric.impl.LeaseImplicitRateMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.MirrMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.NpvMetric;
 import io.github.cuukenn.fincalc.domain.metric.impl.PaybackMetric;
@@ -74,7 +75,7 @@ public final class MetricRegistry {
     }
 
     /**
-     * A registry with the full built-in set: the 25 codes of {@link MetricCodes#ALL} — the §9.5
+     * A registry with the full built-in set: the 26 codes of {@link MetricCodes#ALL} — the §9.5
      * table plus the R103 borrower family — nothing else.
      *
      * @return a fresh registry; registering a metric with an existing code replaces it
@@ -96,6 +97,7 @@ public final class MetricRegistry {
         for (FinancialMetric metric : BorrowerIrrMetrics.instances()) {
             registry.register(metric);
         }
+        registry.register(new LeaseImplicitRateMetric());
         registry.register(new MirrMetric());
         for (FinancialMetric metric : XirrMetric.instances()) {
             registry.register(metric);
