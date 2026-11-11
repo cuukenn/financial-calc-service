@@ -42,6 +42,11 @@ const FORM_COMPONENTS = [
   'components/MortgageForm.vue',
   'components/MortgageIncomePanel.vue',
   'components/ResultPanel.vue',
+  // D-6：结果区按 pane 拆分后的子组件同样受「共享样式只声明一次」的约束。
+  'components/result/MetricsPane.vue',
+  'components/result/SchedulePane.vue',
+  'components/result/CashflowPane.vue',
+  'components/result/EirPane.vue',
 ]
 
 /** 组件自己的 `<style>` 内容（没有则为空串）。 */

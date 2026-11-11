@@ -272,6 +272,12 @@ const enUS: typeof zhCN = {
     // available in the hover tooltip (no precision lost for reconciliation).
     raw: 'Raw: {value}',
     hasErrors: 'The result contains ERROR-level issues, see the issue list below',
+    // R143: period-indexed IRR annualisation is not trustworthy on sparse cash flows.
+    irrCaveat: {
+      marker: 'Not reliable',
+      tooltip:
+        'This annual figure is derived by compounding a per-period return; this run’s cash flows are sparse (for example a bullet loan), so the period count used for the annualisation is wrong and the reading is not reliable. Use XIRR (the true annual rate) instead.',
+    },
     tabs: {
       metrics: 'Metrics',
       schedule: 'Amortization',

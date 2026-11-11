@@ -32,6 +32,8 @@
   --fcs-fill-alter: #fafafa;
   --fcs-label-muted: rgba(0, 0, 0, 0.65);
   --fcs-text-muted: rgba(0, 0, 0, 0.45);
+  /* R143：读数存疑标注（不是监管阈值色，故不复用 --fcs-ratio-*）。 */
+  --fcs-caveat: #d48806;
 }
 
 /* 大块卡片：两个表单的三个分区共用（卡头压低、正文上紧下松）。
