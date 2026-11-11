@@ -8,6 +8,7 @@ import java.util.List;
 
 import io.github.cuukenn.fincalc.common.error.BusinessException;
 import io.github.cuukenn.fincalc.common.error.CommonErrorCode;
+import io.github.cuukenn.fincalc.common.money.MoneyTolerance;
 import io.github.cuukenn.fincalc.common.money.MoneyUtils;
 
 /**
@@ -25,6 +26,11 @@ public final class LeaseElement {
     public static final int MAX_PERIODS = 1200;
 
     private final BigDecimal principal;
+    private final BigDecimal assetValue;
+    private final BigDecimal downPayment;
+    private final BigDecimal initialDirectCosts;
+    private final BigDecimal guaranteedResidual;
+    private final BigDecimal unguaranteedResidual;
     private final BigDecimal nominalRate;
     private final LocalDate commenceDate;
     private final LocalDate firstRentDate;
@@ -48,6 +54,11 @@ public final class LeaseElement {
 
     private LeaseElement(Builder builder) {
         this.principal = builder.principal;
+        this.assetValue = builder.assetValue;
+        this.downPayment = builder.downPayment;
+        this.initialDirectCosts = builder.initialDirectCosts;
+        this.guaranteedResidual = builder.guaranteedResidual;
+        this.unguaranteedResidual = builder.unguaranteedResidual;
         this.nominalRate = builder.nominalRate;
         this.commenceDate = builder.commenceDate;
         this.firstRentDate = builder.firstRentDate;
@@ -104,6 +115,7 @@ public final class LeaseElement {
         if (residualHandling == ResidualHandling.BALLOON_IN_RENT) {
             validateBalloonResidual();
         }
+        validateStandardAmounts();
         validateExplicitRents();
         validateFees();
         validateDeposit();
@@ -157,6 +169,37 @@ public final class LeaseElement {
      * {@link RepaymentMethodId#EXPLICIT_RENT} requires one strictly positive rent per period; any
      * other method must not carry explicit rents (fail loud instead of silently ignoring them).
      */
+    /**
+     * CAS 21 / IFRS 16 measurement chain: asset value + initial direct costs - down payment =
+     * financed principal. Every amount is optional; when the asset value is absent the element
+     * keeps the pre-R146 shape (principal given directly, no down payment, no IDC).
+     */
+    private void validateStandardAmounts() {
+        requireNonNegative("downPayment", downPayment);
+        requireNonNegative("initialDirectCosts", initialDirectCosts);
+        requireNonNegative("guaranteedResidual", guaranteedResidual);
+        requireNonNegative("unguaranteedResidual", unguaranteedResidual);
+        if (assetValue == null) {
+            return;
+        }
+        if (assetValue.signum() <= 0
+                || (downPayment != null && downPayment.compareTo(assetValue) > 0)) {
+            throw new BusinessException(DomainErrorCode.ASSET_VALUE_OUT_OF_RANGE, assetValue);
+        }
+        BigDecimal idc = initialDirectCosts == null ? MoneyUtils.ZERO : initialDirectCosts;
+        BigDecimal dp = downPayment == null ? MoneyUtils.ZERO : downPayment;
+        BigDecimal expected = assetValue.add(idc).subtract(dp);
+        if (principal.subtract(expected).abs().compareTo(MoneyTolerance.MONEY_COMPARE) > 0) {
+            throw new BusinessException(DomainErrorCode.PRINCIPAL_NOT_BALANCED, principal);
+        }
+    }
+
+    private static void requireNonNegative(String name, BigDecimal value) {
+        if (value != null && value.signum() < 0) {
+            throw new BusinessException(DomainErrorCode.NON_NEGATIVE_AMOUNT, name, value);
+        }
+    }
+
     private void validateExplicitRents() {
         if (method == RepaymentMethodId.EXPLICIT_RENT) {
             int expected = frequency == PaymentFrequency.IRREGULAR
@@ -201,6 +244,26 @@ public final class LeaseElement {
     /** Financed principal; strictly positive. */
     public BigDecimal principal() {
         return principal;
+    }
+
+    public BigDecimal assetValue() {
+        return assetValue;
+    }
+
+    public BigDecimal downPayment() {
+        return downPayment;
+    }
+
+    public BigDecimal initialDirectCosts() {
+        return initialDirectCosts;
+    }
+
+    public BigDecimal guaranteedResidual() {
+        return guaranteedResidual;
+    }
+
+    public BigDecimal unguaranteedResidual() {
+        return unguaranteedResidual;
     }
 
     /** Nominal annual rate as a fraction, e.g. {@code 0.06} for 6%; within [0, 1]. */
@@ -325,6 +388,11 @@ public final class LeaseElement {
     public static final class Builder {
 
         private BigDecimal principal;
+        private BigDecimal assetValue;
+        private BigDecimal downPayment;
+        private BigDecimal initialDirectCosts;
+        private BigDecimal guaranteedResidual;
+        private BigDecimal unguaranteedResidual;
         private BigDecimal nominalRate;
         private LocalDate commenceDate;
         private LocalDate firstRentDate;
@@ -351,6 +419,11 @@ public final class LeaseElement {
 
         private Builder(LeaseElement source) {
             this.principal = source.principal;
+            this.assetValue = source.assetValue;
+            this.downPayment = source.downPayment;
+            this.initialDirectCosts = source.initialDirectCosts;
+            this.guaranteedResidual = source.guaranteedResidual;
+            this.unguaranteedResidual = source.unguaranteedResidual;
             this.nominalRate = source.nominalRate;
             this.commenceDate = source.commenceDate;
             this.firstRentDate = source.firstRentDate;
@@ -375,6 +448,31 @@ public final class LeaseElement {
 
         public Builder principal(BigDecimal principal) {
             this.principal = principal;
+            return this;
+        }
+
+        public Builder assetValue(BigDecimal assetValue) {
+            this.assetValue = assetValue;
+            return this;
+        }
+
+        public Builder downPayment(BigDecimal downPayment) {
+            this.downPayment = downPayment;
+            return this;
+        }
+
+        public Builder initialDirectCosts(BigDecimal initialDirectCosts) {
+            this.initialDirectCosts = initialDirectCosts;
+            return this;
+        }
+
+        public Builder guaranteedResidual(BigDecimal guaranteedResidual) {
+            this.guaranteedResidual = guaranteedResidual;
+            return this;
+        }
+
+        public Builder unguaranteedResidual(BigDecimal unguaranteedResidual) {
+            this.unguaranteedResidual = unguaranteedResidual;
             return this;
         }
 

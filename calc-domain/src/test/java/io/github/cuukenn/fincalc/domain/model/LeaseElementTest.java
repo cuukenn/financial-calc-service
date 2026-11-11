@@ -203,6 +203,26 @@ class LeaseElementTest {
         return rents;
     }
 
+    /** CAS 21 chain: principal = asset value + initial direct costs - down payment. */
+    @Test
+    void standard_measurement_chain_must_balance() {
+        LeaseElement ok = baseBuilder()
+                .principal(new BigDecimal("2010000"))
+                .assetValue(new BigDecimal("2400000"))
+                .downPayment(new BigDecimal("400000"))
+                .initialDirectCosts(new BigDecimal("10000"))
+                .build();
+        assertThat(ok.principal()).isEqualByComparingTo("2010000");
+
+        assertThatThrownBy(() -> baseBuilder()
+                .principal(new BigDecimal("1900000"))
+                .assetValue(new BigDecimal("2400000"))
+                .downPayment(new BigDecimal("400000"))
+                .initialDirectCosts(new BigDecimal("10000"))
+                .build())
+                .isInstanceOf(BusinessException.class);
+    }
+
     private LeaseElement.Builder baseBuilder() {
         return LeaseElement.builder()
                 .principal(new BigDecimal("1000000"))
