@@ -97,6 +97,12 @@ public final class CalculationRequestDto {
     private final RoundingDto rounding;
 
     @Schema(description = "残值金额；缺省 = 无残值。BALLOON_IN_RENT 时须满足 0 ≤ 残值 < 本金（FCS-DOM-1007）")
+    private final BigDecimal assetValue;
+    private final BigDecimal downPayment;
+    private final BigDecimal initialDirectCosts;
+    private final BigDecimal guaranteedResidual;
+    private final BigDecimal unguaranteedResidual;
+
     private final BigDecimal residualValue;
 
     @Schema(description = "残值处理：SEPARATE（残值期末单独回收）/ BALLOON_IN_RENT（摊入租金）",
@@ -168,7 +174,12 @@ public final class CalculationRequestDto {
             @JsonProperty("explicitRents") List<BigDecimal> explicitRents,
             @JsonProperty("fees") List<FeeDto> fees,
             @JsonProperty("ruleRows") List<RuleRowDto> ruleRows,
-            @JsonProperty("allowPartialRuleSet") Boolean allowPartialRuleSet) {
+            @JsonProperty("allowPartialRuleSet") Boolean allowPartialRuleSet,
+            @JsonProperty("assetValue") BigDecimal assetValue,
+            @JsonProperty("downPayment") BigDecimal downPayment,
+            @JsonProperty("initialDirectCosts") BigDecimal initialDirectCosts,
+            @JsonProperty("guaranteedResidual") BigDecimal guaranteedResidual,
+            @JsonProperty("unguaranteedResidual") BigDecimal unguaranteedResidual) {
         this.principal = principal;
         this.nominalRate = nominalRate;
         this.commenceDate = commenceDate;
@@ -192,6 +203,11 @@ public final class CalculationRequestDto {
         this.fees = fees;
         this.ruleRows = ruleRows;
         this.allowPartialRuleSet = allowPartialRuleSet;
+        this.assetValue = assetValue;
+        this.downPayment = downPayment;
+        this.initialDirectCosts = initialDirectCosts;
+        this.guaranteedResidual = guaranteedResidual;
+        this.unguaranteedResidual = unguaranteedResidual;
     }
 
     public BigDecimal principal() {
@@ -236,6 +252,26 @@ public final class CalculationRequestDto {
 
     public RoundingDto rounding() {
         return rounding;
+    }
+
+    public BigDecimal assetValue() {
+        return assetValue;
+    }
+
+    public BigDecimal downPayment() {
+        return downPayment;
+    }
+
+    public BigDecimal initialDirectCosts() {
+        return initialDirectCosts;
+    }
+
+    public BigDecimal guaranteedResidual() {
+        return guaranteedResidual;
+    }
+
+    public BigDecimal unguaranteedResidual() {
+        return unguaranteedResidual;
     }
 
     public BigDecimal residualValue() {

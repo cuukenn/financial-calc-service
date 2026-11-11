@@ -29,6 +29,28 @@ class CalculationRequestAssemblerTest {
 
     private final CalculationRequestAssembler assembler = new CalculationRequestAssembler();
 
+    /** CAS 21: the five measurement-chain fields reach the element untouched. */
+    @Test
+    void maps_the_standard_measurement_chain() {
+        CalculationRequestDto dto = new CalculationRequestDto(
+                new BigDecimal("2010000"), new BigDecimal("0.06"),
+                LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1),
+                12, null, PaymentFrequency.MONTHLY,
+                io.github.cuukenn.fincalc.domain.model.PaymentTiming.IN_ARREARS,
+                "THIRTY_360", "NONE", null,
+                BigDecimal.ZERO, io.github.cuukenn.fincalc.domain.model.ResidualHandling.SEPARATE,
+                BigDecimal.ZERO, new BigDecimal("0.06"), "CNY", "EQUAL_INSTALLMENT",
+                null, io.github.cuukenn.fincalc.domain.model.RateChangePolicy.RESOLVE,
+                null, null, null, null,
+                new BigDecimal("2400000"), new BigDecimal("400000"),
+                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO);
+
+        var element = assembler.assemble(dto).element();
+        assertThat(element.assetValue()).isEqualByComparingTo("2400000");
+        assertThat(element.downPayment()).isEqualByComparingTo("400000");
+        assertThat(element.initialDirectCosts()).isEqualByComparingTo("10000");
+    }
+
     @Test
     void maps_irregular_frequency_with_explicit_periods() {
         CalculationRequestDto dto = baseDto();
@@ -152,7 +174,7 @@ class CalculationRequestAssemblerTest {
                 BigDecimal.ZERO, io.github.cuukenn.fincalc.domain.model.ResidualHandling.SEPARATE,
                 BigDecimal.ZERO, new BigDecimal("0.06"), "CNY", "EQUAL_INSTALLMENT",
                 null, io.github.cuukenn.fincalc.domain.model.RateChangePolicy.RESOLVE,
-                null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
     }
 
     private static CalculationRequestDto withFrequency(CalculationRequestDto source,
@@ -164,7 +186,7 @@ class CalculationRequestAssemblerTest {
                 source.residualHandling(), source.deposit(), source.vatRate(), source.currency(),
                 source.method(), source.gracePeriod(), source.rateChangePolicy(),
                 source.explicitRents(), source.fees(), source.ruleRows(),
-                source.allowPartialRuleSet());
+                source.allowPartialRuleSet(), source.assetValue(), source.downPayment(), source.initialDirectCosts(), source.guaranteedResidual(), source.unguaranteedResidual());
     }
 
     private static CalculationRequestDto withExplicitPeriods(CalculationRequestDto source,
@@ -176,7 +198,7 @@ class CalculationRequestAssemblerTest {
                 source.residualHandling(), source.deposit(), source.vatRate(), source.currency(),
                 source.method(), source.gracePeriod(), source.rateChangePolicy(),
                 source.explicitRents(), source.fees(), source.ruleRows(),
-                source.allowPartialRuleSet());
+                source.allowPartialRuleSet(), source.assetValue(), source.downPayment(), source.initialDirectCosts(), source.guaranteedResidual(), source.unguaranteedResidual());
     }
 
     private static CalculationRequestDto withFees(CalculationRequestDto source,
@@ -188,7 +210,7 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), source.method(), source.gracePeriod(),
                 source.rateChangePolicy(), source.explicitRents(), fees, source.ruleRows(),
-                source.allowPartialRuleSet());
+                source.allowPartialRuleSet(), source.assetValue(), source.downPayment(), source.initialDirectCosts(), source.guaranteedResidual(), source.unguaranteedResidual());
     }
 
     private static CalculationRequestDto withGracePeriod(CalculationRequestDto source,
@@ -200,7 +222,7 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), source.method(), gracePeriod,
                 source.rateChangePolicy(), source.explicitRents(), source.fees(),
-                source.ruleRows(), source.allowPartialRuleSet());
+                source.ruleRows(), source.allowPartialRuleSet(), source.assetValue(), source.downPayment(), source.initialDirectCosts(), source.guaranteedResidual(), source.unguaranteedResidual());
     }
 
     private static CalculationRequestDto withAllowPartial(CalculationRequestDto source,
@@ -212,7 +234,7 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), source.method(), source.gracePeriod(),
                 source.rateChangePolicy(), source.explicitRents(), source.fees(),
-                source.ruleRows(), allowPartial);
+                source.ruleRows(), allowPartial, source.assetValue(), source.downPayment(), source.initialDirectCosts(), source.guaranteedResidual(), source.unguaranteedResidual());
     }
 
     private static CalculationRequestDto withRuleRows(CalculationRequestDto source,
@@ -224,7 +246,7 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), source.method(), source.gracePeriod(),
                 source.rateChangePolicy(), source.explicitRents(), source.fees(), ruleRows,
-                source.allowPartialRuleSet());
+                source.allowPartialRuleSet(), source.assetValue(), source.downPayment(), source.initialDirectCosts(), source.guaranteedResidual(), source.unguaranteedResidual());
     }
 
     private static CalculationRequestDto withMethod(CalculationRequestDto source,
@@ -236,6 +258,6 @@ class CalculationRequestAssemblerTest {
                 source.residualValue(), source.residualHandling(), source.deposit(),
                 source.vatRate(), source.currency(), method, source.gracePeriod(),
                 source.rateChangePolicy(), source.explicitRents(), source.fees(),
-                source.ruleRows(), source.allowPartialRuleSet());
+                source.ruleRows(), source.allowPartialRuleSet(), source.assetValue(), source.downPayment(), source.initialDirectCosts(), source.guaranteedResidual(), source.unguaranteedResidual());
     }
 }
