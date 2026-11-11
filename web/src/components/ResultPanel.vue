@@ -14,7 +14,7 @@ import SchedulePane from './result/SchedulePane.vue'
  *
  * 每个 pane 的主体是独立子组件，props 引用稳定 —— AntD Tabs 不销毁已访问的 pane，
  * 但子组件在 props 未变时不会重渲染，因此切换内层 Tab 不再重建整棵表格树。
- * 行数据在各自 pane 内 `detach` 成普通对象并分页（每页 24 行），见 `result/tableProps.ts`。
+ * 行数据在各自 pane 内 `detach` 成普通对象并分页（每页 12 行），见 `result/tableProps.ts`。
  */
 const props = defineProps<{ result: CalculationResult }>()
 

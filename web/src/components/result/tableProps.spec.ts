@@ -8,15 +8,15 @@ import {
 } from './tableProps'
 
 /**
- * D-6：结果区列表的两条口径 —— 行数据与响应式结果解绑、默认每页 24 行。
+ * D-6：结果区列表的两条口径 —— 行数据与响应式结果解绑、默认每页 12 行。
  */
 describe('result table props (D-6)', () => {
-  it('defaults to 24 rows per page and offers larger page sizes', () => {
-    expect(ROWS_PER_PAGE).toBe(24)
-    expect(RESULT_TABLE_PAGINATION.pageSize).toBe(24)
+  it('defaults to 12 rows per page and offers larger page sizes', () => {
+    expect(ROWS_PER_PAGE).toBe(12)
+    expect(RESULT_TABLE_PAGINATION.pageSize).toBe(12)
     expect(RESULT_TABLE_PAGINATION.showSizeChanger).toBe(true)
-    expect([...PAGE_SIZE_OPTIONS]).toEqual(['24', '48', '96'])
-    expect([...RESULT_TABLE_PAGINATION.pageSizeOptions]).toEqual(['24', '48', '96'])
+    expect([...PAGE_SIZE_OPTIONS]).toEqual(['12', '24', '48'])
+    expect([...RESULT_TABLE_PAGINATION.pageSizeOptions]).toEqual(['12', '24', '48'])
   })
 
   it('keeps the pagination object referentially stable (a new object every render would re-render the table)', () => {

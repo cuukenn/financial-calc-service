@@ -32,27 +32,32 @@ function installment(periodNo: number): Installment {
 }
 
 /**
- * D-6：摊销计划表默认每页 24 行 —— 360 期的一次测算不再把 360 行同时挂载。
+ * D-6：摊销计划表默认每页 12 行 —— 360 期的一次测算不再把 360 行同时挂载。
  */
 describe('SchedulePane pagination (D-6)', () => {
   const rows = Array.from({ length: 30 }, (_, index) => installment(index + 1))
 
-  it('renders only the first 24 of 30 rows and exposes paging', () => {
+  it('renders only the first 12 of 30 rows and exposes paging', () => {
     const wrapper = mountWithI18n(SchedulePane, { props: { installments: rows } })
 
     const bodyRows = wrapper.findAll('[data-test="installments-table"] .ant-table-tbody tr.ant-table-row')
-    expect(bodyRows).toHaveLength(24)
+    expect(bodyRows).toHaveLength(12)
     expect(wrapper.find('.ant-pagination').exists()).toBe(true)
-    // 分页配置是模块级常量：24 行一页。
+    // 分页配置是模块级常量：12 行一页。
     expect(wrapper.find('.ant-pagination-item-2').exists()).toBe(true)
   })
 
-  it('shows the remainder on the second page', async () => {
+  it('pages through the remainder 12 rows at a time', async () => {
     const wrapper = mountWithI18n(SchedulePane, { props: { installments: rows } })
 
     await wrapper.find('.ant-pagination-item-2').trigger('click')
+    let bodyRows = wrapper.findAll('[data-test="installments-table"] .ant-table-tbody tr.ant-table-row')
+    expect(bodyRows).toHaveLength(12)
+    expect(bodyRows[0].text()).toContain('13')
 
-    const bodyRows = wrapper.findAll('[data-test="installments-table"] .ant-table-tbody tr.ant-table-row')
+    // 30 行 → 第 3 页只剩 6 行。
+    await wrapper.find('.ant-pagination-item-3').trigger('click')
+    bodyRows = wrapper.findAll('[data-test="installments-table"] .ant-table-tbody tr.ant-table-row')
     expect(bodyRows).toHaveLength(6)
     expect(bodyRows[0].text()).toContain('25')
   })

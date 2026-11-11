@@ -5,16 +5,16 @@
  * AntD Tabs 不销毁已访问的 pane，几千个单元格各跑一次 `formatMoney`。两道措施：
  * 1. 行数据用 `detachRows` 解绑成普通对象 —— 与响应式结果对象断开引用，
  *    避免探测/代理开销，也避免下游把行当成可变量改写。
- * 2. 每页 24 行 —— 挂载的单元格从「全表」降到「一页」。
+ * 2. 每页 12 行 —— 挂载的单元格从「全表」降到「一页」。
  *
  * 分页配置对象必须是**常量**：每次渲染新建对象会让 AntD Table 认为配置变了而重算。
  */
 
 /** 默认每页行数。 */
-export const ROWS_PER_PAGE = 24
+export const ROWS_PER_PAGE = 12
 
 /** 可选每页行数（字符串形式，AntD 的 pageSizeOptions 口径）。 */
-export const PAGE_SIZE_OPTIONS = ['24', '48', '96'] as const
+export const PAGE_SIZE_OPTIONS = ['12', '24', '48'] as const
 
 /** 三张表共用的分页配置（`TablePaginationConfig` 的可赋值子集）；引用稳定。 */
 export interface ResultTablePagination {
