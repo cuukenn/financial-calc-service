@@ -153,6 +153,13 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
         if (element.residualHandling() == ResidualHandling.BALLOON_IN_RENT) {
             BigDecimal outstanding = installments.get(installments.size() - 1).closingBalance();
             addFlow(flows, maturity, outstanding, CashFlowType.RESIDUAL, CashFlowDirection.INFLOW);
+            return;
+        }
+        // CAS 21: the guaranteed residual (incl. purchase option price) is a terminal receipt
+        // even when it is not a balloon in the schedule.
+        if (element.guaranteedResidual() != null && element.guaranteedResidual().signum() > 0) {
+            addFlow(flows, maturity, money(element.guaranteedResidual(), rounding),
+                    CashFlowType.RESIDUAL, CashFlowDirection.INFLOW);
         }
     }
 
