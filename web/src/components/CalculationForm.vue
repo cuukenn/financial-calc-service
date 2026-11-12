@@ -816,7 +816,7 @@ function onReset(): void {
     </Col>
 
     <Col :xs="24" :lg="14">
-      <ResultPanel v-if="result" :result="result" />
+      <ResultPanel v-if="result" :result="result" scenario="lease" />
     </Col>
   </Row>
 </template>

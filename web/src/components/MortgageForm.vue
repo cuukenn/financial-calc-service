@@ -514,7 +514,7 @@ function onReset(): void {
     <Col :xs="24" :lg="14">
       <!-- 结果区：ResultPanel 只是外壳（Card + runId + ERROR 提示 + 四个 Tab），
            各 Tab 的主体已拆成 `components/result/*Pane.vue`（D-6）。 -->
-      <ResultPanel v-if="result" :result="result" />
+      <ResultPanel v-if="result" :result="result" scenario="mortgage" />
     </Col>
   </Row>
 </template>

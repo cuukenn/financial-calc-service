@@ -305,6 +305,17 @@ const enUS: typeof zhCN = {
       note:
         'These are labels of the same schedule read from the borrower-side cash-flow direction. They are funding-cost display aids: not interest the contract charges, and never summed with any lessor figure. The guaranteed residual is included at the lessor-side full amount, whereas CAS 21 第十八条 counts only the expected-payable part for the lessee.',
     },
+    // R149: stamp duty is a contract tax (AGENTS.md §4) derived from the total rent; it enters
+    // neither the amortization table nor the IRR cash flows.
+    stampDuty: {
+      title: 'Stamp duty (contract tax — not in the schedule, not in the IRR)',
+      note:
+        'Tax base = Σ rent − separately stated VAT, rate 0.005% (five hundredths of a per ten thousand, the separate financing-lease tax item of the Stamp Tax Law, excluding VAT). It is a contract tax derived from this run’s total rent: it does not enter the amortization table, does not enter the IRR cash flows, and is never added to Σ rent to form a new cost figure.',
+      base: 'Tax base (Σ rent − VAT)',
+      rate: 'Rate',
+      amount: 'Duty payable',
+      unavailable: 'Total rent is missing or unparseable, so stamp duty cannot be computed',
+    },
     issues: {
       title: 'Issues',
       period: '(period {n})',

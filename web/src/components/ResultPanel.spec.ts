@@ -86,6 +86,47 @@ describe('ResultPanel', () => {
     setLocale('zh-CN')
   })
 
+  it('derives the lease stamp duty from Σ租金 − 增值税 and labels it a contract tax (R149)', () => {
+    const wrapper = mountWithI18n(ResultPanel, { props: { result: result(), scenario: 'lease' } })
+
+    const section = wrapper.find('[data-test="stamp-duty-section"]')
+    expect(section.exists()).toBe(true)
+    // 口径文案是验收的一部分：派生的合同税费必须自己说清「不进摊销表 / 不进 IRR」。
+    expect(section.text()).toContain('印花税')
+    expect(section.text()).toContain('不进摊销表')
+    expect(section.text()).toContain('不进 IRR')
+    // 1 032 797.15 − 3 600.00 = 1 029 197.15；×0.005% = 51.4598575 → 51.46（分以下四舍五入）。
+    expect(section.find('[data-test="stamp-duty-base-label"]').text()).toContain('Σ租金')
+    expect(section.find('[data-test="stamp-duty-base-value"]').text()).toContain('1,029,197.15')
+    expect(section.find('[data-test="stamp-duty-rate-value"]').text()).toContain('0.005%')
+    expect(section.find('[data-test="stamp-duty-amount-value"]').text()).toContain('51.46')
+  })
+
+  it('does not invent a stamp duty for the mortgage scenario (税目是融资租赁合同)', () => {
+    // 《印花税法》的 0.005% 是融资租赁合同税目；借款合同的印花税不在 AGENTS.md §4 的
+    // 已批准口径内 —— 房贷 Tab 宁缺勿造，整节不出现（不是显示 0，也不是换个基数照抄）。
+    const wrapper = mountWithI18n(ResultPanel, {
+      props: { result: result(), scenario: 'mortgage' },
+    })
+    expect(wrapper.find('[data-test="stamp-duty-section"]').exists()).toBe(false)
+  })
+
+  it('says the stamp duty is not computable instead of inventing 0', () => {
+    const withNullRent = result()
+    withNullRent.schedule.header.metrics = {
+      ...withNullRent.schedule.header.metrics,
+      TOTAL_RENT: null,
+    }
+
+    const wrapper = mountWithI18n(ResultPanel, {
+      props: { result: withNullRent, scenario: 'lease' },
+    })
+    const section = wrapper.find('[data-test="stamp-duty-section"]')
+    expect(section.exists()).toBe(true)
+    expect(section.find('[data-test="stamp-duty-grid"]').exists()).toBe(false)
+    expect(section.find('[data-test="stamp-duty-unavailable"]').text()).toContain('不可计算')
+  })
+
   it('renders metric cards with the R92-8 primary-display rule and 「—」 for null metrics', () => {
     const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 

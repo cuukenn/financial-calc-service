@@ -1,6 +1,6 @@
 # 06. 印花税测算（租金总额 0.005%）
 
-Status: ready-for-agent
+Status: resolved（2026-11-12 纯前端落地，引擎契约零改动）
 Type: task
 Priority: P2
 数据角色: B 结果派生 —— Σ租金（不含税）× 0.005%，不进现金流
@@ -28,3 +28,22 @@ Blocked by: —
 
 `web/src/components/result/MetricsPane.vue`、`web/src/i18n/locales/*.ts`、
 必要时 `web/src/utils/`（新增纯函数 + 单测）。
+
+## 落地记录（2026-11-12）
+
+| 层 | 内容 |
+|---|---|
+| 纯函数 | `web/src/components/result/stampDuty.ts`：`STAMP_DUTY_RATE = 0.00005`、计税用 `÷ 20000`（0.005% = 1/20000，用精确十进制除法而不是乘法，P-01 禁浮点），HALF_UP 到分（P-05）；`TOTAL_RENT` 缺失或不可解析 → `null`（不是 0） |
+| 计税依据 | `TOTAL_RENT − TOTAL_TAX`：单列增值税不计印花税（AGENTS.md §4）。引擎 v1 不做价税分离，所以常规运行的 `TOTAL_TAX = 0.00`，含税场景也能算 |
+| 结果区 | `MetricsPane.vue` 在指标卡之后、借款方视角之前新增 `[data-test="stamp-duty-section"]`：计税依据 / 税率 / 税额三格，标题与说明写明「不进摊销表 / 不进 IRR / 不与 Σ 租金相加」 |
+| 场景闸门 | `ResultPanel` 与 `MetricsPane` 新增 `scenario` prop（默认 `lease`，`CalculationForm` 传 `lease`、`MortgageForm` 传 `mortgage`）。**房贷 Tab 不显示印花税**：0.005% 是《印花税法》的融资租赁合同税目，借款合同的印花税不在 AGENTS.md §4 已批准口径内 —— 不发明税额 |
+| 文案 | `result.stampDuty` 节进 `zh-CN.ts` / `en-US.ts`（双语言 parity 测试通过） |
+| README | 新增「印花税：租赁结果区的合同税费（R149）」小节，与结果区同口径 |
+
+对账：黄金基线 `TOTAL_RENT 1 032 797.15 / TOTAL_TAX 0.00` → 依据 1 032 797.15、税额 **51.64**；
+含税例 `106 000.02 − 6 000.02 = 100 000.00` → 税额 **5.00**。
+
+未做的部分（有意的）：不给引擎加 `TOTAL_STAMP_DUTY` 指标 code。印花税不进摊销表也不进现金流，
+加进指标目录就会让它看起来像测算结果（spec 非目标：本轮不改引擎契约与指标口径；AGENTS.md M-02
+要求每个结果区指标能由本笔测算的输入与摊销表复算 —— 这一行正是由 `TOTAL_RENT`/`TOTAL_TAX`
+两个既有 code 复算的）。

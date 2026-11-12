@@ -6,18 +6,28 @@ import { useI18n } from 'vue-i18n'
 import type { Issue } from '@/api/types'
 import type { AppLocale } from '@/i18n'
 import { metricPrimaryLabel, metricShowsSecondaryCode, metricTooltip } from '@/i18n/metricCatalog'
+import type { ScenarioKey } from '@/scenario'
 import { formatMoney, formatNumber, formatPercent } from '@/utils/format'
 
 import { annualRateCaveatCodes } from './annualRateCaveat'
+import { STAMP_DUTY_RATE_TEXT, stampDuty as computeStampDuty } from './stampDuty'
 
 /**
  * 指标 pane（D-6 拆分）：独立的子组件，props 引用稳定时切换外层 Tab 不会重渲染，
  * 图与表的开销不再随 Tabs 的内部状态变化而重复付出。
+ *
+ * R149：`scenario` 决定派生的合同税费要不要出现 —— 印花税是《印花税法》的**融资租赁
+ * 合同**税目，房贷 Tab 的一笔住房贷款不是那个税目，不得替它发明一个税额。默认按
+ * 融资租赁（与既有单页形态一致，承 `scenario.ts` 的默认场景）。
  */
-const props = defineProps<{
-  metrics: Record<string, string | null>
-  issues: Issue[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    metrics: Record<string, string | null>
+    issues: Issue[]
+    scenario?: ScenarioKey
+  }>(),
+  { scenario: 'lease' },
+)
 
 const { t, te, locale } = useI18n()
 
@@ -71,6 +81,13 @@ const activeLocale = computed(() => locale.value as AppLocale)
 
 /** R143：稀疏现金流下按「期」年化的读数不可信 —— 由与 XIRR 的差异判定。 */
 const caveatedCodes = computed(() => annualRateCaveatCodes(props.metrics))
+
+/**
+ * R149：印花税只在融资租赁场景派生。房贷 Tab 不显示：《印花税法》里 0.005% 是
+ * 融资租赁合同的税目，而借款合同的印花税不在 AGENTS.md §4 已批准的口径内 —— 宁缺勿造。
+ */
+const stampDutyEnabled = computed(() => props.scenario === 'lease')
+const stampDuty = computed(() => (stampDutyEnabled.value ? computeStampDuty(props.metrics) : null))
 
 function showsSecondaryCode(code: string): boolean {
   return metricShowsSecondaryCode(code, activeLocale.value)
@@ -182,6 +199,49 @@ function issueLevelLabel(level: string): string {
       </div>
     </div>
 
+    <div v-if="stampDutyEnabled" class="stamp-duty" data-test="stamp-duty-section">
+      <Typography.Title :level="5">{{ t('result.stampDuty.title') }}</Typography.Title>
+      <Typography.Text type="secondary">{{ t('result.stampDuty.note') }}</Typography.Text>
+      <div
+        v-if="stampDuty"
+        class="metrics-grid"
+        :style="{ gridTemplateColumns: 'repeat(3, auto)' }"
+        data-test="stamp-duty-grid"
+      >
+        <div class="metrics-grid-item">
+          <span class="metrics-grid-label" data-test="stamp-duty-base-label">
+            {{ t('result.stampDuty.base') }}
+          </span>
+          <Tooltip :title="stampDuty.base">
+            <span class="metrics-grid-value" data-test="stamp-duty-base-value">
+              {{ formatMoney(stampDuty.base) }}
+            </span>
+          </Tooltip>
+        </div>
+        <div class="metrics-grid-item">
+          <span class="metrics-grid-label" data-test="stamp-duty-rate-label">
+            {{ t('result.stampDuty.rate') }}
+          </span>
+          <span class="metrics-grid-value" data-test="stamp-duty-rate-value">
+            {{ STAMP_DUTY_RATE_TEXT }}
+          </span>
+        </div>
+        <div class="metrics-grid-item">
+          <span class="metrics-grid-label" data-test="stamp-duty-amount-label">
+            {{ t('result.stampDuty.amount') }}
+          </span>
+          <Tooltip :title="stampDuty.amount">
+            <span class="metrics-grid-value" data-test="stamp-duty-amount-value">
+              {{ formatMoney(stampDuty.amount) }}
+            </span>
+          </Tooltip>
+        </div>
+      </div>
+      <Typography.Text v-else type="secondary" data-test="stamp-duty-unavailable">
+        {{ t('result.stampDuty.unavailable') }}
+      </Typography.Text>
+    </div>
+
     <div v-if="borrowerMetrics.length > 0" class="borrower-metrics" data-test="borrower-metrics-section">
       <Typography.Title :level="5">{{ t('result.borrowerSection.title') }}</Typography.Title>
       <Typography.Text type="secondary">{{ t('result.borrowerSection.note') }}</Typography.Text>
@@ -283,6 +343,10 @@ function issueLevelLabel(level: string): string {
 }
 
 .borrower-metrics {
+  margin-top: 16px;
+}
+
+.stamp-duty {
   margin-top: 16px;
 }
 

@@ -3,6 +3,7 @@ import { Alert, Card, TabPane, Tabs, Typography } from 'ant-design-vue'
 import { useI18n } from 'vue-i18n'
 
 import type { CalculationResult } from '@/api/types'
+import type { ScenarioKey } from '@/scenario'
 
 import CashflowPane from './result/CashflowPane.vue'
 import EirPane from './result/EirPane.vue'
@@ -15,8 +16,17 @@ import SchedulePane from './result/SchedulePane.vue'
  * 每个 pane 的主体是独立子组件，props 引用稳定 —— AntD Tabs 不销毁已访问的 pane，
  * 但子组件在 props 未变时不会重渲染，因此切换内层 Tab 不再重建整棵表格树。
  * 行数据在各自 pane 内 `detach` 成普通对象并分页（每页 12 行），见 `result/tableProps.ts`。
+ *
+ * R149：`scenario` 只是把「这是哪一笔测算」传进需要它的 pane（目前是指标 pane 的派生
+ * 合同税费）。引擎与契约对两个场景完全相同（R100），所以外壳不据场景改变任何引擎数据。
  */
-const props = defineProps<{ result: CalculationResult }>()
+const props = withDefaults(
+  defineProps<{
+    result: CalculationResult
+    scenario?: ScenarioKey
+  }>(),
+  { scenario: 'lease' },
+)
 
 const { t } = useI18n()
 </script>
@@ -36,7 +46,11 @@ const { t } = useI18n()
     />
     <Tabs data-test="result-tabs">
       <TabPane key="metrics" :tab="t('result.tabs.metrics')">
-        <MetricsPane :metrics="props.result.schedule.header.metrics" :issues="props.result.schedule.issues" />
+        <MetricsPane
+          :metrics="props.result.schedule.header.metrics"
+          :issues="props.result.schedule.issues"
+          :scenario="props.scenario"
+        />
       </TabPane>
       <TabPane key="schedule" :tab="t('result.tabs.schedule')">
         <SchedulePane :installments="props.result.schedule.installments" />
