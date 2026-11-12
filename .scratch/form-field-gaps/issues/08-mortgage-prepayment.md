@@ -4,7 +4,7 @@ Status: ready-for-agent
 Type: task
 Priority: P3
 数据角色: A + B —— 提前还款改变剩余期供（参与测算），结清金额与罚息为派生读数
-Blocked by: 02
+Blocked by: — （02 已于 2026-11-12 resolved，本项解锁）
 
 ## 背景
 
