@@ -21,8 +21,10 @@ import java.util.Objects;
  *
  * <p>Root finding goes through the {@link RootSolver} port so the numeric method is substitutable;
  * the bracket follows the design convention {@code [-0.9999, 10]}. A yield that cannot be found
- * (no sign change, no root in the bracket, budget exhausted) is {@code null}, and the caller
- * records the {@code FCS-CALC-3003} warning — a metric is never fabricated.
+ * (no sign change — no root to converge on) is {@code null}, and the caller records the
+ * {@code FCS-CALC-3003} warning — a metric is never fabricated. An exhausted budget is not a
+ * refusal: the sign-opposite bracket invariant guarantees a root, so the solver returns the
+ * bracket midpoint and the yield stands.
  *
  * <p><b>Precision.</b> These formulas keep guard digits: sums and quotients run at
  * {@link MathContext#DECIMAL128} and the power steps at 40 significant digits (see

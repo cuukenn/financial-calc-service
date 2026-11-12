@@ -42,6 +42,10 @@ public final class MirrMetric implements FinancialMetric {
         if (flows.isEmpty()) {
             return null;
         }
+        if (!MetricSupport.annualizable(context)) {
+            // IRREGULAR: mirr annualizes over periodsPerYear, which does not exist here.
+            return null;
+        }
         BigDecimal nominal = context.element() == null ? null : context.element().nominalRate();
         BigDecimal reinvestRate = context.reinvestRate() != null ? context.reinvestRate() : nominal;
         BigDecimal financeRate = context.financeRate() != null ? context.financeRate() : nominal;

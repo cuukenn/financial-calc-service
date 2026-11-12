@@ -29,7 +29,11 @@ import io.github.cuukenn.fincalc.common.error.ErrorCode;
  *       {@link CalculationFacade#calculate} for each §9.5 metric that threw during the metric
  *       run (final-review fix wave; R57 — the code enters with the path that raises it, instead
  *       of borrowing {@code FCS-CALC-3003}, whose registered template means IRR
- *       non-convergence).</li>
+ *       non-convergence);</li>
+ *   <li>{@link #ANNUAL_METRICS_NOT_APPLICABLE} — WARN-level {@code ValidationIssue} code raised
+ *       by {@link CalculationFacade#calculate} once for an {@code IRREGULAR} schedule, whose
+ *       annualized metrics are uncomputable because no periods-per-year exists to annualize
+ *       by.</li>
  * </ul>
  */
 public enum EngineErrorCode implements ErrorCode {
@@ -86,7 +90,18 @@ public enum EngineErrorCode implements ErrorCode {
      * Own code per R57 — {@code FCS-CALC-3003}'s registered template means the §9.7 table's IRR
      * non-convergence, a different failure.
      */
-    METRIC_COMPUTATION_FAILED("FCS-ENG-1007", "FCS-ENG-1007: 指标 %s 计算失败, 记为不可计算");
+    METRIC_COMPUTATION_FAILED("FCS-ENG-1007", "FCS-ENG-1007: 指标 %s 计算失败, 记为不可计算"),
+
+    /**
+     * Annualization-absence marker of {@link CalculationFacade#calculate} step 6: an
+     * {@link io.github.cuukenn.fincalc.domain.model.PaymentFrequency#IRREGULAR} schedule has no
+     *「一年几期」, so every metric that annualizes a periodic rate or converts periods to years is
+     * present-but-null by construction rather than by failure. Own code per R57: this is not a
+     * metric that broke, it is a unit that does not exist, and conflating the two would make a
+     * healthy run look like a failing one.
+     */
+    ANNUAL_METRICS_NOT_APPLICABLE("FCS-ENG-1008",
+            "FCS-ENG-1008: %s 付租没有统一的年化口径, 年化/按年换算的指标记为不可计算");
 
     private final String code;
     private final String message;

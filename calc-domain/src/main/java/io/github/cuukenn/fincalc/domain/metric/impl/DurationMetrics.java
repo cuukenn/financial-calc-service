@@ -84,6 +84,11 @@ public final class DurationMetrics implements FinancialMetric {
         if (rate == null) {
             return null;
         }
+        if (!MetricSupport.annualizable(context)) {
+            // IRREGULAR: duration and convexity are year-denominated, and the period→year
+            // conversion has no convention here.
+            return null;
+        }
         BigDecimal growth = BigDecimal.ONE.add(rate);
         if (growth.signum() <= 0) {
             return null;

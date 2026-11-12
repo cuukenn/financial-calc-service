@@ -82,6 +82,10 @@ public final class BorrowerIrrMetrics implements FinancialMetric {
         if (context.perspective() != CashFlowPerspective.LESSEE) {
             return null;
         }
+        if (!MetricSupport.annualizable(context)) {
+            // IRREGULAR: no annual compounding convention exists, so no annual view either.
+            return null;
+        }
         BigDecimal periodIrr = context.computed(BorrowerIrrPeriodMetric.BORROWER_IRR_PERIOD);
         if (periodIrr == null) {
             // No borrower root in the run (never solved, or not computable for this flow set):

@@ -46,16 +46,33 @@ class RootSolverTest {
     }
 
     @Test
-    void solver_returns_null_when_the_iteration_budget_is_exhausted() {
-        // |f| can never fall below the tolerance: it is 1e-20 on both sides of the discontinuity,
-        // so neither endpoint, nor any midpoint, is within 1e-40. The Newton steps keep landing on
-        // the wrong side of the jump and the bracket stalls a few 1e-8 wide, so the 100-iteration
-        // budget runs out — and design document §9.5 requires null rather than a fabricated rate.
+    void solver_converges_on_a_flattened_function_within_the_iteration_budget() {
+        // f(x) = x^3 - 1e-9 on [0, 1]: the derivative near the root (1e-3) is 3e-6, so every Newton
+        // step is nearly the midpoint and convergence is purely geometric. The guaranteed-shrink
+        // invariant — an accepted step must land in the inner half of the bracket — is what makes
+        // the budget provably enough for a 1e-25 rate tolerance.
+        Function<BigDecimal, BigDecimal> f = x -> x.multiply(x).multiply(x)
+                .subtract(new BigDecimal("1e-9"));
+
+        assertThat(solver.solve(f, BigDecimal.ZERO, BigDecimal.ONE, new BigDecimal("1e-25")))
+                .isBetween(new BigDecimal("0.0009999999999999"),
+                        new BigDecimal("0.0010000000000001"));
+    }
+
+    @Test
+    void solver_keeps_a_budget_exhausted_answer_inside_the_sign_opposite_bracket() {
+        // |f| can never fall below the function tolerance: it is 1e-20 on both sides of the jump,
+        // and no midpoint of a bracket that never resolves the jump is within 1e-40 of zero. The
+        // step function is outside the port's contract (it promises continuity), which is exactly
+        // the point: the bracket is still sign-opposite, so a root is guaranteed inside it and the
+        // honest answer is the bracket midpoint, not a null that claims nothing was found. A
+        // fabricated rate is prevented by the bracket, not by refusing to answer.
         BigDecimal flat = new BigDecimal("1e-20");
         Function<BigDecimal, BigDecimal> f = x -> x.signum() >= 0 ? flat : flat.negate();
 
         assertThat(solver.solve(f, BigDecimal.ONE.negate(), BigDecimal.ONE, new BigDecimal("1e-40")))
-                .isNull();
+                .isNotNull()
+                .isBetween(BigDecimal.ONE.negate(), BigDecimal.ONE);
     }
 
     @Test

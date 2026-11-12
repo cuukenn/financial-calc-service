@@ -89,6 +89,10 @@ public final class IrrMetrics implements FinancialMetric {
         if (variant == Variant.PERIOD) {
             return MoneyUtils.mid(IrrCalculator.periodIrr(flows));
         }
+        if (!MetricSupport.annualizable(context)) {
+            // IRREGULAR: no annual compounding convention exists, so no annual view either.
+            return null;
+        }
         BigDecimal periodIrr = context.computed(MetricCodes.IRR_PERIOD);
         if (periodIrr == null) {
             // The periodic root is absent (not solved yet, or not computable for this flow set).

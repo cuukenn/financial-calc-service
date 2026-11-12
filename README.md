@@ -78,6 +78,14 @@ IRR_ANNUAL_SIMPLE` **数值逐位相等**（测试里直接断言相等）。`BO
 `BORROWER_IRR_ANNUAL*` 当成资金成本读数，年度成本请用 `XIRR` / `TRUE_ANNUAL_RATE`
 （详见文末「已知缺陷 D-2」）。
 
+**年化的前提是「一年几期」**（R148）：`IRREGULAR` 付租没有统一的年频率，引擎把它的
+`periodsPerYear` 记为 0 而不是抬成 1。凡需要期/年换算的指标——`IRR_ANNUAL`、
+`IRR_ANNUAL_SIMPLE`、`MIRR`、`PAYBACK_PERIOD`、`DISCOUNTED_PAYBACK`、`DURATION_MACAULAY`、
+`DURATION_MODIFIED`、`CONVEXITY`、`LEASE_IMPLICIT_RATE`——一律显式 `null`；周期口径与按日口径的
+`IRR_PERIOD`、`XIRR`、`XNPV`、`TRUE_ANNUAL_RATE` 与 §9.7 实际利率法表照常输出，26 个 code 一个不少。
+每次这样的运行附一条 `FCS-ENG-1008` WARN：这不是「指标算不出来」，而是**年化单位在这笔测算里不存在**。
+不规则付租的年度成本请用 `XIRR` / `TRUE_ANNUAL_RATE`（按日折现，不依赖期/年换算）。
+
 ## 还款算法 code 对照表
 
 | code | 含义 |
@@ -209,7 +217,9 @@ curl -s -X POST http://localhost:8080/api/v1/calculations \
 | `SystemException` 与一切未捕获异常 | 500 | `FCS-SRV-1002`（消息不含内部细节） |
 
 错误码清单以设计文档 **§B 错误码草案** 为基础（`docs/superpowers/specs/2026-11-02-financial-calc-service-design.md`），
-加上引擎实际扩充（如 `FCS-CALC-3006/3007`，见文末「实现偏差记录」勘误节）。
+加上引擎实际扩充（如 `FCS-CALC-3006/3007` 与 `FCS-ENG-1005`–`1008`，见文末「实现偏差记录」勘误节）。
+`FCS-ENG-1008` 是 WARN 级、不是失败：它说明这笔测算的**年化口径不存在**（`IRREGULAR` 付租没有
+「一年几期」），相关的年化指标按 `null` 发出。
 
 ### GET /api/v1/algorithms
 

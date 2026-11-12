@@ -15,6 +15,7 @@ import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
 import io.github.cuukenn.fincalc.domain.model.PaymentFrequency;
 import io.github.cuukenn.fincalc.domain.model.PaymentTiming;
+import io.github.cuukenn.fincalc.domain.model.PeriodDate;
 import io.github.cuukenn.fincalc.domain.model.PrincipalPlanKind;
 import io.github.cuukenn.fincalc.domain.model.RateChangePolicy;
 import io.github.cuukenn.fincalc.domain.model.RepaymentMethodId;
@@ -295,8 +296,14 @@ class CalculationFacadeTest {
         // so the chain's EIR must land on the same root.
         assertThat(r.effectiveInterest().rows().get(11).closingNetInvestment())
                 .isEqualByComparingTo("100000.00");
+        // The chain's root, pinned. R148 re-pinned it one place further down: the solver now stops
+        // on the rate-domain bracket and polishes the answer with one Newton step, landing 4.85e-18
+        // away from the value pinned before. The old constant was the same root to ~17 places only —
+        // the retired「|f| ≤ 1e-10」early exit accepted a point whose NPV was 3.21e-11 yuan, which
+        // satisfied a function-value test while sitting 2.4e-11 of rate away from the root. The new
+        // side is the accurate one: |NPV| there is 1.78e-14 yuan.
         assertThat(r.effectiveInterest().eir())
-                .isEqualByComparingTo(new BigDecimal("0.018330355206960317887095484105732990671974"));
+                .isEqualByComparingTo(new BigDecimal("0.01833035520696032273875607164681932454514852"));
         // Pinned divergence (documented, deliberate): the IRR_PERIOD metric prices the §9.4 event
         // table, where the guaranteed residual is a real receipt but the unguaranteed residual is
         // not (the lessor recovers it by keeping the asset, not in cash). The §9.7 chain prices
@@ -454,6 +461,59 @@ class CalculationFacadeTest {
         assertThat(r.schedule().header().metrics().find(MetricCodes.TOTAL_INTEREST))
                 .isEqualByComparingTo("61000.02");
         assertThat(r.schedule().header().roundingDifference()).isEqualByComparingTo("0.00");
+    }
+
+    /**
+     * R148: an {@code IRREGULAR} schedule has no「一年几期」, so annualization is not a wrong number
+     * here — it is a missing unit. Everything periodic or day-based still computes (the §9.7 chain
+     * included); every metric that annualizes a periodic rate or converts periods to years comes back
+     * present-but-null, and the run says why once through {@code FCS-ENG-1008} instead of leaving the
+     * reader to notice which cards went empty.
+     */
+    @Test
+    void irregular_schedule_nulls_the_annualized_metrics_and_says_why() {
+        LeaseElement element = baseElement().toBuilder()
+                .method(RepaymentMethodId.EQUAL_PRINCIPAL)
+                .frequency(PaymentFrequency.IRREGULAR)
+                .firstRentDate(LocalDate.of(2024, 3, 1))
+                .explicitPeriods(List.of(
+                        irregularPeriod(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 3, 1)),
+                        irregularPeriod(LocalDate.of(2024, 3, 1), LocalDate.of(2024, 6, 1)),
+                        irregularPeriod(LocalDate.of(2024, 6, 1), LocalDate.of(2024, 10, 1))))
+                .build();
+
+        CalculationResult r = CalculationFacade.defaults().calculate(
+                new CalculationRequest(element, null, CalculationOptions.defaults()));
+
+        assertThat(r.schedule().installments()).hasSize(3);
+        assertThat(r.schedule().hasErrors()).isFalse();
+
+        FinancialMetrics m = r.schedule().header().metrics();
+        assertThat(m.codes()).hasSize(26);
+        assertThat(m.find(MetricCodes.IRR_PERIOD)).isNotNull();
+        assertThat(m.find(MetricCodes.XIRR)).isNotNull();
+        assertThat(m.find(MetricCodes.TRUE_ANNUAL_RATE)).isNotNull();
+        assertThat(m.find(MetricCodes.XNPV)).isNotNull();
+        assertThat(r.effectiveInterest()).isNotNull();
+
+        assertThat(List.of(MetricCodes.IRR_ANNUAL, MetricCodes.IRR_ANNUAL_SIMPLE, MetricCodes.MIRR,
+                MetricCodes.PAYBACK_PERIOD, MetricCodes.DISCOUNTED_PAYBACK,
+                MetricCodes.DURATION_MACAULAY, MetricCodes.DURATION_MODIFIED, MetricCodes.CONVEXITY,
+                MetricCodes.LEASE_IMPLICIT_RATE))
+                .allSatisfy(code -> assertThat(m.find(code)).isNull());
+        // The codes that annualize a rate the run solved are null; the ones that never needed a
+        // period→year conversion still stand next to them in the same bag.
+        assertThat(m.find(MetricCodes.NPV)).isNotNull();
+
+        assertThat(r.schedule().issues()).singleElement().satisfies(issue -> {
+            assertThat(issue.level()).isEqualTo(IssueLevel.WARN);
+            assertThat(issue.code()).isEqualTo("FCS-ENG-1008");
+            assertThat(issue.message()).contains("IRREGULAR");
+        });
+    }
+
+    private static PeriodDate irregularPeriod(LocalDate start, LocalDate end) {
+        return PeriodDate.builder().startDate(start).endDate(end).paymentDate(end).build();
     }
 
     private static BigDecimal sum(List<Installment> rows,

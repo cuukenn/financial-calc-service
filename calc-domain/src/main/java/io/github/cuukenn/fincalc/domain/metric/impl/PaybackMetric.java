@@ -111,6 +111,11 @@ public final class PaybackMetric implements FinancialMetric {
             // one.
             return null;
         }
+        if (!MetricSupport.annualizable(context)) {
+            // IRREGULAR: both walks report years, and the periods→years conversion has no
+            // convention when the schedule has no fixed period length.
+            return null;
+        }
 
         BigDecimal previous = MetricSupport.discounted(flows.get(0), rate);
         if (previous.signum() >= 0) {

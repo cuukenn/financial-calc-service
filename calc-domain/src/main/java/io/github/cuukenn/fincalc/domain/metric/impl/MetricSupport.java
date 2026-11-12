@@ -113,7 +113,16 @@ final class MetricSupport {
         return denominator.signum() == 0 ? null : numerator.divide(denominator, MC);
     }
 
-    /** {@code periodsPerYear} as a {@link BigDecimal}; the constructor guarantees it is positive. */
+    /**
+     * Whether the run's schedule has an annual compounding convention at all. An {@code IRREGULAR}
+     * schedule supplies {@code periodsPerYear == 0}, and every metric that annualizes or converts
+     * periods to years returns {@code null} instead of a number whose unit is undefined.
+     */
+    static boolean annualizable(MetricContext context) {
+        return context.periodsPerYear() > 0;
+    }
+
+    /** {@code periodsPerYear} as a {@link BigDecimal}; only call when {@link #annualizable}. */
     static BigDecimal periodsPerYear(MetricContext context) {
         return BigDecimal.valueOf(context.periodsPerYear());
     }

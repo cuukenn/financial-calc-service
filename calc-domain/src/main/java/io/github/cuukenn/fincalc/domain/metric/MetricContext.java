@@ -67,7 +67,8 @@ public final class MetricContext {
      * @param schedule      schedule the totals and balances read; may be {@code null}
      * @param element       lease element the rates and residual read; may be {@code null}
      * @param periodsPerYear periods per year for annualization and year-denominated metrics; at
-     *                      least 1 (an {@code IRREGULAR} schedule supplies its own effective value)
+     *                      least 1, or {@code 0} for an {@code IRREGULAR} schedule (no annual view
+     *                      exists — the annualizing metrics return {@code null})
      * @param discountRate  per-period discount rate; {@code null} means derive it from the run
      * @param reinvestRate  annual reinvestment rate for MIRR; {@code null} means default it
      * @param financeRate   annual finance rate for MIRR; {@code null} means default it
@@ -86,7 +87,8 @@ public final class MetricContext {
      *                      {@code null}
      * @param schedule      schedule the totals and balances read; may be {@code null}
      * @param element       lease element the rates and residual read; may be {@code null}
-     * @param periodsPerYear periods per year; at least 1
+     * @param periodsPerYear periods per year; at least 1, or {@code 0} for an {@code IRREGULAR}
+     *                      schedule
      * @param discountRate  per-period discount rate; {@code null} means derive it from the run
      * @param reinvestRate  annual reinvestment rate for MIRR; {@code null} means default it
      * @param financeRate   annual finance rate for MIRR; {@code null} means default it
@@ -105,8 +107,8 @@ public final class MetricContext {
             BigDecimal financeRate, CashFlowPerspective perspective,
             Map<String, BigDecimal> computedValues) {
         Objects.requireNonNull(cashFlows, "cashFlows");
-        if (periodsPerYear < 1) {
-            throw new IllegalArgumentException("periodsPerYear must be at least 1: "
+        if (periodsPerYear < 0) {
+            throw new IllegalArgumentException("periodsPerYear must be at least 0: "
                     + periodsPerYear);
         }
         this.cashFlows = Collections.unmodifiableList(new ArrayList<>(cashFlows));
@@ -154,7 +156,11 @@ public final class MetricContext {
         return element;
     }
 
-    /** Payment periods per year, the {@code m} of the §9.5 formulas; at least 1. */
+    /**
+     * Payment periods per year, the {@code m} of the §9.5 formulas; at least 1, or {@code 0} for
+     * an {@code IRREGULAR} schedule where no annual compounding convention exists and the
+     * annualizing metrics return {@code null} (a wrong-unit number is worse than a missing one).
+     */
     public int periodsPerYear() {
         return periodsPerYear;
     }

@@ -90,7 +90,12 @@ public final class NpvMetric implements FinancialMetric {
     private static BigDecimal annualRate(MetricContext context) {
         BigDecimal discountRate = context.discountRate();
         if (discountRate == null) {
+            // The day-based XIRR is a true annual rate whatever the schedule's period shape.
             return context.computed(MetricCodes.XIRR);
+        }
+        if (!MetricSupport.annualizable(context)) {
+            // IRREGULAR: the configured periodic rate has no annual equivalent.
+            return null;
         }
         if (BigDecimal.ONE.add(discountRate).signum() <= 0) {
             return null;

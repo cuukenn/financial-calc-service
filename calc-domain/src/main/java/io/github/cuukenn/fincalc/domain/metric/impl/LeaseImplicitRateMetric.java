@@ -51,8 +51,12 @@ public final class LeaseImplicitRateMetric implements FinancialMetric {
         }
 
         BigDecimal period = IrrCalculator.periodIrr(priced);
-        return period == null ? null
-                : IrrCalculator.annualize(period, context.periodsPerYear());
+        if (period == null || !MetricSupport.annualizable(context)) {
+            // IRREGULAR: the CAS 21 measure chain solves the period rate, but the annual view has
+            // no compounding convention.
+            return null;
+        }
+        return IrrCalculator.annualize(period, context.periodsPerYear());
     }
 
     private static BigDecimal zeroIfNull(BigDecimal value) {

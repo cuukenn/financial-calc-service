@@ -257,6 +257,16 @@ public final class CalculationFacade {
                     String.format(EngineErrorCode.METRIC_COMPUTATION_FAILED.message(), code),
                     null));
         }
+        if (element.frequency().periodsPerYear() == 0) {
+            // Not a failure: no periods-per-year exists to annualize by, so the annualizing
+            // metrics answered null by construction. Say so once, in the run, instead of leaving
+            // the reader to count which cards came back empty.
+            engineIssues.add(new ValidationIssue(IssueLevel.WARN,
+                    EngineErrorCode.ANNUAL_METRICS_NOT_APPLICABLE.code(),
+                    String.format(EngineErrorCode.ANNUAL_METRICS_NOT_APPLICABLE.message(),
+                            element.frequency().name()),
+                    null));
+        }
         if (!IrrCalculator.hasSingleSignChange(flows)) {
             engineIssues.add(new ValidationIssue(IssueLevel.WARN,
                     EngineErrorCode.IRR_ROOT_AMBIGUOUS.code(),
@@ -312,6 +322,13 @@ public final class CalculationFacade {
         } catch (BusinessException ex) {
             issues.add(new ValidationIssue(IssueLevel.WARN, ex.errorCode().code(),
                     "实际利率法摊销表未生成: " + ex.getMessage(), null));
+            return null;
+        } catch (ArithmeticException ex) {
+            // BigDecimal's own arithmetic failures (non-terminating quotients, intValueExact
+            // overflows) are numeric-degenerate inputs, not engine bugs — the "never fails here"
+            // contract covers them the same way: a WARN and no table, never a broken run.
+            issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
+                    "实际利率法摊销表未生成: 数值退化 (" + ex.getMessage() + ")", null));
             return null;
         }
     }
@@ -380,9 +397,13 @@ public final class CalculationFacade {
         }
     }
 
-    /** Periods per year for the metric run; IRREGULAR reports 0, the metrics need at least 1. */
+    /**
+     * Periods per year for the metric run; {@code 0} for {@code IRREGULAR}, which the metric layer
+     * reads as "no annual convention" — the annualizing metrics return {@code null} and the run
+     * carries a WARN instead of an annualized number whose unit is wrong by construction.
+     */
     private static int periodsPerYear(LeaseElement element) {
-        return Math.max(element.frequency().periodsPerYear(), 1);
+        return element.frequency().periodsPerYear();
     }
 
     /** The external directory's {@code .fcs} files, sorted; missing or unreadable fails startup. */
