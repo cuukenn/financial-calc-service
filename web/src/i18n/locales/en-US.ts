@@ -194,6 +194,32 @@ const enUS: typeof zhCN = {
       belowFloor: 'Below the floor',
       neutral: 'Not evaluable',
     },
+    // R150: repricing is the element a mortgage contract changes most often (AGENTS.md §2.2
+    // 重定价日 / 重定价周期). It lands as the engine's existing segmented-rate rule rows, no new contract key.
+    repricing: {
+      cycle: 'Repricing cycle',
+      hint: 'No repricing = the fixed-rate path. Choose 3 / 6 / 12 months (央行公告〔2024〕第 11 号 offers exactly these three; the value gate lives in the UI, the engine only sees segmented rates).',
+      cycles: {
+        none: 'No repricing (fixed rate)',
+        months: '{months} months',
+      },
+      anchorDate: 'Repricing date',
+      anchorPh: 'Empty = the disbursement anniversary',
+      futureLprs: 'LPR of the later segments (%)',
+      futureLprsPh: 'e.g. 3.9, 3.1 (in segment order, comma separated)',
+      futureLprsHint:
+        'Give the LPR in force at each repricing, in segment order; the spread stays (P-04: the spread is a contract term, repricing re-fixes the LPR only). A missing segment is never filled in with the current LPR silently.',
+      reuse: 'Reuse the current LPR for missing segments (an assumption, not a contract fact)',
+      readoutTitle: 'Segment rates (checkable before submit)',
+      currentRate: 'Rate in force now',
+      currentRateFrom: 'from',
+      nextDate: 'Next repricing date',
+      nextDateNone: 'No further repricing within the term',
+      segmentRange: 'Periods {from}–{to} (from {date})',
+      rateMissing: 'LPR missing for this segment',
+      assumedNotice:
+        'The LPR of {count} of these segments was filled in by the "reuse the current LPR" assumption: it is not a rate the contract stated, and the result follows that assumption (AGENTS.md: apply the documented convention and label it).',
+    },
     gates: {
       // §71: these [法] thresholds are validated in the UI, the copy must not claim the engine checks them (R107/R109).
       note: 'Client-side gates: down payment ≥ 15%, term ≤ 480 months and the 50%/60% DTI limits are checked by this form; the calculation engine does not check them.',
@@ -204,6 +230,14 @@ const enUS: typeof zhCN = {
       downPaymentFloorNotEvaluable:
         'The collateral value is not greater than 0 (the lower of transaction price and appraised value), so LTV and the down payment ratio cannot be computed: the {min} down payment floor cannot be evaluated and submit is blocked (front-end floor, not engine-validated).',
       rateNotComposable: 'The annual rate cannot be composed from the LPR and the spread, check the inputs.',
+      // R150: the three repricing gates, all of them in the UI (the engine does not know the word
+      // "repricing cycle" — it only sees segmented-rate rule rows).
+      repricingCycle:
+        'The repricing cycle must be 3 / 6 / 12 months (央行公告〔2024〕第 11 号): submit is blocked (UI-validated value, not engine-validated).',
+      repricingCoverage:
+        'The repricing segments do not cover periods 1 to {periods} contiguously: submit is blocked (the engine RuleSetValidator rejects the same gap; failing here avoids a network round trip).',
+      repricingMissingLpr:
+        '{count} segment(s) have no LPR: the first-segment LPR must not be reused silently (AGENTS.md §3.1 — a missing input is an error). Supply the later LPRs, or check "reuse the current LPR" and treat it as an assumption.',
     },
     validation: {
       principal: 'Please enter the loan amount',
@@ -217,6 +251,10 @@ const enUS: typeof zhCN = {
       commenceDate: 'Please select the disbursement date',
       firstRepaymentDate: 'Please select the first repayment date',
       firstRepaymentBeforeCommence: 'The first repayment date must not precede the disbursement date (the engine rejects it)',
+      // R150: field-level checks for the three repricing elements.
+      repricingCycle: 'The repricing cycle must be 0 (no repricing) or 3 / 6 / 12 months',
+      repricingAnchorBeforeCommence: 'The repricing date must not precede the disbursement date (a repricing event before disbursement does not belong to this loan)',
+      futureLprs: 'Invalid later-LPR format: enter comma separated non-negative percentages (e.g. 3.9, 3.1)',
       periods: 'Please enter the loan term in months',
       periodsRange: 'The loan term must be within 1–{max} months (≤ 40 years)',
       transactionPrice: 'Please enter the transaction price',

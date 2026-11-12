@@ -194,6 +194,32 @@ const zhCN = {
       belowFloor: '低于下限',
       neutral: '无法判断',
     },
+    // R150：重定价是房贷合同里最常变的要素（AGENTS.md §2.2 规范名「重定价日 / 重定价周期」）。
+    // 落地方式是把「周期 + 每段 LPR」写成引擎已有的分段利率规则行，不新增契约键。
+    repricing: {
+      cycle: '重定价周期',
+      hint: '不重定价 = 固定利率路径。选 3 / 6 / 12 个月（央行公告〔2024〕第 11 号只给这三个周期；该取值闸门在前端，引擎只看见分段利率）。',
+      cycles: {
+        none: '不重定价（固定利率）',
+        months: '{months} 个月',
+      },
+      anchorDate: '重定价日',
+      anchorPh: '留空 = 放款日对日',
+      futureLprs: '后续各段 LPR（%）',
+      futureLprsPh: '如 3.9, 3.1（按段顺序，逗号分隔）',
+      futureLprsHint:
+        '按段顺序给出每次重定价时的 LPR；加点不变（P-04：加点是合同条款，重定价只重定 LPR）。缺失的段不会被静默填成当前 LPR。',
+      reuse: '缺段沿用当前 LPR（假设，非合同事实）',
+      readoutTitle: '分段利率（提交前可核对）',
+      currentRate: '当期执行利率',
+      currentRateFrom: '自',
+      nextDate: '下次重定价日',
+      nextDateNone: '期限内不再重定价',
+      segmentRange: '第 {from}–{to} 期（{date} 起）',
+      rateMissing: '缺该段 LPR',
+      assumedNotice:
+        '其中 {count} 段的 LPR 是按「沿用当前 LPR」的假设补上的：它不是合同里给过的利率，结果按该假设计（AGENTS.md 无约定时按口径执行并标注）。',
+    },
     gates: {
       // §71 硬约束：这些 [法] 门槛由前端校验，文案不得声称后端已校验（R107/R109）。
       note: '前端门槛：首付 ≥ 15%、期限 ≤ 480 个月、DTI 50%/60% 均由本表单校验，测算引擎不校验这些门槛。',
@@ -204,6 +230,13 @@ const zhCN = {
       downPaymentFloorNotEvaluable:
         '抵押物价值不大于 0（成交价与评估价孰低），贷款成数（LTV）与首付比例无法计算：首付比例 ≥ {min} 的下限无法判定，已阻止提交（该下限由前端校验，引擎未校验）。',
       rateNotComposable: '无法由 LPR 与加点组合出年利率，请检查输入。',
+      // R150：重定价的三道闸门，全部在前端（引擎不认识「重定价周期」这个词，只认分段利率）。
+      repricingCycle:
+        '重定价周期只能是 3 / 6 / 12 个月（央行公告〔2024〕第 11 号）：已阻止提交（该取值由前端校验，引擎未校验）。',
+      repricingCoverage:
+        '重定价分段没有连续覆盖第 1 期到第 {periods} 期：已阻止提交（引擎的 RuleSetValidator 同样会拒绝缺口，这里不让它跑一趟网络）。',
+      repricingMissingLpr:
+        '有 {count} 段没有给出 LPR：不得静默沿用首期 LPR（AGENTS.md §3.1 输入要素缺失即报错）。请补齐后续 LPR，或显式勾选「沿用当前 LPR」并把它当作假设。',
     },
     validation: {
       principal: '请输入贷款金额',
@@ -217,6 +250,10 @@ const zhCN = {
       commenceDate: '请选择放款日',
       firstRepaymentDate: '请选择首期还款日',
       firstRepaymentBeforeCommence: '首期还款日不得早于放款日（引擎会拒绝该组合）',
+      // R150：重定价三要素的字段级校验。
+      repricingCycle: '重定价周期须是 0（不重定价）或 3 / 6 / 12 个月',
+      repricingAnchorBeforeCommence: '重定价日不得早于放款日（早于放款日的重定价事件不属于这笔贷款）',
+      futureLprs: '后续 LPR 格式无效：请输入逗号分隔的非负百分数（如 3.9, 3.1）',
       periods: '请输入贷款期限（月）',
       periodsRange: '贷款期限须在 1–{max} 个月之间（≤ 40 年）',
       transactionPrice: '请输入抵押物成交价',

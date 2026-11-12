@@ -15,6 +15,8 @@ import type { Rule } from 'ant-design-vue/es/form'
 import { isLprStepAligned } from '@/utils/rate'
 import { isDecimalText, isNonNegativeDecimal, isPositiveDecimal } from '@/utils/ratio'
 
+import { isLprSequence, isRepricingCycle, parseLprSequence } from './repricing'
+
 /** AGENTS.md §2.3 房贷期限 ≤ 40 年 = 480 个月；引擎上限仍是 1200（R107）。 */
 export const MAX_LOAN_MONTHS = 480
 
@@ -30,6 +32,8 @@ export type Translate = (key: string, named?: Record<string, unknown>) => string
 /** 装配规则需要的表单要素：首期还款日要与放款日比较。 */
 export interface MortgageRuleModel {
   commenceDate: string
+  /** R150：重定价日与放款日比较需要知道是否真的启用了重定价。 */
+  repricingCycle: number
 }
 
 /**
@@ -91,6 +95,32 @@ export function isRepaymentAfterDisbursement(
 ): boolean {
   if (commenceDate === '' || firstRepaymentDate === '') return true
   return firstRepaymentDate >= commenceDate
+}
+
+/**
+ * R150：重定价周期只有 0（不重定价）/ 3 / 6 / 12 个月（央行公告〔2024〕第 11 号）。
+ * 引擎不认识「重定价周期」这个词 —— 它只看见分段利率规则行 —— 所以这一条是纯前端的
+ * [法] 门槛（与 480 月、≤ 12 期 BULLET 同类，见 §71 的诚实标注），文案不得声称后端已校验。
+ */
+export function isRepricingCycleAllowed(value: unknown): boolean {
+  return isRepricingCycle(value)
+}
+
+/** 未来各段 LPR 序列：空 = 没给（由提交闸门决定阻断还是沿用）；给了就必须每项可解析且非负。 */
+export function isLprSequenceText(value: unknown): boolean {
+  if (value === undefined || value === null) return true
+  if (typeof value !== 'string') return false
+  const items = parseLprSequence(value)
+  return items.length === 0 || isLprSequence(items)
+}
+
+/** 重定价日允许留空（= 放款日对日）；给了就不能早于放款日，否则这笔贷款不会重定价。 */
+export function isRepricingAnchorAfterDisbursement(
+  commenceDate: string,
+  anchorDate: string,
+): boolean {
+  if (commenceDate === '' || anchorDate === '') return true
+  return anchorDate >= commenceDate
 }
 
 /** 金额格式规则（可选字段共用；必填与否由 required 规则表达）。 */
@@ -161,6 +191,38 @@ export function buildMortgageRules(
             ? Promise.resolve()
             : Promise.reject(new Error(t('mortgage.validation.firstRepaymentBeforeCommence')))
         },
+      },
+    ],
+    // R150：重定价三要素的表单门槛。引擎不认识「重定价周期」，这些只能在前端拦（§71 诚实标注）。
+    repricingCycle: [
+      {
+        trigger: 'change',
+        validator: (_rule, value) =>
+          isRepricingCycleAllowed(value)
+            ? Promise.resolve()
+            : Promise.reject(new Error(t('mortgage.validation.repricingCycle'))),
+      },
+    ],
+    repricingAnchorDate: [
+      {
+        trigger: 'change',
+        validator: (_rule, value) => {
+          const text = typeof value === 'string' ? value.trim() : ''
+          return isRepricingAnchorAfterDisbursement(model.commenceDate, text)
+            ? Promise.resolve()
+            : Promise.reject(
+                new Error(t('mortgage.validation.repricingAnchorBeforeCommence')),
+              )
+        },
+      },
+    ],
+    futureLprPercents: [
+      {
+        trigger: 'change',
+        validator: (_rule, value) =>
+          isLprSequenceText(value)
+            ? Promise.resolve()
+            : Promise.reject(new Error(t('mortgage.validation.futureLprs'))),
       },
     ],
     periods: [

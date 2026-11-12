@@ -100,7 +100,7 @@ describe('isRepaymentAfterDisbursement (引擎拒绝首期还款日早于放款�
 describe('buildMortgageRules (validators reject on raw values, never silently fix them)', () => {
   // 翻译函数在此只用于证明「消息与插值参数走 i18n」，不测文案本身。
   const translate: Translate = (key, named) => `${key}:${JSON.stringify(named ?? {})}`
-  const rules = buildMortgageRules(translate, { commenceDate: '2026-11-01' })
+  const rules = buildMortgageRules(translate, { commenceDate: '2026-11-01', repricingCycle: 0 })
 
   /** 取字段的第 index 条规则并直接跑它的 validator。 */
   async function runValidator(name: string, index: number, value: unknown): Promise<string | null> {
@@ -118,11 +118,14 @@ describe('buildMortgageRules (validators reject on raw values, never silently fi
       'appraisalValue',
       'commenceDate',
       'firstRepaymentDate',
+      'futureLprPercents',
       'lprPercent',
       'monthlyIncome',
       'otherMonthlyDebt',
       'periods',
       'principal',
+      'repricingAnchorDate',
+      'repricingCycle',
       'spreadBp',
       'transactionPrice',
     ])

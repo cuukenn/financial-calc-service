@@ -776,9 +776,11 @@ describe('MortgageForm 显式重置 (Task 6 §2)', () => {
     // 日期也要先改掉：否则「重置恢复默认值」对放款日/首期还款日是无从验证的。
     // DatePicker 在 jsdom 里不认键盘输入（内部按 format 解析，setValue 不提交模型），
     // 直接按 v-model 的契约改值：值格式由 `value-format="YYYY-MM-DD"` 决定。
-    const pickers = wrapper.findAllComponents(DatePicker)
-    await pickers[0].vm.$emit('update:value', '2027-01-05')
-    await pickers[1].vm.$emit('update:value', '2027-02-05')
+    // 按 data-test 定位而不是按 findAllComponents 的下标：表单里 DatePicker 的先后次序
+    // 属于布局细节（R150 的「重定价日」就排在放款日之前），按下标取会取错控件。
+    const pickerAt = (hook: string) => wrapper.find(`[data-test="${hook}"]`).findComponent(DatePicker)
+    await pickerAt('mortgage-commence-date').vm.$emit('update:value', '2027-01-05')
+    await pickerAt('mortgage-first-repayment-date').vm.$emit('update:value', '2027-02-05')
     await flushPromises()
     await submit(wrapper)
 

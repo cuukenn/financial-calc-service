@@ -20,6 +20,7 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Col,
   DatePicker,
   Form,
@@ -29,6 +30,7 @@ import {
   Radio,
   RadioGroup,
   Row,
+  Select,
   Space,
   Typography,
 } from 'ant-design-vue'
@@ -61,6 +63,17 @@ import {
   markerKey,
   statusClass,
 } from './ratioStatus'
+import {
+  NO_REPRICING,
+  REPRICING_CYCLE_MONTHS,
+  buildRateRuleRows,
+  isRepricingCycle,
+  nextRepricingDate,
+  parseLprSequence,
+  planSegmentRates,
+  repricingSegments,
+  segmentsCoverPeriods,
+} from './repricing'
 import ResultPanel from './ResultPanel.vue'
 
 const { t } = useI18n()
@@ -88,6 +101,17 @@ interface MortgageFormState {
   appraisalValue: string
   monthlyIncome: string
   otherMonthlyDebt: string
+  /**
+   * 重定价周期（月）：0 = 不重定价（固定利率，payload 与本字段引入前逐位一致），
+   * 或 3 / 6 / 12（央行公告〔2024〕第 11 号给出的三个周期）。其它取值一律拒绝。
+   */
+  repricingCycle: number
+  /** 重定价日（锚点）。留空 = 放款日对日；填了日期 = 每年/每周期的对应日。 */
+  repricingAnchorDate: string
+  /** 后续各段的 LPR（百分数，逗号分隔）。缺失且未勾选沿用 → 阻断，不静默沿用。 */
+  futureLprPercents: string
+  /** 显式勾选「缺段沿用当前 LPR」：这是一条被标注的假设，不是合同事实。 */
+  reuseCurrentLpr: boolean
 }
 
 /**
@@ -109,6 +133,10 @@ function defaults(): MortgageFormState {
     appraisalValue: '2800000',
     monthlyIncome: '',
     otherMonthlyDebt: '',
+    repricingCycle: NO_REPRICING,
+    repricingAnchorDate: '',
+    futureLprPercents: '',
+    reuseCurrentLpr: false,
   }
 }
 
@@ -189,15 +217,89 @@ watch(
 )
 
 /**
+ * 重定价分段（R150）。`repricingCycle === 0` 时是 `null` —— 固定利率路径，payload 与本模块
+ * 引入前逐位一致。分段只决定「哪一期用哪个利率」：日期用来定位期次，不进入任何金额计算
+ * （P-01），利率仍然由引擎从这些边界上的期次算出（§3.2 分段计息）。
+ */
+const repricingSegmentsList = computed(() => {
+  if (form.repricingCycle === NO_REPRICING || !isRepricingCycle(form.repricingCycle)) {
+    return null
+  }
+  try {
+    return repricingSegments({
+      commenceDate: form.commenceDate,
+      firstRepaymentDate: form.firstRepaymentDate,
+      periods: form.periods ?? 0,
+      cycleMonths: form.repricingCycle,
+      // 重定价日留空 = 放款日对日（§2.2「重定价日」的默认口径），不是猜一个日期。
+      anchorDate:
+        form.repricingAnchorDate.trim() === '' ? form.commenceDate : form.repricingAnchorDate.trim(),
+    })
+  } catch {
+    // 日期或期限非法（表单规则会给字段级文案）：这里只保证不产出一套错误的段。
+    return null
+  }
+})
+
+/** 每段利率 = 该段 LPR + 同一加点（P-04：加点是合同条款，重定价只重定 LPR）。 */
+const repricingPlan = computed(() => {
+  const segments = repricingSegmentsList.value
+  if (segments === null) return null
+  return planSegmentRates({
+    segmentCount: segments.length,
+    currentLprPercent: form.lprPercent,
+    spreadBp: form.spreadBp,
+    futureLprPercents: parseLprSequence(form.futureLprPercents),
+    reuseCurrentLpr: form.reuseCurrentLpr,
+  })
+})
+
+const nextRepricing = computed(() =>
+  repricingSegmentsList.value === null ? null : nextRepricingDate(repricingSegmentsList.value),
+)
+
+/** 靠「沿用当前 LPR」补上的段：必须作为假设披露，不得伪装成合同里给过的利率。 */
+const assumedRepricingSegments = computed(() => repricingPlan.value?.assumedSegments ?? [])
+
+const cycleOptions = computed(() => [
+  { value: NO_REPRICING, label: t('mortgage.repricing.cycles.none') },
+  ...REPRICING_CYCLE_MONTHS.map((months) => ({
+    value: months,
+    label: t('mortgage.repricing.cycles.months', { months }),
+  })),
+])
+
+/** 段区间读数：让「哪几期用哪个利率」在提交前就是人可核对的。 */
+const repricingSegmentReadout = computed(() => {
+  const segments = repricingSegmentsList.value
+  const plan = repricingPlan.value
+  if (segments === null || plan === null) return []
+  return segments.map((segment) => ({
+    key: segment.index,
+    label: t('mortgage.repricing.segmentRange', {
+      from: segment.fromPeriod,
+      to: segment.toPeriod,
+      date: segment.effectiveDate,
+    }),
+    rate: plan.rates[segment.index] === null
+      ? t('mortgage.repricing.rateMissing')
+      : formatDecimalPercent(plan.rates[segment.index] as string, 4),
+  }))
+})
+
+/**
  * 提交（R101 字段映射：14 个键）。R137：`residualHandling` / `rateChangePolicy` 是
  * `LeaseElement` 的必填要素（`LeaseElement.requireField`），`CalculationRequestAssembler`
  * 只给 `rounding` / `gracePeriod` 补默认 —— AGENTS.md §3.1 也规定输入要素必须显式提供、
  * 缺失即报错、不得静默取默认值，所以这两键连同 `residualValue` 一律由表单**显式发送**，
  * 不在服务端补默认。住房按揭没有残值/留购价：`SEPARATE` + `0` 让 §3.4 校验一与校验二
  * 严格成立（Σ本金 = 合同本金、末期余额 = 0）。`RESOLVE` 是重定价的既有姿态（自变更日重算）。
+ *
+ * R150：重定价不新增契约键。它就是把「周期 + 每段 LPR」写成引擎早就认识的**分段利率规则行**
+ * （`ruleRows`），所以 14 键的固定利率路径逐字节不变，只有真的选了周期才多一个 `ruleRows`。
  */
 function buildRequest(annualRateDecimal: string): CalculationRequest {
-  return {
+  const request: CalculationRequest = {
     principal: form.principal.trim(),
     nominalRate: annualRateDecimal,
     commenceDate: form.commenceDate,
@@ -214,6 +316,12 @@ function buildRequest(annualRateDecimal: string): CalculationRequest {
     residualHandling: 'SEPARATE',
     rateChangePolicy: 'RESOLVE',
   }
+  const segments = repricingSegmentsList.value
+  const plan = repricingPlan.value
+  if (segments === null || plan === null) return request
+  // 段利率缺失在这里就已经不可能：闸门在提交前拦（见 onFinish）。规则行不得带空利率。
+  request.ruleRows = buildRateRuleRows(segments, plan.rates as string[])
+  return request
 }
 
 /**
@@ -261,6 +369,25 @@ async function onFinish(): Promise<void> {
   if (composed === null) {
     blockRun(t('mortgage.gates.rateNotComposable'))
     return
+  }
+
+  // R150 重定价闸门：周期取值、段覆盖、以及「缺段 LPR 不得静默沿用」都要在网络往返之前失败。
+  // 引擎不认识「重定价周期」这个词（它只认分段利率），所以 3/6/12 之外的取值只有这里拦得住。
+  if (form.repricingCycle !== NO_REPRICING) {
+    const segments = repricingSegmentsList.value
+    const plan = repricingPlan.value
+    if (segments === null || plan === null) {
+      blockRun(t('mortgage.gates.repricingCycle'))
+      return
+    }
+    if (!segmentsCoverPeriods(segments, form.periods ?? 0)) {
+      blockRun(t('mortgage.gates.repricingCoverage', { periods: form.periods ?? 0 }))
+      return
+    }
+    if (plan.missingSegments.length > 0) {
+      blockRun(t('mortgage.gates.repricingMissingLpr', { count: plan.missingSegments.length }))
+      return
+    }
   }
 
   localError.value = null
@@ -367,6 +494,57 @@ function onReset(): void {
                 </FormItem>
               </Col>
               <Col :span="12">
+                <FormItem :label="t('mortgage.repricing.cycle')" name="repricingCycle">
+                  <Select
+                    v-model:value="form.repricingCycle"
+                    :options="cycleOptions"
+                    data-test="mortgage-repricing-cycle"
+                    style="width: 100%"
+                  />
+                  <template #extra>
+                    <span>{{ t('mortgage.repricing.hint') }}</span>
+                  </template>
+                </FormItem>
+              </Col>
+              <Col :span="12" data-test="mortgage-repricing-anchor-col">
+                <FormItem :label="t('mortgage.repricing.anchorDate')" name="repricingAnchorDate">
+                  <span data-test="mortgage-repricing-anchor" style="display: block">
+                    <DatePicker
+                      v-model:value="form.repricingAnchorDate"
+                      value-format="YYYY-MM-DD"
+                      allow-clear
+                      :disabled="form.repricingCycle === NO_REPRICING"
+                      :placeholder="t('mortgage.repricing.anchorPh')"
+                      style="width: 100%"
+                    />
+                  </span>
+                </FormItem>
+              </Col>
+              <Col :span="12" data-test="mortgage-repricing-lprs-col">
+                <FormItem :label="t('mortgage.repricing.futureLprs')" name="futureLprPercents">
+                  <Input
+                    v-model:value="form.futureLprPercents"
+                    data-test="mortgage-repricing-lprs"
+                    :disabled="form.repricingCycle === NO_REPRICING"
+                    :placeholder="t('mortgage.repricing.futureLprsPh')"
+                  />
+                  <template #extra>
+                    <span>{{ t('mortgage.repricing.futureLprsHint') }}</span>
+                  </template>
+                </FormItem>
+              </Col>
+              <Col :span="12">
+                <FormItem>
+                  <Checkbox
+                    v-model:checked="form.reuseCurrentLpr"
+                    data-test="mortgage-repricing-reuse"
+                    :disabled="form.repricingCycle === NO_REPRICING"
+                  >
+                    {{ t('mortgage.repricing.reuse') }}
+                  </Checkbox>
+                </FormItem>
+              </Col>
+              <Col :span="24">
                 <FormItem :label="t('mortgage.basic.commenceDate')" name="commenceDate">
                   <span data-test="mortgage-commence-date" style="display: block">
                     <DatePicker
@@ -404,6 +582,41 @@ function onReset(): void {
                     <span>{{ t('mortgage.gates.bulletOnly', { max: BULLET_MAX_MONTHS }) }}</span>
                   </template>
                 </FormItem>
+              </Col>
+              <Col v-if="form.repricingCycle !== NO_REPRICING" :span="24">
+                <div class="repricing-readout" data-test="mortgage-repricing-readout">
+                  <div class="repricing-readout-title">
+                    {{ t('mortgage.repricing.readoutTitle') }}
+                  </div>
+                  <div data-test="mortgage-repricing-current-rate">
+                    {{ t('mortgage.repricing.currentRate') }}: {{ annualRateText }}
+                    （{{ t('mortgage.repricing.currentRateFrom') }}:
+                    {{ repricingSegmentsList && repricingSegmentsList.length > 0
+                      ? repricingSegmentsList[0].effectiveDate : form.commenceDate }}）
+                  </div>
+                  <div data-test="mortgage-repricing-next-date">
+                    {{ t('mortgage.repricing.nextDate') }}:
+                    {{ nextRepricing ?? t('mortgage.repricing.nextDateNone') }}
+                  </div>
+                  <ul class="repricing-segments">
+                    <li
+                      v-for="row in repricingSegmentReadout"
+                      :key="row.key"
+                      :data-test="`mortgage-repricing-segment-${row.key}`"
+                    >
+                      {{ row.label }} — {{ row.rate }}
+                    </li>
+                  </ul>
+                  <div
+                    v-if="assumedRepricingSegments.length > 0"
+                    class="repricing-assumed"
+                    data-test="mortgage-repricing-assumed"
+                  >
+                    {{ t('mortgage.repricing.assumedNotice', {
+                      count: assumedRepricingSegments.length,
+                    }) }}
+                  </div>
+                </div>
               </Col>
             </Row>
           </Card>
@@ -531,5 +744,25 @@ function onReset(): void {
 }
 .composed-rate-hint {
   font-size: 11px;
+}
+/* 重定价读数（R150）：把「哪几期用哪个利率」写在提交之前，让分段是人可核对的。 */
+.repricing-readout {
+  border: 1px solid var(--fcs-panel-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--fcs-text-muted);
+}
+.repricing-readout-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.repricing-segments {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.repricing-assumed {
+  margin-top: 4px;
+  color: var(--fcs-caveat);
 }
 </style>

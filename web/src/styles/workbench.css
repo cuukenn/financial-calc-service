@@ -34,6 +34,10 @@
   --fcs-text-muted: rgba(0, 0, 0, 0.45);
   /* R143：读数存疑标注（不是监管阈值色，故不复用 --fcs-ratio-*）。 */
   --fcs-caveat: #d48806;
+  /* R150：信息性面板的描边（接近 AntD colorBorder #d9d9d9）。它不是阈值状态色，
+     所以不复用 --fcs-ratio-border —— 那条 token 的语义是「阈值读数框」，
+     面板描边借用它会让 workbench.spec 的「组件不得自带阈值色值」守卫失去意义。 */
+  --fcs-panel-border: rgba(0, 0, 0, 0.15);
 }
 
 /* 大块卡片：两个表单的三个分区共用（卡头压低、正文上紧下松）。
