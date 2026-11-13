@@ -47,6 +47,32 @@ public final class DecimalMath {
     }
 
     /**
+     * {@code base^exponent} with the base's logarithm supplied by the caller — the memo seam
+     * AGENTS.md §6 N-05/N-03 allows. A discount walk over N flows takes the same base
+     * {@code 1 + rate} N times, so {@code ln(base)} belongs outside the flow loop; {@link #pow}
+     * computes it inside every call, which on a 480-flow XIRR solve is 480 copies of the same
+     * series per NPV evaluation.
+     *
+     * <p><b>Not a numerical change.</b> {@code ln(base)} here is the caller's earlier
+     * {@link #ln(BigDecimal)} call on the same base: BigDecimal series steps are deterministic, so
+     * the argument handed to {@link #exp} is bit-identical to what {@link #pow} would build. The
+     * seam moves work, it does not rewrite arithmetic — no Horner form, no regrouped products, no
+     * different precision (AGENTS.md §6 N-03), and the result is the same {@link #exp} call.
+     *
+     * @param base     the base, must be positive; only used to fail fast on a non-positive base
+     * @param exponent the exponent, may be fractional or negative
+     * @param lnBase   {@code ln(base)} as returned by {@link #ln} for the very same base
+     * @return the power at the internal precision, identical to {@link #pow(base, exponent)}
+     * @throws ArithmeticException when {@code base} is not positive
+     */
+    public static BigDecimal powWithLn(BigDecimal base, BigDecimal exponent, BigDecimal lnBase) {
+        if (base.signum() <= 0) {
+            throw new ArithmeticException("ln requires a positive argument: " + base.toPlainString());
+        }
+        return exp(exponent.multiply(lnBase, CALC));
+    }
+
+    /**
      * Natural logarithm of a positive argument.
      *
      * @throws ArithmeticException when {@code value} is not positive

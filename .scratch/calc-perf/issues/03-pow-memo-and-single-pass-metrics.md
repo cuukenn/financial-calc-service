@@ -1,6 +1,6 @@
 # 03. 求根里的 `pow` 复用与指标走查合并
 
-Status: ready-for-agent
+Status: resolved（2026-11-14，前半落地、后半裁定不实施）
 Type: task
 Priority: P2
 口径影响: 不得改变任何输出数值（逐位一致）；不得为了省时间重排加法/乘法次序
@@ -32,3 +32,35 @@ Blocked by: 01, 02
 ## 涉及文件
 
 `calc-domain/.../metric/impl/IrrCalculator`（求根内的 NPV 求值）、`DurationMetrics.java`、`TotalMetrics.java`、`AverageBalanceMetric.java`、`MetricSupport.java`、`LeaseImplicitRateMetric.java`、`calc-domain/.../support/DecimalMath`（`pow` 的 memo 落点）。
+
+## 落地记录（2026-11-14）
+
+**落地（第 1 项的求根内部分）**
+
+- `DecimalMath.powWithLn`：`exp(t·ln(1+rate))` 替代 `(1+rate)^t` 的 DECIMAL128 `pow`；`xnpv` 的每条现金流权重 `discount ÷ (1+rate)^t` 改为 `discount × exp(−t·ln)`，`ln(1+rate)` 与权重表在求根循环外一次算好。求根内每轮每流只剩一次乘加。
+- **数值不变性**：`GoldenScheduleTest`（20 例）+ `ConservationPropertyTest` 全绿，480 期全链路闸门内；`RunCostBaselineTest` 三格全绿。
+- **读数**：480 期指标线 1586–1611 ms → **1105–1174 ms（≈ −30%）**；逐码归因：XIRR 964.6 ms、IRR_PERIOD 191.5 ms，其余 24 码全部 ≤ 8 ms。
+- N-03 合规：`MAX_ITERATIONS`（两求解器）、TOLERANCE 语义（R148 解域）、内部精度一律未动；**没有**用 Horner 或代数改写——`powWithLn` 换的是每一次幂的算法，不重排任何加乘次序，且逐位一致由金序列证明。
+
+**裁定不实施（第 1 项的跨码 memo、第 2、3 项）——§6 规则 1（先测量再优化）**
+
+`MetricSolveCountTest#the_metric_line_costs_are_attributable_to_each_code`（timing 装饰器，逐码归因，480 期）：
+
+| 归因 | 读数 |
+|---|---|
+| XIRR | 964.6 ms |
+| IRR_PERIOD | 191.5 ms |
+| XNPV | 7.8 ms |
+| 三个 Duration | 各 1.5 ms |
+| MIRR / NPV / DISCOUNTED_PAYBACK | 1.5 / 1.4 / 1.3 ms |
+| 五个列合计、租赁率、均余额 | 各 0.1 ms |
+| payback、IRR_ANNUAL 对、TRUE_ANNUAL、隐含利率、borrower 族 | 0.0 ms |
+
+单遍行合计、`(1+rate)^t` 阶梯 memo、共享 PV 走查、build-once 镜像各自能省 0.1–8 ms / 1173 ms——在本机测量噪声之下。**测不出收益的优化不做**；为它们引入 run 级可变载体是拿正确性风险换零时间。证据与裁定一并写进 `PeriodicRootHandoff` 的 Javadoc（「Why nothing else travels on this channel」段），防回潮。
+
+**验收对照**
+
+- 逐位一致：金序列 + 属性测试全绿（非 0.01 元容差）。
+- LESSEE/LESSOR R103/R124 语义未动：`CashFlowPerspectiveMetricsTest` 绿。
+- 校验器四项全绿。
+- 目标「指标装配线 ≤ 800 ms」**未达且不再追**：剩余成本是 XIRR 的求解轮数本身（N-03 禁止下调），跨码算术浪费已证不存在。

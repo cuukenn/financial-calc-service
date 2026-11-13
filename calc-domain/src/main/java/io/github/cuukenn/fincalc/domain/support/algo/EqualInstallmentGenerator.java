@@ -126,21 +126,21 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
     private static BigDecimal solveSegment(BigDecimal opening, BigDecimal annual,
             BigDecimal periodicRate, int remaining, List<PeriodDate> remainingWindows,
             DayCountConvention dayCount, BigDecimal residual) {
-        if (uniformWindows(annual, remainingWindows, dayCount)) {
+        // Each window's rate is derived once per segment solve and then consumed twice — by the
+        // uniformity test and by the bisection's ~50 evaluations (AGENTS.md §6 N-05). The products are
+        // the same unrounded {@code annual × yearFraction(window)} in window order, so the rent the
+        // segment prices is bit-identical to the separately-derived version (AGENTS.md §6 N-04).
+        List<BigDecimal> periodRates = PmtSolver.periodRates(annual, remainingWindows, dayCount);
+        if (uniform(periodRates)) {
             return PmtSolver.closedForm(opening, periodicRate, remaining, residual);
         }
-        return PmtSolver.iterative(opening, remainingWindows, dayCount, annual, residual);
+        return PmtSolver.iterative(opening, periodRates, annual, residual);
     }
 
-    /** Whether every window accrues the same periodic rate at {@code annual}. */
-    private static boolean uniformWindows(BigDecimal annual, List<PeriodDate> windows,
-            DayCountConvention dayCount) {
-        PeriodDate first = windows.get(0);
-        BigDecimal firstRate = annual.multiply(dayCount.yearFraction(first.startDate(),
-                first.endDate()));
-        for (PeriodDate window : windows) {
-            BigDecimal rate = annual.multiply(dayCount.yearFraction(window.startDate(),
-                    window.endDate()));
+    /** Whether every window of a segment accrues the same periodic rate. */
+    private static boolean uniform(List<BigDecimal> periodRates) {
+        BigDecimal firstRate = periodRates.get(0);
+        for (BigDecimal rate : periodRates) {
             if (rate.subtract(firstRate).abs().compareTo(RATE_EPSILON) > 0) {
                 return false;
             }

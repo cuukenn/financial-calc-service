@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -72,24 +73,59 @@ public final class IrrCalculator {
     /** Net present value at an annual rate, discounting by actual days over 365. */
     public static BigDecimal xnpv(List<CashFlow> flows, BigDecimal annualRate) {
         requireFlows(flows);
+        return xnpv(flows, annualRate, yearWeights(flows));
+    }
+
+    /**
+     * The same walk over day weights the caller already holds (AGENTS.md §6 N-05: an XIRR solve
+     * evaluates this function ~120 times over the same flow set, and each evaluation used to redo
+     * the origin scan and the 480 {@code days ÷ 365} quotients the flow set itself determines).
+     *
+     * <p>The weights come from {@link #yearWeights(List)} and nothing else, so the values are the
+     * ones any single {@link #xnpv(List, BigDecimal)} call would derive — the same quotients in the
+     * same order. What the seam saves is work, not digits.
+     */
+    public static BigDecimal xnpv(List<CashFlow> flows, BigDecimal annualRate,
+            List<BigDecimal> yearWeights) {
+        requireFlows(flows);
         Objects.requireNonNull(annualRate, "annualRate");
+        Objects.requireNonNull(yearWeights, "yearWeights");
+        if (yearWeights.size() != flows.size()) {
+            throw new IllegalArgumentException("yearWeights must match flows: " + yearWeights.size()
+                    + " weights for " + flows.size() + " flows");
+        }
+        BigDecimal growth = BigDecimal.ONE.add(annualRate);
+        requirePositiveBase(growth, annualRate);
+        // ln(1 + rate) is the same for every flow of one evaluation; DecimalMath.pow would take
+        // its series flows.size() times. powWithLn is that power with the log factored out.
+        BigDecimal lnGrowth = DecimalMath.ln(growth);
+        BigDecimal total = BigDecimal.ZERO;
+        for (int index = 0; index < flows.size(); index++) {
+            BigDecimal factor = DecimalMath.powWithLn(growth, yearWeights.get(index), lnGrowth);
+            total = total.add(signed(flows.get(index)).divide(factor, MC), MC);
+        }
+        return total;
+    }
+
+    /**
+     * The {@code days ÷ 365} weight of every flow against the earliest flow date — a property of
+     * the flow set alone, independent of any rate. One XIRR solve evaluates the day-discounted NPV
+     * ~120 times; the weights are derived once for the solve instead of once per evaluation.
+     */
+    public static List<BigDecimal> yearWeights(List<CashFlow> flows) {
+        requireFlows(flows);
         LocalDate origin = flows.get(0).date();
         for (CashFlow flow : flows) {
             if (flow.date().compareTo(origin) < 0) {
                 origin = flow.date();
             }
         }
-        BigDecimal growth = BigDecimal.ONE.add(annualRate);
-        requirePositiveBase(growth, annualRate);
-        BigDecimal total = BigDecimal.ZERO;
+        List<BigDecimal> weights = new ArrayList<>(flows.size());
         for (CashFlow flow : flows) {
-            BigDecimal years = BigDecimal.valueOf(ChronoUnit.DAYS.between(origin, flow.date()))
-                    .divide(DAYS_PER_YEAR, MC);
-            // BigDecimal has no decimal-exponent pow on JDK 11: see DecimalMath.
-            BigDecimal factor = DecimalMath.pow(growth, years);
-            total = total.add(signed(flow).divide(factor, MC), MC);
+            weights.add(BigDecimal.valueOf(ChronoUnit.DAYS.between(origin, flow.date()))
+                    .divide(DAYS_PER_YEAR, MC));
         }
-        return total;
+        return weights;
     }
 
     /** Periodic yield with NPV zero; {@code null} when it cannot be found. */
@@ -118,7 +154,11 @@ public final class IrrCalculator {
         if (!hasSignChange(flows)) {
             return null;
         }
-        return solver.solve(rate -> xnpv(flows, rate), RATE_LOWER, RATE_UPPER,
+        // The day weights belong to the flow set, not to the rate: derive them once for the whole
+        // solve instead of ~120 times inside it (AGENTS.md §6 N-05). Same quotients, same order —
+        // the root the solver lands on is the one the per-evaluation walk would have produced.
+        List<BigDecimal> weights = yearWeights(flows);
+        return solver.solve(rate -> xnpv(flows, rate, weights), RATE_LOWER, RATE_UPPER,
                 BisectionNewtonSolver.DEFAULT_TOLERANCE);
     }
 

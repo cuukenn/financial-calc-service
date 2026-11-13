@@ -11,6 +11,7 @@ import io.github.cuukenn.fincalc.domain.metric.FinancialMetrics;
 import io.github.cuukenn.fincalc.domain.metric.MetricCodes;
 import io.github.cuukenn.fincalc.domain.metric.MetricContext;
 import io.github.cuukenn.fincalc.domain.metric.MetricRegistry;
+import io.github.cuukenn.fincalc.domain.metric.PeriodicRootHandoff;
 import io.github.cuukenn.fincalc.domain.model.CashFlow;
 import io.github.cuukenn.fincalc.domain.model.CashFlowDirection;
 import io.github.cuukenn.fincalc.domain.model.CashFlowType;
@@ -124,7 +125,25 @@ import java.util.stream.Stream;
  * the §9.4 event table, so the rent-consistent rate equals {@code IRR_PERIOD} there. Upfront fees
  * and deposits never enter the stream — the chain does not see them either
  * ({@code rowOneOpening} is the schedule's own opening balance), so fee-bearing schedules keep
- * closing. If the stream has no root ({@code periodIrr == null}) or the calculator still refuses
+ * closing.
+ *
+ * <p><b>One solve per stream (AGENTS.md §6 N-05).</b> When that stream is a flow set some solve of
+ * this run already priced — the §9.4 event table {@code IRR_PERIOD} was solved over, or the
+ * implicit-rate measure chain's table-plus-unguaranteed-residual set — the engine reads the run's
+ * <em>unrounded</em> root off the {@link PeriodicRootHandoff} ledger instead of solving the same
+ * problem twice. The raw root and not the published scale-10 {@code IRR_PERIOD} is what keeps every
+ * §9.7 row cent-for-cent (AGENTS.md §6 N-04: the 0.01 元容差 is a validation tolerance, never a
+ * licence to price a chain with a rounded rate). Where the streams differ — a separately settled
+ * 留购价, a guaranteed residual listed on top of the balloon, the unguaranteed residual CAS 21
+ * 第三十八条 prices into the net investment while §9.4 keeps the event table cash-only, an upfront
+ * fee or a deposit leg — the chain solves its own root: a different stream has a different root,
+ * and that stated caliber difference is the only reason a run pays for a second solve.
+ * {@link MetricCodes#LEASE_IMPLICIT_RATE} shares the same ledger: when its stream is the event
+ * table (no unguaranteed residual, asset value = principal) it reads {@code IRR_PERIOD}'s root, and
+ * when it solves its own it records it, so the §9.7 chain reuses that root instead of solving the
+ * identical stream a third time.
+ *
+ * <p>If the stream has no root ({@code periodIrr == null}) or the calculator still refuses
  * the table, {@code effectiveInterest} is {@code null} and the failure surfaces as a WARN issue
  * carrying the refused code — never an exception.
  *
@@ -241,9 +260,9 @@ public final class CalculationFacade {
         // perspective is the caller's (R103); it changes nothing above, and the schedule keeps the
         // lessor event table whatever the metric view is (R109).
         List<String> failedMetrics = new ArrayList<>();
-        FinancialMetrics metrics = this.metrics.computeAll(new MetricContext(flows, schedule,
-                element, periodsPerYear(element), null, null, null, request.perspective()),
-                failedMetrics);
+        MetricContext metricContext = new MetricContext(flows, schedule, element,
+                periodsPerYear(element), null, null, null, request.perspective());
+        FinancialMetrics metrics = this.metrics.computeAll(metricContext, failedMetrics);
 
         // Step 5: the enriched schedule.
         schedule = schedule.with(metrics, flows);
@@ -282,8 +301,8 @@ public final class CalculationFacade {
         }
 
         // Step 7: the §9.7 effective-interest table (nullable, never thrown).
-        EffectiveInterestTable effectiveInterest =
-                effectiveInterest(schedule, element, metrics, engineIssues);
+        EffectiveInterestTable effectiveInterest = effectiveInterest(schedule, element, metrics,
+                metricContext.rootHandoff(), engineIssues);
 
         // The engine's findings join the schedule's own issues in one rebuild.
         if (!engineIssues.isEmpty()) {
@@ -304,14 +323,14 @@ public final class CalculationFacade {
      * stable code of the refusal — the run itself never fails here.
      */
     private EffectiveInterestTable effectiveInterest(Schedule schedule, LeaseElement element,
-            FinancialMetrics metrics, List<ValidationIssue> issues) {
+            FinancialMetrics metrics, PeriodicRootHandoff rootHandoff, List<ValidationIssue> issues) {
         if (metrics.find(MetricCodes.IRR_PERIOD) == null) {
             issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
                     "FCS-CALC-3003: IRR_PERIOD 不收敛, 实际利率法摊销表未生成", null));
             return null;
         }
         BigDecimal residualExtra = unrecoveredResiduals(element, schedule);
-        BigDecimal periodIrr = netInvestmentPeriodIrr(schedule, residualExtra);
+        BigDecimal periodIrr = netInvestmentPeriodIrr(schedule, residualExtra, rootHandoff);
         if (periodIrr == null) {
             issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
                     "FCS-CALC-3003: 租金口径现金流无内部收益率, 实际利率法摊销表未生成", null));
@@ -358,7 +377,8 @@ public final class CalculationFacade {
      * index when nonzero. See the class javadoc for the closing arithmetic and the shapes this
      * closes exactly.
      */
-    private BigDecimal netInvestmentPeriodIrr(Schedule schedule, BigDecimal residualExtra) {
+    private BigDecimal netInvestmentPeriodIrr(Schedule schedule, BigDecimal residualExtra,
+            PeriodicRootHandoff rootHandoff) {
         List<Installment> installments = schedule.installments();
         if (installments.isEmpty()) {
             return null;
@@ -383,6 +403,24 @@ public final class CalculationFacade {
             stream.add(new CashFlow(last.periodNo(), last.endDate(), terminal,
                     CashFlowType.RESIDUAL, CashFlowDirection.INFLOW));
         }
+
+        BigDecimal solvedOverRun = rootHandoff.rootFor(stream);
+        if (solvedOverRun != null) {
+            // The stream this chain prices is the very stream some solve of this run — the §9.5
+            // metric line's IRR_PERIOD, or the implicit-rate measure chain — already solved, or its
+            // exact direction mirror (R103): same discount indices, same signed amounts, so it has
+            // the same root, and solving it again is the duplicate AGENTS.md §6 N-05 forbids. Read
+            // the ledger's unrounded root, not the published scale-10 IRR_PERIOD: substituting the
+            // rounded rate would move cents along the chain's rows (AGENTS.md §6 N-04).
+            return solvedOverRun;
+        }
+        // A stated second solve, not a silent one. This stream differs from the §9.4 event table the
+        // run's IRR_PERIOD is a root of whenever the deal carries money the event table does not list
+        // in the same place: an upfront fee or deposit leg, a separately settled 留购价, a guaranteed
+        // residual on top of the balloon, or — CAS 21 第三十八条 — the unguaranteed residual, which is
+        // part of the lessor's net investment the chain must unwind but never becomes cash (§9.4 keeps
+        // the event table cash-only). Different stream, therefore a different root, therefore its own
+        // solve: that is the caliber difference, and it is the only reason this run pays for two.
         return IrrCalculator.periodIrr(stream);
     }
 

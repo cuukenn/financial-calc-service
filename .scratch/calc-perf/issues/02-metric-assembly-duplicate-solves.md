@@ -1,6 +1,6 @@
 # 02. 砍掉重复求根：指标装配线一次 run 只做一次求根
 
-Status: ready-for-agent
+Status: resolved（2026-11-14）
 Type: task
 Priority: P1
 口径影响: 不得改变任何输出数值（逐位一致）；不改 §9.5 口径、不改契约
@@ -32,3 +32,29 @@ Blocked by: 01
 ## 涉及文件
 
 `calc-engine/.../CalculationFacade.java`（`netInvestmentPeriodIrr`、`effectiveInterest`）、`calc-domain/.../metric/MetricRegistry.java`、`calc-domain/.../metric/impl/`（`IrrMetrics`、`XirrMetric`、`LeaseImplicitRateMetric`、`BorrowerIrrPeriodMetric`）。
+
+## 落地记录（2026-11-14）
+
+**做了什么**
+
+1. **run 级求根台账** `calc-domain/.../metric/PeriodicRootHandoff.java`：`record(root, flows)` 记录每次求解的未舍入根与流集，`rootFor(stream)` 按内容判定「同一根问题」（同 index、同金额、方向全同或全反——R103 镜像）后复用。`MetricContext.rootHandoff()` 是随 run 共享的通道。
+2. **§9.7 链复用**：`CalculationFacade.netInvestmentPeriodIrr` 先 `rootFor(stream)`，命中即读未舍入根（不是公布的 scale-10 `IRR_PERIOD`——N-04）；不命中才自解，且口径差已在 Javadoc 写明（CAS 21 第三十八条净投资含未担保余值 vs §9.4 事件表现金-only）。
+3. **隐含利率查台账再解**：`LeaseImplicitRateMetric` 先查、解完记录——无未担保余值时它的流集就是事件表，直接复用 `IRR_PERIOD` 的根，一次求根都不花。
+
+**读数**（`MetricSolveCountTest` 七条钉桩，全绿）
+
+- 480 期普通单子全链路：**3 → 2 求根**（246 次求值不变——XIRR 124 + IRR_PERIOD 122）。
+- 12 期 + 未担保余值：**4 → 3**（隐含利率解一次，§9.7 链读它的根，不再解第三遍同一条净投资流）。
+- 12 期 + 资产价值、无未担保余值：分期指标线 **3 → 2**，隐含利率 = IRR_ANNUAL（年化舍入放大界 1e-8 内，注释写明为什么不是逐位）。
+- 无资产价值时 `LEASE_IMPLICIT_RATE`：**0 求根**（确认它返回 null 前不碰求解器）。
+
+**没做什么（裁定）**
+
+- **按码集装配（第 2 项）不实施**：N-06 明文——不得因「界面未展示」停止产出 §9.5 要求的码；引擎侧省不出时间，裁剪属展示层职责。
+- 复用不是「部分复用机制的补齐」而是换机制：原 `MetricRunState` 单根通道换成多记录台账，因为带资产价值的单子里隐含利率与 §9.7 链构成**第二条**同根问题，单根通道接不住。
+
+**验收对照**
+
+- 求根次数有可核对的记录：`BisectionNewtonSolver.SOLVE_COUNT/EVALUATION_COUNT` + 测试断言，非「看起来快了」。
+- 全量 `mvn -o test` 绿（36 类，含 GoldenSchedule / Conservation / MetricRegistry / EndToEndSmoke / CalculationFacade 44 位 `eir()` 钉桩）——数值逐位一致。
+- §9.7 退化路径契约未动：`IRR_PERIOD` 缺失仍 null + WARN `FCS-CALC-3003`。

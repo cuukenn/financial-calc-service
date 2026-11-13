@@ -3,6 +3,7 @@ package io.github.cuukenn.fincalc.domain.support;
 import io.github.cuukenn.fincalc.domain.port.RootSolver;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 /**
@@ -42,6 +43,21 @@ public final class BisectionNewtonSolver implements RootSolver {
     /** Iteration budget shared with the design document's solver convention. */
     public static final int MAX_ITERATIONS = 100;
 
+    /**
+     * Monotonic count of {@link #solve} entries since JVM start. Cost accounting only: AGENTS.md §6
+     * N-05 forbids solving the same root twice inside one measurement, and a count a test can read
+     * is how a run shows it paid for each root once — never「看起来快了」as evidence.
+     */
+    public static final AtomicLong SOLVE_COUNT = new AtomicLong();
+
+    /**
+     * Monotonic count of function evaluations the solver has requested since JVM start, including
+     * the endpoint probes, the Newton derivative probes and the {@link #bracketAnswer} polish: one
+     * evaluation is one whole NPV/XNPV walk over the flow set. With {@link #SOLVE_COUNT} this is the
+     * multiplication every consumer of the solver pays — solves × evaluations × flows.
+     */
+    public static final AtomicLong EVALUATION_COUNT = new AtomicLong();
+
     /** Default convergence target for yield metrics: the returned rate is within this of a root. */
     public static final BigDecimal DEFAULT_TOLERANCE = new BigDecimal("1e-10");
 
@@ -74,6 +90,11 @@ public final class BisectionNewtonSolver implements RootSolver {
     @Override
     public BigDecimal solve(Function<BigDecimal, BigDecimal> function, BigDecimal lower,
             BigDecimal upper, BigDecimal tolerance) {
+        SOLVE_COUNT.incrementAndGet();
+        Function<BigDecimal, BigDecimal> counted = rate -> {
+            EVALUATION_COUNT.incrementAndGet();
+            return function.apply(rate);
+        };
         BigDecimal lo = lower;
         BigDecimal hi = upper;
         if (lo.compareTo(hi) > 0) {
@@ -81,8 +102,8 @@ public final class BisectionNewtonSolver implements RootSolver {
             lo = hi;
             hi = swap;
         }
-        BigDecimal fLo = function.apply(lo);
-        BigDecimal fHi = function.apply(hi);
+        BigDecimal fLo = counted.apply(lo);
+        BigDecimal fHi = counted.apply(hi);
         if (fLo.signum() == 0) {
             return lo;
         }
@@ -95,7 +116,7 @@ public final class BisectionNewtonSolver implements RootSolver {
 
         for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
             BigDecimal mid = lo.add(hi).divide(TWO, MC);
-            BigDecimal fMid = function.apply(mid);
+            BigDecimal fMid = counted.apply(mid);
             if (fMid.signum() == 0) {
                 return mid;
             }
@@ -104,9 +125,9 @@ public final class BisectionNewtonSolver implements RootSolver {
             // either way, so the fallback costs no extra evaluation.
             BigDecimal point = mid;
             BigDecimal fPoint = fMid;
-            BigDecimal step = newtonStep(function, mid, fMid, lo, hi);
+            BigDecimal step = newtonStep(counted, mid, fMid, lo, hi);
             if (step != null) {
-                BigDecimal fStep = function.apply(step);
+                BigDecimal fStep = counted.apply(step);
                 if (fStep.signum() == 0) {
                     return step;
                 }
@@ -121,13 +142,13 @@ public final class BisectionNewtonSolver implements RootSolver {
                 fHi = fPoint;
             }
             if (hi.subtract(lo).abs().compareTo(tolerance) <= 0) {
-                return bracketAnswer(function, lo, hi);
+                return bracketAnswer(counted, lo, hi);
             }
         }
         // Budget exhausted: the bracket is still sign-opposite, so it holds a root and the
         // midpoint is within half its width of it — a bracketed answer, not a fabricated one. A
         // null here would report a non-convergence the sign invariant rules out.
-        return bracketAnswer(function, lo, hi);
+        return bracketAnswer(counted, lo, hi);
     }
 
     /**

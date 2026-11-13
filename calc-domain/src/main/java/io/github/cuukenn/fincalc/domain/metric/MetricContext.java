@@ -58,6 +58,7 @@ public final class MetricContext {
     private final BigDecimal financeRate;
     private final CashFlowPerspective perspective;
     private final Map<String, BigDecimal> computedValues;
+    private final PeriodicRootHandoff rootHandoff;
 
     /**
      * A lessor-view context — the v1 shape; delegates with {@link CashFlowPerspective#LESSOR}.
@@ -106,6 +107,14 @@ public final class MetricContext {
             int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
             BigDecimal financeRate, CashFlowPerspective perspective,
             Map<String, BigDecimal> computedValues) {
+        this(cashFlows, schedule, element, periodsPerYear, discountRate, reinvestRate, financeRate,
+                perspective, computedValues, new PeriodicRootHandoff());
+    }
+
+    private MetricContext(List<CashFlow> cashFlows, Schedule schedule, LeaseElement element,
+            int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
+            BigDecimal financeRate, CashFlowPerspective perspective,
+            Map<String, BigDecimal> computedValues, PeriodicRootHandoff rootHandoff) {
         Objects.requireNonNull(cashFlows, "cashFlows");
         if (periodsPerYear < 0) {
             throw new IllegalArgumentException("periodsPerYear must be at least 0: "
@@ -120,6 +129,7 @@ public final class MetricContext {
         this.financeRate = financeRate;
         this.perspective = perspective == null ? CashFlowPerspective.LESSOR : perspective;
         this.computedValues = computedValues;
+        this.rootHandoff = Objects.requireNonNull(rootHandoff, "rootHandoff");
     }
 
     /**
@@ -138,7 +148,7 @@ public final class MetricContext {
     MetricContext withRunValues(Map<String, BigDecimal> runValues) {
         return new MetricContext(cashFlows, schedule, element, periodsPerYear, discountRate,
                 reinvestRate, financeRate, perspective,
-                Objects.requireNonNull(runValues, "runValues"));
+                Objects.requireNonNull(runValues, "runValues"), rootHandoff);
     }
 
     /** Cash flows to measure, in sequence order; unmodifiable. */
@@ -201,5 +211,20 @@ public final class MetricContext {
      */
     public BigDecimal computed(String code) {
         return computedValues.get(code);
+    }
+
+    /**
+     * The channel the run writes its unrounded periodic root onto, for a consumer that needs the root
+     * itself rather than its §9.5 rounded publication — see {@link PeriodicRootHandoff} for when the
+     * value may be reused and for what it is not.
+     *
+     * <p>The same object is shared by this context and every {@code withRunValues} copy of it, so the
+     * caller that built the context reads what the run recorded. It is the one mutable thing a
+     * {@code MetricContext} exposes, and it is not a §9.5 output: no metric code reads it.
+     *
+     * @return this run's hand-off; never {@code null}
+     */
+    public PeriodicRootHandoff rootHandoff() {
+        return rootHandoff;
     }
 }

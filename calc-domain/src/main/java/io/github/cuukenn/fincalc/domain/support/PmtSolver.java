@@ -5,12 +5,14 @@ import io.github.cuukenn.fincalc.domain.model.PeriodDate;
 import io.github.cuukenn.fincalc.domain.port.DayCountConvention;
 import java.math.BigDecimal;
 import java.math.MathContext;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Solves the level rent of an annuity schedule, in the two ways the calculation can be exact.
@@ -27,6 +29,16 @@ import java.util.Set;
  *
  * <p>Rents are assumed to fall due at the end of their period. A schedule paid in advance needs its
  * own balance walk and is not priced here.
+ *
+ * <p><b>The walk's rates are derived once per solve</b> ({@link #periodRates}): a bisection evaluates
+ * the projection ~50 times over the same windows, and the rate each window accrues is a product of
+ * the window and the nominal rate alone, never of the candidate rent. Deriving it per evaluation
+ * retook the convention's {@code days ÷ year} quotient and its exact product tens of millions of
+ * times on the 1200-period / 400-segment cell — the single largest cost the engine pays
+ * (AGENTS.md §6 N-05). The refactor changes where the product is computed, not what it is: same
+ * unrounded multiply, same window order, same {@link MathContext#DECIMAL128} steps, so every schedule
+ * amount is bit-identical (AGENTS.md §6 N-03/N-04). The iteration budget and {@link #TOLERANCE} are
+ * untouched.
  */
 public final class PmtSolver {
 
@@ -44,6 +56,16 @@ public final class PmtSolver {
             new HashSet<>(Arrays.asList("THIRTY_360", "THIRTY_E_360")));
 
     private static final int MAX_BRACKET_DOUBLINGS = 64;
+
+    /**
+     * Diagnostic counters for AGENTS.md §6 N-01 attribution — how many iterative rent solves a run
+     * paid for, how many candidate rents it evaluated, and how many balance-walk steps those
+     * evaluations took. They carry no calculation meaning (nothing reads them to produce a number)
+     * and exist so a cost regression in the segmented cells can be located instead of guessed at.
+     */
+    public static final AtomicLong SOLVE_COUNT = new AtomicLong();
+    public static final AtomicLong EVALUATION_COUNT = new AtomicLong();
+    public static final AtomicLong WALK_STEP_COUNT = new AtomicLong();
 
     private PmtSolver() {
     }
@@ -111,33 +133,61 @@ public final class PmtSolver {
      */
     public static BigDecimal iterative(BigDecimal principal, List<PeriodDate> windows,
             DayCountConvention dayCount, BigDecimal annualRate, BigDecimal residualValue) {
-        Objects.requireNonNull(principal, "principal");
-        Objects.requireNonNull(windows, "windows");
         Objects.requireNonNull(dayCount, "dayCount");
-        Objects.requireNonNull(annualRate, "annualRate");
         if (windows.isEmpty()) {
             throw new IllegalArgumentException("windows must not be empty");
         }
+        return iterative(principal, periodRates(annualRate, windows, dayCount), annualRate,
+                residualValue);
+    }
+
+    /**
+     * {@link #iterative(BigDecimal, List, DayCountConvention, BigDecimal, BigDecimal)} over window
+     * rates the caller already derived — the seam that lets a segmented run derive each window's rate
+     * once for the segment instead of once per uniformity test, once more per solve and ~50 more
+     * times inside the bisection (AGENTS.md §6 N-05). The values are the same
+     * {@code annualRate × yearFraction(window)} products in the same order, so the solved rent is
+     * bit-identical (AGENTS.md §6 N-04).
+     *
+     * <p>{@code annualRate} is consulted only for the zero-rate shortcut a flat nominal rate gets;
+     * a window whose own fraction is zero (a same-date window) must not trigger it, which is why the
+     * check reads the nominal rate and not the derived list.
+     *
+     * @param principal     amount financed at the first window's start
+     * @param periodRates   each window's rate at the nominal rate, in window order; never empty
+     * @param annualRate    the nominal annual rate those rates were derived from
+     * @param residualValue balloon left outstanding at maturity, may be null or zero
+     * @return the rent at the shared output scale
+     */
+    public static BigDecimal iterative(BigDecimal principal, List<BigDecimal> periodRates,
+            BigDecimal annualRate, BigDecimal residualValue) {
+        Objects.requireNonNull(principal, "principal");
+        Objects.requireNonNull(periodRates, "periodRates");
+        Objects.requireNonNull(annualRate, "annualRate");
+        if (periodRates.isEmpty()) {
+            throw new IllegalArgumentException("periodRates must not be empty");
+        }
+        SOLVE_COUNT.incrementAndGet();
         BigDecimal residual = MoneyUtils.zeroIfNull(residualValue);
         if (annualRate.signum() == 0) {
             return MoneyUtils.out(principal.subtract(residual)
-                    .divide(BigDecimal.valueOf(windows.size()), MC));
+                    .divide(BigDecimal.valueOf(periodRates.size()), MC));
         }
 
         BigDecimal low = BigDecimal.ZERO;
-        if (error(principal, windows, dayCount, annualRate, residual, low).signum() <= 0) {
+        if (error(principal, periodRates, residual, low).signum() <= 0) {
             // The residual alone already covers the grown principal: nothing has to be repaid.
             return MoneyUtils.out(BigDecimal.ZERO);
         }
-        BigDecimal high = principal.divide(BigDecimal.valueOf(windows.size()), MC);
+        BigDecimal high = principal.divide(BigDecimal.valueOf(periodRates.size()), MC);
         for (int attempt = 0; attempt < MAX_BRACKET_DOUBLINGS; attempt++) {
-            if (error(principal, windows, dayCount, annualRate, residual, high).signum() < 0) {
-                return bisect(principal, windows, dayCount, annualRate, residual, low, high);
+            if (error(principal, periodRates, residual, high).signum() < 0) {
+                return bisect(principal, periodRates, residual, low, high);
             }
             high = high.multiply(TWO, MC);
         }
         throw new IllegalStateException("no rent bracket found within " + MAX_BRACKET_DOUBLINGS
-                + " doublings for " + windows.size() + " periods");
+                + " doublings for " + periodRates.size() + " periods");
     }
 
     /**
@@ -148,26 +198,54 @@ public final class PmtSolver {
      */
     public static BigDecimal closingBalance(BigDecimal principal, List<PeriodDate> windows,
             DayCountConvention dayCount, BigDecimal annualRate, BigDecimal rent) {
-        Objects.requireNonNull(principal, "principal");
+        Objects.requireNonNull(rent, "rent");
+        return walk(principal, periodRates(annualRate, windows, dayCount), rent);
+    }
+
+    /**
+     * The periodic rate of every window — {@code annualRate × yearFraction(window)} in window order.
+     *
+     * <p>The product belongs to the window and the nominal rate, not to the candidate rent, so a
+     * bisection that walks the same windows ~50 times needs it once (AGENTS.md §6 N-05). Deriving it
+     * inside the walk retook the convention's {@code days ÷ 360} quotient and the exact product on
+     * every evaluation: on the 1200-period / 400-segment cell that is tens of millions of quotients
+     * for a number the schedule already determined.
+     *
+     * <p>No rounding is introduced here: the product is the same unrounded {@link BigDecimal#multiply}
+     * the inline walk performed, in the same order (AGENTS.md §6 N-03/N-04, §1 P-07).
+     */
+    public static List<BigDecimal> periodRates(BigDecimal annualRate, List<PeriodDate> windows,
+            DayCountConvention dayCount) {
+        Objects.requireNonNull(annualRate, "annualRate");
         Objects.requireNonNull(windows, "windows");
         Objects.requireNonNull(dayCount, "dayCount");
-        Objects.requireNonNull(annualRate, "annualRate");
-        Objects.requireNonNull(rent, "rent");
-        BigDecimal balance = principal;
+        List<BigDecimal> rates = new ArrayList<>(windows.size());
         for (PeriodDate window : windows) {
-            BigDecimal rate = annualRate.multiply(dayCount.yearFraction(window.startDate(),
-                    window.endDate()));
+            rates.add(annualRate.multiply(dayCount.yearFraction(window.startDate(),
+                    window.endDate())));
+        }
+        return rates;
+    }
+
+    /**
+     * The balance walk over precomputed periodic rates — the projection the bisection converges on,
+     * one {@code balance(1 + rate) − rent} step per rate, rounded at {@link MathContext#DECIMAL128}
+     * exactly as the window-based walk did.
+     */
+    private static BigDecimal walk(BigDecimal principal, List<BigDecimal> periodRates,
+            BigDecimal rent) {
+        BigDecimal balance = principal;
+        for (BigDecimal rate : periodRates) {
             balance = balance.add(balance.multiply(rate, MC), MC).subtract(rent, MC);
         }
         return balance;
     }
 
-    private static BigDecimal bisect(BigDecimal principal, List<PeriodDate> windows,
-            DayCountConvention dayCount, BigDecimal annualRate, BigDecimal residual,
-            BigDecimal low, BigDecimal high) {
+    private static BigDecimal bisect(BigDecimal principal, List<BigDecimal> periodRates,
+            BigDecimal residual, BigDecimal low, BigDecimal high) {
         for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
             BigDecimal middle = low.add(high).divide(TWO, MC);
-            BigDecimal error = error(principal, windows, dayCount, annualRate, residual, middle);
+            BigDecimal error = error(principal, periodRates, residual, middle);
             if (error.abs().compareTo(TOLERANCE) <= 0) {
                 return MoneyUtils.out(middle);
             }
@@ -182,8 +260,10 @@ public final class PmtSolver {
     }
 
     /** Positive when a rent leaves more than the residual outstanding; the walk is monotone in rent. */
-    private static BigDecimal error(BigDecimal principal, List<PeriodDate> windows,
-            DayCountConvention dayCount, BigDecimal annualRate, BigDecimal residual, BigDecimal rent) {
-        return closingBalance(principal, windows, dayCount, annualRate, rent).subtract(residual);
+    private static BigDecimal error(BigDecimal principal, List<BigDecimal> periodRates,
+            BigDecimal residual, BigDecimal rent) {
+        EVALUATION_COUNT.incrementAndGet();
+        WALK_STEP_COUNT.addAndGet(periodRates.size());
+        return walk(principal, periodRates, rent).subtract(residual);
     }
 }
