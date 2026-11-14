@@ -115,19 +115,15 @@ describe('buildMortgageRules (validators reject on raw values, never silently fi
 
   it('names exactly the fields the mortgage form renders', () => {
     expect(Object.keys(rules).sort()).toEqual([
-      'appraisalValue',
       'commenceDate',
       'firstRepaymentDate',
       'futureLprPercents',
       'lprPercent',
-      'monthlyIncome',
-      'otherMonthlyDebt',
       'periods',
       'principal',
       'repricingAnchorDate',
       'repricingCycle',
       'spreadBp',
-      'transactionPrice',
     ])
   })
 
@@ -158,7 +154,6 @@ describe('buildMortgageRules (validators reject on raw values, never silently fi
     // 第 2 条是金额格式规则（第 1 条是贷款金额须 > 0 的数值门槛）。
     expect(await runValidator('principal', 2, '1,000,000')).toContain('mortgage.validation.money')
     expect(await runValidator('principal', 2, '1000000')).toBeNull()
-    expect(await runValidator('monthlyIncome', 0, '1e5')).toContain('mortgage.validation.money')
   })
 
   it('rejects a 贷款金额 that is not greater than 0, naming the element in the message', async () => {

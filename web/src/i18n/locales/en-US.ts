@@ -126,8 +126,7 @@ const enUS: typeof zhCN = {
   mortgage: {
     // Task 5 / R101: the mortgage scenario goes through the same
     // POST /api/v1/calculations contract; element names follow AGENTS.md §2.2
-    // (loan amount / down payment ratio / LTV / monthly housing-expense-to-income
-    // ratio / total monthly debt-to-income ratio) — no synonyms.
+    // (loan amount, etc.) — no synonyms.
     cardTitle: 'Mortgage Calculation Form',
     basic: {
       title: 'Loan Elements',
@@ -147,47 +146,13 @@ const enUS: typeof zhCN = {
       periods: 'Term (months)',
       method: 'Repayment method',
     },
-    collateral: {
-      // R103: LTV / down payment ratio are front-end derived metrics, never engine metrics.
-      title: 'Collateral & Leverage (front-end only, not sent)',
-      transactionPrice: 'Transaction price',
-      appraisalValue: 'Appraised value',
-      collateralValue: 'Collateral value (lower of price and appraisal)',
-      ltv: 'Loan-to-value (LTV)',
-      downPaymentRatio: 'Down payment ratio',
-    },
-    income: {
-      // R103: DTI is a front-end derived metric too.
-      title: 'Income & Debts (front-end only, not sent)',
-      monthlyIncome: 'Monthly disposable income',
-      monthlyIncomePh: 'e.g. 16000',
-      otherMonthlyDebt: 'Other monthly debt payments',
-      otherMonthlyDebtPh: 'e.g. 1600',
+    payment: {
+      title: 'Monthly payment (from this run)',
       monthlyPayment: 'Monthly payment',
-      dti: 'Monthly housing expense / income ratio',
-      allDebtRatio: 'Total monthly debt / income ratio',
-      // AGENTS.md §9.5 posture: an uncomputable metric must say so, never a silent 0.
-      unavailable: 'No income provided, DTI cannot be determined',
-      thresholds:
-        'Thresholds and colours: housing-expense ratio ≤ 50% compliant, > 50% approaching the limit, > 60% over the limit; all-debt ratio ≤ 60% compliant, > 60% over the limit; equal to a limit is not a breach (judged on the unrounded value).',
-      paymentNote: 'Monthly payment basis: first installment for equal installments; largest installment for equal principal and bullet loans (worst month).',
-      // Task 6 §5 (copy ownership handed over from Task 5): a bullet loan repays one lump sum.
-      // The row heading gets its own name under §2.2 instead of posing as a monthly payment;
-      // the arithmetic and the DTI basis stay exactly as they were.
       lumpSumPayment: 'Lump-sum repayment at maturity',
+      paymentNote: 'Monthly-payment basis: first rent for annuity; the largest rent of the whole table (worst month) for equal-principal and bullet.',
       lumpSumBasis:
-        'Bullet basis: this figure is the principal plus all deferred interest repaid in a single payment at maturity (the largest installment in the schedule) — it is not a monthly payment; the 月供 basis of §2.2 applies to the monthly methods only.',
-      lumpSumProxyNote:
-        'Comparing this lump-sum maturity payment directly with monthly disposable income is a deliberately conservative proxy: the ratio is far larger than the burden actually spread across the months, so it flags the risk of this method.',
-    },
-    status: {
-      // Task 6 §3: one text marker per status, so meaning is not carried by colour alone.
-      ok: 'Compliant',
-      warn: 'Approaching the limit',
-      breach: 'Over the limit',
-      // A floor breach points the other way: below the floor, not over a ceiling.
-      belowFloor: 'Below the floor',
-      neutral: 'Not evaluable',
+        'Bullet basis: this amount is the principal plus all deferred interest repaid at maturity (the largest row of the table), not a monthly payment — the §2.2 monthly-payment basis only applies to monthly-repayment methods.',
     },
     // R150: repricing is the element a mortgage contract changes most often (AGENTS.md §2.2
     // 重定价日 / 重定价周期). It lands as the engine's existing segmented-rate rule rows, no new contract key.
@@ -217,13 +182,9 @@ const enUS: typeof zhCN = {
     },
     gates: {
       // §71: these [法] thresholds are validated in the UI, the copy must not claim the engine checks them (R107/R109).
-      note: 'Client-side gates: down payment ≥ 15%, term ≤ 480 months and the 50%/60% DTI limits are blocked by this form; with product=MORTGAGE the engine also discloses the down-payment and term thresholds as WARN findings (DTI stays front-end: the engine has no income input, M-01).',
+      note: 'Front-end gates: the term cap and the repayment-method rules are enforced by this form; with product=MORTGAGE the engine discloses thresholds as WARN findings (the down-payment/DTI readouts were removed per the input-field-audit ruling, 2026-11-14).',
       bulletOnly: 'Bullet (principal and interest at maturity) is selectable only when the term is ≤ {max} months (金规〔2026〕5号: only terms ≤ 1 year may repay at maturity).',
       bulletReset: 'Term exceeds {max} months: bullet repayment is not selectable and the choice was reset to equal installments (front-end rule, not engine-validated).',
-      downPaymentFloor: 'Down payment ratio is below the {min} floor (currently {actual}): submit is blocked (front-end floor; the engine also discloses it as a WARN finding — issue 15/A2, disclosure only).',
-      // AGENTS.md §2.3 "the threshold is a hard constraint": an unevaluable floor must not pass silently.
-      downPaymentFloorNotEvaluable:
-        'The collateral value is not greater than 0 (the lower of transaction price and appraised value), so LTV and the down payment ratio cannot be computed: the {min} down payment floor cannot be evaluated and submit is blocked (front-end floor; the engine discloses a WARN only when the element carries the chain fields).',
       rateNotComposable: 'The annual rate cannot be composed from the LPR and the spread, check the inputs.',
       // R150: the three repricing gates, all of them in the UI (the engine does not know the word
       // "repricing cycle" — it only sees segmented-rate rule rows).
@@ -255,8 +216,6 @@ const enUS: typeof zhCN = {
       futureLprs: 'Invalid later-LPR format: enter comma separated non-negative percentages (e.g. 3.9, 3.1)',
       periods: 'Please enter the loan term in months',
       periodsRange: 'The loan term must be within 1–{max} months (≤ 40 years)',
-      transactionPrice: 'Please enter the transaction price',
-      appraisalValue: 'Please enter the appraised value',
     },
   },
   enums: {

@@ -229,7 +229,7 @@ describe('CalculationForm', () => {
   it('sends the deposit calibers and the percent-denominated interest rate (ticket 03)', async () => {
     const wrapper = mountWithI18n(CalculationForm)
     await wrapper.find('[data-test="deposit"]').setValue('50000')
-    // AntD Select 与 R92-2 币种用例同款交互：mousedown 展开弹层，点击选项提交枚举值。
+    // AntD Select 交互：mousedown 展开弹层，点击选项提交枚举值。
     await pickOption(wrapper, '[data-test="deposit-timing"]', '随首期租金')
     await pickOption(wrapper, '[data-test="deposit-settlement"]', '冲抵末期租金')
     await wrapper.find('[data-test="deposit-interest-rate"]').setValue('3')

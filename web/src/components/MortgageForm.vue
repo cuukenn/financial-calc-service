@@ -6,15 +6,12 @@
  * 本表单不发新端点、不改 DTO，只把房贷要素映射成一份合法的租赁测算请求。
  * R101 映射：贷款金额→principal、LPR+加点→nominalRate、放款日→commenceDate、
  * 首期还款日→firstRentDate、期限（月）→periods，固定 MONTHLY / IN_ARREARS /
- * THIRTY_360 / NONE / CNY（P-03：30/360 使月利率 = 年利率 ÷ 12）。
+
  * payload 共 14 键（R101 + R137）：11 个房贷要素 + 三个 `LeaseElement` 必填要素
  * （`residualValue` / `residualHandling` / `rateChangePolicy`，见下方 `buildRequest`）。
- * 其余租赁专属键（保证金、费用、规则行、显式租金、宽限期、舍入、税率）一律缺席 ——
+ * 其余租赁专属键（保证金、费用、规则行、显式租金、宽限期、舍入）一律缺席 ——
  * 空串会被后端当成真实要素写进摊销表的 费用/税 列。
  *
- * R103：抵押物成交价、评估价、月可支配收入、其他月债务支出、首付比例都是前端派生
- * 与前端校验，不进 payload、不进引擎指标目录；贷款成数（LTV）与 DTI 全程在十进制
- * 字符串上算（P-01），阈值比较用未舍入原值（P-10）。
  */
 import {
   Alert,
@@ -39,32 +36,21 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { ApiError, calculate } from '@/api/client'
-import type { CalculationRequest, CalculationResult } from '@/api/types'
 import { formatMoney } from '@/utils/format'
+import type { CalculationRequest, CalculationResult } from '@/api/types'
 import { composeLprRate } from '@/utils/rate'
 import {
-  collateralValue,
   compareDecimal,
   decimalSubtract,
-  downPaymentRatio,
   formatDecimalPercent,
-  loanToValue,
+  pickMonthlyPayment,
 } from '@/utils/ratio'
-
-import MortgageIncomePanel from './MortgageIncomePanel.vue'
 import {
   BULLET_MAX_MONTHS,
   MAX_LOAN_MONTHS,
   buildMortgageRules,
   isBulletRepaymentAllowed,
 } from './mortgageRules'
-import {
-  collateralLeverageStatus,
-  downPaymentFloorOutcome,
-  downPaymentFloorRatio,
-  markerKey,
-  statusClass,
-} from './ratioStatus'
 import {
   NO_REPRICING,
   REPRICING_CYCLE_MONTHS,
@@ -99,10 +85,6 @@ interface MortgageFormState {
    */
   periods: number
   method: string
-  transactionPrice: string
-  appraisalValue: string
-  monthlyIncome: string
-  otherMonthlyDebt: string
   /**
    * 重定价周期（月）：0 = 不重定价（固定利率，payload 与本字段引入前逐位一致），
    * 或 3 / 6 / 12（央行公告〔2024〕第 11 号给出的三个周期）。其它取值一律拒绝。
@@ -117,10 +99,6 @@ interface MortgageFormState {
 }
 
 /**
- * 表单的初始要素 = Task 5 钉住的边界样例（一份 defaults() 工厂，重置与初始态共用，
- * 不重复写第二遍）：成交 3 000 000 / 评估 2 800 000 → 抵押物价值 2 800 000
- * （成交价与评估价孰低），贷款 2 380 000 → 贷款成数 85.00%、首付比例 15.00%，
- * 恰好达全国统一下限（「以上」含本数）。与租赁表单同款：开箱即得一组合法要素。
  */
 function defaults(): MortgageFormState {
   return {
@@ -131,10 +109,6 @@ function defaults(): MortgageFormState {
     firstRepaymentDate: '2026-12-01',
     periods: 360,
     method: 'EQUAL_INSTALLMENT',
-    transactionPrice: '3000000',
-    appraisalValue: '2800000',
-    monthlyIncome: '',
-    otherMonthlyDebt: '',
     repricingCycle: NO_REPRICING,
     repricingAnchorDate: '',
     futureLprPercents: '',
@@ -168,6 +142,23 @@ const annualRateText = computed(() =>
     : `${annualRate.value} (${formatDecimalPercent(annualRate.value)})`,
 )
 
+/**
+ * 月供读数（由本次摊销表派生，属测算结果）：等额本息取首期租金，等额本金 /
+ * 到期一次还本付息取全表最大租金（最坏月份）。收入类输入已按 input-field-audit
+ * 裁定（2026-11-14）整体移除，这里不再有 DTI。
+ */
+const rents = computed(() =>
+  result.value === null ? [] : result.value.schedule.installments.map((row) => row.rentDue),
+)
+const monthlyPayment = computed(() => pickMonthlyPayment(rents.value, form.method))
+const isBullet = computed(() => form.method === 'BULLET_LOAN')
+const paymentLabel = computed(() =>
+  isBullet.value ? t('mortgage.payment.lumpSumPayment') : t('mortgage.payment.monthlyPayment'),
+)
+const basisNote = computed(() =>
+  isBullet.value ? t('mortgage.payment.lumpSumBasis') : t('mortgage.payment.paymentNote'),
+)
+
 const bulletAllowed = computed(() => isBulletRepaymentAllowed(form.periods))
 
 const methodOptions = computed(() =>
@@ -177,26 +168,6 @@ const methodOptions = computed(() =>
     // R109：期限 > 12 月时该选项禁用（不发送、不静默改写用户的其他选择）。
     disabled: value === 'BULLET_LOAN' && !bulletAllowed.value,
   })),
-)
-
-/** 抵押物价值 = min(成交价, 评估价)（§2.2 / 金规〔2026〕5号第十九条）。 */
-const collateral = computed(() => collateralValue(form.transactionPrice, form.appraisalValue))
-const ltv = computed(() => loanToValue(form.principal, collateral.value))
-const downPayment = computed(() => downPaymentRatio(form.principal, collateral.value))
-
-/**
- * Task 6 §3（修复轮 1）：抵押物价值 / 贷款成数（LTV）/ 首付比例这组读数的仪表状态。
- * 判定在未舍入的十进制串上做（P-10），而且判线用的**就是提交闸门用的那个函数**
- * （ratioStatus.ts 里唯一的 `downPaymentFloorBlocked` 调用，下限常量也只在那一处引）：
- * 徽章走 collateralLeverageStatus，闸门走 downPaymentFloorOutcome，同一个模块里的同一次判定。
- * 抵押物价值本身不是阈值读数，所以不挂状态。
- */
-const leverageState = computed(() => collateralLeverageStatus(form.principal, collateral.value))
-const leverageOutcome = computed(() => downPaymentFloorOutcome(form.principal, collateral.value))
-
-/** 摊销表各期租金：月供口径的输入，交给 MortgageIncomePanel 派生（R103）。 */
-const rents = computed(() =>
-  result.value === null ? [] : result.value.schedule.installments.map((row) => row.rentDue),
 )
 
 /** 校验规则与文案取自纯模块，随语言切换响应式更新。 */
@@ -329,8 +300,6 @@ function buildRequest(annualRateDecimal: string): CalculationRequest {
 
 /**
  * 被前端 [法] 门槛阻断（Task 6 §2）：先把上一次跑的结果与 API 错误清掉，再给阻断文案。
- * Task 5 评审点出的 stale readout 路径就在这里 —— 被阻断的一次提交不能把上一次的结果
- * 和 DTI/LTV 读数留在屏幕上。
  */
 function blockRun(message: string): void {
   result.value = null
@@ -346,23 +315,6 @@ function onFinishFailed(): void {
 
 /** AntD Form 的 @finish 只在内置校验通过后触发；此处再跑前端 [法] 门槛。 */
 async function onFinish(): Promise<void> {
-  // 首付硬下限 15%：用未舍入原值比较（P-10），恰好 15% 放行（「以上」含本数）。
-  // 抵押物价值缺失或 ≤ 0 时贷款成数（LTV）/首付比例不可计算 —— 无法判定的
-  // 硬下限必须阻断而不是放行（AGENTS.md §2.3「阈值即硬约束」、§9.5 不可计算姿态）。
-  // 修复轮 1：闸门读的就是徽章用的那一次结局（ratioStatus.ts 里唯一的判定处），
-  // 表单自己不再比一遍下限。
-  const floorText = formatDecimalPercent(downPaymentFloorRatio(), 0)
-  if (leverageOutcome.value !== 'ok') {
-    blockRun(
-      leverageOutcome.value === 'unevaluable'
-        ? t('mortgage.gates.downPaymentFloorNotEvaluable', { min: floorText })
-        : t('mortgage.gates.downPaymentFloor', {
-            min: floorText,
-            actual: formatDecimalPercent(downPayment.value),
-          }),
-    )
-    return
-  }
   // R109 兜底：期限 > 12 月时 BULLET_LOAN 不可能被提交（选项已禁用并被 watch 重置）。
   if (form.method === 'BULLET_LOAN' && !bulletAllowed.value) {
     blockRun(t('mortgage.gates.bulletOnly', { max: BULLET_MAX_MONTHS }))
@@ -466,9 +418,7 @@ async function onPrepay(payload: {
 
 /**
  * 显式重置（Task 6 §2）：模型回到 defaults()、清掉校验态、清掉结果与两条错误提示，
- * 依赖这次结果的读数（月供 / DTI / 全部负债 DTI）随之回到未计算的「—」。
- * 抵押物价值 / 贷款成数 / 首付比例是活输入的实时派生，不是这次跑的结果：
- * 它们回到与初次挂载相同的状态（默认要素 85.00% / 15.00%）。
+ * 依赖这次结果的月供读数随之回到未计算的「—」。
  * 重置只管这一份表单：不切 Tab、不碰语言偏好。
  */
 function onReset(): void {
@@ -681,55 +631,21 @@ function onReset(): void {
             </Row>
           </Card>
 
-          <Card
-            :title="t('mortgage.collateral.title')"
-            size="small"
-            data-test="mortgage-card-collateral"
-            class="block-card"
-          >
-            <Row :gutter="12">
-              <Col :span="12">
-                <FormItem :label="t('mortgage.collateral.transactionPrice')" name="transactionPrice">
-                  <Input v-model:value="form.transactionPrice" data-test="mortgage-transaction-price" />
-                </FormItem>
-              </Col>
-              <Col :span="12">
-                <FormItem :label="t('mortgage.collateral.appraisalValue')" name="appraisalValue">
-                  <Input v-model:value="form.appraisalValue" data-test="mortgage-appraisal-value" />
-                </FormItem>
-              </Col>
-            </Row>
-            <!-- 抵押物价值 / 贷款成数 / 首付比例：前端派生指标，不进引擎（R103）。
-                 阈值读数（LTV / 首付比例）的颜色与文案标记见 Task 6 §3。 -->
-            <dl class="ratio-list">
-              <div class="ratio-item">
-                <dt>{{ t('mortgage.collateral.collateralValue') }}</dt>
-                <dd data-test="mortgage-collateral-value">{{ formatMoney(collateral) }}</dd>
-              </div>
-              <div class="ratio-item">
-                <dt>{{ t('mortgage.collateral.ltv') }}</dt>
-                <dd class="ratio-readout" :class="statusClass(leverageState)" data-test="mortgage-ltv-readout">
-                  <span data-test="mortgage-ltv-value">{{ formatDecimalPercent(ltv) }}</span>
-                  <span data-test="mortgage-ltv-status" class="ratio-marker">{{ t(markerKey(leverageState)) }}</span>
-                </dd>
-              </div>
-              <div class="ratio-item">
-                <dt>{{ t('mortgage.collateral.downPaymentRatio') }}</dt>
-                <dd class="ratio-readout" :class="statusClass(leverageState)" data-test="mortgage-down-payment-readout">
-                  <span data-test="mortgage-down-payment-value">{{ formatDecimalPercent(downPayment) }}</span>
-                  <!-- 下限类读数：breach 的方向是「低于下限」，不是「超限」。 -->
-                  <span data-test="mortgage-down-payment-status" class="ratio-marker">{{ t(markerKey(leverageState, true)) }}</span>
+          <!-- 月供读数：由本次摊销表派生（等额本息取首期，等额本金/到期一次还本付息取最坏月份）。
+               收入/债务输入与 DTI/杠杆读数已按 input-field-audit 裁定（2026-11-14）整体移除。 -->
+          <Card size="small" data-test="mortgage-card-payment" class="block-card">
+            <dl class="payment-list">
+              <div class="payment-item">
+                <dt data-test="mortgage-payment-label">{{ paymentLabel }}</dt>
+                <dd data-test="mortgage-monthly-payment">
+                  {{ monthlyPayment === null ? '—' : formatMoney(monthlyPayment) }}
                 </dd>
               </div>
             </dl>
+            <Typography.Text type="secondary" data-test="mortgage-payment-basis" style="display: block">
+              {{ basisNote }}
+            </Typography.Text>
           </Card>
-
-          <MortgageIncomePanel
-            v-model:monthly-income="form.monthlyIncome"
-            v-model:other-monthly-debt="form.otherMonthlyDebt"
-            :rents="rents"
-            :method="form.method"
-          />
 
           <Alert
             v-if="bulletResetNotice"

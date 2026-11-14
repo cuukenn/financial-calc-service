@@ -21,14 +21,6 @@ interface Decimal {
   scale: number
 }
 
-/** 房贷监管阈值（AGENTS.md §2.3：首付 ≥ 15%、DTI 50%/60%）。 */
-export const MIN_DOWN_PAYMENT_RATIO = '0.15'
-export const MORTGAGE_DTI_LIMIT = '0.5'
-export const ALL_DEBT_DTI_LIMIT = '0.6'
-
-/** 内部计算精度下限（P-07/P-11：不低于 10 位）。 */
-const RATIO_SCALE = 10
-
 function pow10(exponent: number): bigint {
   return 10n ** BigInt(exponent)
 }
@@ -171,7 +163,7 @@ export function isNonNegativeDecimal(raw: string): boolean {
   return parsed !== null && !parsed.negative
 }
 
-/** 严格正数谓词：DTI 的分母（月可支配收入）必须 > 0，否则该指标不可计算。 */
+/** 严格正数谓词：分母必须 > 0，否则比值不可计算（界面须说明「无法判断」而不是给 0）。 */
 export function isPositiveDecimal(raw: string): boolean {
   const parsed = parseDecimal(raw)
   return parsed !== null && !parsed.negative && parsed.digits > 0n
@@ -186,60 +178,9 @@ export function isDecimalText(raw: string): boolean {
 }
 
 /**
- * 抵押物价值 = min(成交价, 评估价)
- * （AGENTS.md §2.2 / 金规〔2026〕5号第十九条：成交价与评估价孰低）。
- */
-export function collateralValue(
-  transactionPrice: string,
-  appraisalValue: string,
-): string | null {
-  const price = parseDecimal(transactionPrice)
-  const appraisal = parseDecimal(appraisalValue)
-  if (price === null || appraisal === null) return null
-  return canonical(compareDecimal(transactionPrice, appraisalValue) <= 0 ? price : appraisal)
-}
-
-/** 贷款成数（LTV）= 贷款金额 ÷ 抵押物价值。 */
-export function loanToValue(loanAmount: string, collateral: string | null): string | null {
-  if (collateral === null) return null
-  return decimalDivide(loanAmount, collateral, RATIO_SCALE)
-}
-
-/** 首付比例 = 1 − LTV = (抵押物价值 − 贷款金额) ÷ 抵押物价值。 */
-export function downPaymentRatio(loanAmount: string, collateral: string | null): string | null {
-  if (collateral === null) return null
-  const ownFunds = decimalSubtract(collateral, loanAmount)
-  if (ownFunds === null) return null
-  return decimalDivide(ownFunds, collateral, RATIO_SCALE)
-}
-
-/**
- * 月房贷支出/收入比（DTI）= 月供 ÷ 月可支配收入。
- * 收入缺失/为 0/为负 → null：该指标不可计算，界面必须说明「无法判断」而不是报 0。
- */
-export function debtToIncomeRatio(monthlyPayment: string | null, monthlyIncome: string): string | null {
-  if (monthlyPayment === null || !isPositiveDecimal(monthlyIncome)) return null
-  return decimalDivide(monthlyPayment, monthlyIncome, RATIO_SCALE)
-}
-
-/** 月所有债务支出/收入比 = (月供 + 其他月债务支出) ÷ 月可支配收入。 */
-export function allDebtToIncomeRatio(
-  monthlyPayment: string | null,
-  otherMonthlyDebt: string,
-  monthlyIncome: string,
-): string | null {
-  if (monthlyPayment === null) return null
-  const total = decimalAdd(monthlyPayment, otherMonthlyDebt.trim() === '' ? '0' : otherMonthlyDebt)
-  if (total === null) return null
-  return debtToIncomeRatio(total, monthlyIncome)
-}
-
-/**
- * 取用于 DTI 的「月供」：
+ * 取用于「月供」读数的月供值（由本次摊销表派生，AGENTS.md §2.2 规范名）：
  * - 等额本息：每期租金恒定，取首期 rentDue；
  * - 等额本金 / 到期一次还本付息：取全表最大的 rentDue（最坏月份）。
- *
- * 该口径在 MortgageForm 的 DTI 展示中固定使用，并由 ratio.spec / MortgageForm.spec 双重钉住。
  */
 export function pickMonthlyPayment(rents: string[], method: string): string | null {
   if (rents.length === 0) return null
@@ -254,42 +195,6 @@ export function pickMonthlyPayment(rents: string[], method: string): string | nu
     if (largest === null || compareDecimal(rent, canonical(largest)) > 0) largest = parsed
   }
   return largest === null ? null : canonical(largest)
-}
-
-/** 比例类指标是否超过上限（恰好等于上限不算超限：「不足」不含本数）。 */
-export function exceedsLimit(value: string | null, limit: string): boolean {
-  return value !== null && compareDecimal(value, limit) > 0
-}
-
-/**
- * 比例类指标是否低于下限（恰好等于下限不算未达标：「以上」含本数）。
- *
- * 注意：null 只代表「该比例不可计算」，本比较器不替调用方决定放不放行 ——
- * 不可计算的监管阈值必须阻断（AGENTS.md §2.3「阈值即硬约束」、§9.5 的不可计算姿态），
- * 所以提交闸门请用 downPaymentFloorBlocked，不要直接拿本函数的 false 当放行。
- */
-export function belowFloor(value: string | null, floor: string): boolean {
-  return value !== null && compareDecimal(value, floor) < 0
-}
-
-/**
- * 首付比例硬下限闸门（AGENTS.md §2.3：首付比例 ≥ 15%，全国统一下限）。
- *
- * 三种情况都阻断：
- * 1. 抵押物价值缺失（成交价 / 评估价不可解析）；
- * 2. 抵押物价值不大于 0（0 或负数）—— 此时贷款成数与首付比例都是「—」；
- * 3. 首付比例算得出且低于下限。
- * 恰好等于下限放行（「以上」含本数），比较用未舍入原值（P-10），不得先舍入再判限。
- */
-export function downPaymentFloorBlocked(
-  loanAmount: string,
-  collateral: string | null,
-  floor: string,
-): boolean {
-  if (collateral === null || !isPositiveDecimal(collateral)) return true
-  const ratio = downPaymentRatio(loanAmount, collateral)
-  if (ratio === null) return true
-  return belowFloor(ratio, floor)
 }
 
 /**

@@ -8,7 +8,7 @@ import { formatDecimalPercent, isDecimalText } from './ratio'
  *
  * 百分数格式化按关注点分工，仓库里每类百分数只有一个格式化器（Task 6 §5）：
  * 利率类指标（IRR/XIRR/MIRR/_true 年利率_）对外 4 位百分数用下面的 formatPercent；
- * 监管阈值读数（首付比例、贷款成数、DTI）用的 2 位百分数是 `utils/ratio.ts` 的
+ * 百分数展示值的 2 位口径是 `utils/ratio.ts` 的
  * `formatDecimalPercent` —— 那一个才是 P-10 安全的（判限在未舍入原值上做，展示才舍入），
  * 所以它留在 ratio.ts 与阈值同源，不得搬到这里、也不得另复制一份。
  */

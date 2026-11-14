@@ -716,7 +716,7 @@ function onReset(): void {
             </Row>
           </Card>
 
-          <!-- 大块 3：费用与其他（费用编辑器 + 残值/保证金/税率）。 -->
+          <!-- 大块 3：费用与其他（费用编辑器 + 残值/保证金）。 -->
           <Card
             :title="t('form.feesOther.title')"
             size="small"

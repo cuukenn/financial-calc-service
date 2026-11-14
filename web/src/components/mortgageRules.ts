@@ -237,15 +237,5 @@ export function buildMortgageRules(
               ),
       },
     ],
-    transactionPrice: [
-      { required: true, message: t('mortgage.validation.transactionPrice'), trigger: 'change' },
-      amountFormatRule(t, 'mortgage.validation.money'),
-    ],
-    appraisalValue: [
-      { required: true, message: t('mortgage.validation.appraisalValue'), trigger: 'change' },
-      amountFormatRule(t, 'mortgage.validation.money'),
-    ],
-    monthlyIncome: [amountFormatRule(t, 'mortgage.validation.money')],
-    otherMonthlyDebt: [amountFormatRule(t, 'mortgage.validation.money')],
   }
 }

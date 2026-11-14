@@ -112,7 +112,7 @@ function presetSegmentedRates(): void {
             {{ t('form.rentStructure.ruleRows.remove') }}
           </Button>
         </div>
-        <!-- R95：行内即时格式错误（与名义税率/增值税率同口径的提示文案）。 -->
+        <!-- R95：行内即时格式错误（与名义税率同口径的提示文案）。 -->
         <Typography.Text
           v-if="rateInvalid(row)"
           type="danger"
