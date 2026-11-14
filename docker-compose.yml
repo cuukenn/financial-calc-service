@@ -1,32 +1,20 @@
 # 一键部署：docker compose up -d --build
-#   前端（nginx 托管 + /api 反代）→ http://localhost:8081
-#   后端（Spring Boot 8080，仅容器网络内可达，actuator 健康检查）
+# 单容器：前端界面与后端 API 打在同一个 jar 里，一个端口全部搞定
+#   工作台入口 → http://localhost:8080/（jar 内静态资源）
+#   API        → http://localhost:8080/api/v1/...
 services:
-  backend:
+  app:
     build:
       context: .
-      dockerfile: docker/backend.Dockerfile
-    image: financial-calc-backend:latest
-    container_name: financial-calc-backend
+      dockerfile: Dockerfile
+    image: financial-calc-app:latest
+    container_name: financial-calc-app
     restart: unless-stopped
-    expose:
-      - "8080"
+    ports:
+      - "8080:8080"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
       interval: 15s
       timeout: 5s
       retries: 10
       start_period: 30s
-
-  frontend:
-    build:
-      context: .
-      dockerfile: docker/frontend.Dockerfile
-    image: financial-calc-frontend:latest
-    container_name: financial-calc-frontend
-    restart: unless-stopped
-    ports:
-      - "8081:80"
-    depends_on:
-      backend:
-        condition: service_healthy

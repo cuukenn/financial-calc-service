@@ -1,6 +1,4 @@
-name: Release
-
-# 打 tag 触发：git push origin v* → 构建前后端产物 → 创建 GitHub Release 并附产物
+# Release：打 tag（v*）→ 前端构建产物打进 jar 静态资源 → 一个 jar 产物 + 部署文件
 on:
   push:
     tags:
@@ -10,8 +8,8 @@ permissions:
   contents: write
 
 jobs:
-  build-backend:
-    name: 后端产物（Spring Boot jar）
+  build:
+    name: 一体化产物（前端 dist 进 jar 静态资源）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,24 +21,6 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: 测试后打包（N-01 闸门测试一并执行）
-        run: mvn -B package
-
-      - name: 上传后端产物
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jar
-          path: calc-server/target/calc-server-*.jar
-
-  build-frontend:
-    name: 前端产物（Vue dist 包）
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - uses: actions/checkout@v4
-
       - name: 安装 Node 20
         uses: actions/setup-node@v4
         with:
@@ -48,50 +28,44 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: 安装依赖
-        run: npm ci
-
-      - name: 类型检查 + 测试 + 构建
+      - name: 前端构建（类型检查 + 测试 + 产物）
+        working-directory: web
         run: |
+          npm ci
           npm run build
           npm test
 
-      - name: 打包前端产物
+      - name: 前端产物进 jar 静态资源
         run: |
-          cd dist
-          zip -r ../financial-calc-web-${{ github.ref_name }}.zip .
-          cd ..
-          mv financial-calc-web-${{ github.ref_name }}.zip /tmp/
+          mkdir -p calc-server/src/main/resources/static
+          cp -r web/dist/* calc-server/src/main/resources/static/
 
-      - name: 上传前端产物
+      # N-01：闸门测试在 mvn package 全量执行
+      - name: 后端测试后打包（jar 自带前端界面）
+        run: mvn -B package
+
+      - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-dist
-          path: /tmp/financial-calc-web-${{ github.ref_name }}.zip
+          name: financial-calc-app
+          path: calc-server/target/calc-server-*.jar
 
   release:
     name: 创建 GitHub Release
-    needs: [build-backend, build-frontend]
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: 下载后端产物
+      - name: 下载产物
         uses: actions/download-artifact@v4
         with:
-          name: backend-jar
+          name: financial-calc-app
           path: artifacts/
 
-      - name: 下载前端产物
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: artifacts/
-
-      - name: 附上 docker-compose 与 Dockerfile 供部署
+      - name: 附上部署文件（根目录 Dockerfile + compose）
         run: |
-          cp docker-compose.yml artifacts/
-          zip -j artifacts/docker-deploy-${{ github.ref_name }}.zip docker-compose.yml docker/backend.Dockerfile docker/frontend.Dockerfile docker/nginx.conf
+          zip -j artifacts/docker-deploy-${{ github.ref_name }}.zip docker-compose.yml Dockerfile .dockerignore
 
       - name: 创建 Release 并附产物
         uses: softprops/action-gh-release@v2
@@ -99,6 +73,5 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/calc-server-*.jar
-            artifacts/financial-calc-web-*.zip
             artifacts/docker-compose.yml
             artifacts/docker-deploy-*.zip

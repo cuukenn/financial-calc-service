@@ -8,3 +8,5 @@ target/
 .jqwik-database
 web/node_modules/
 web/dist/
+calc-server/src/main/resources/static/
+.zcode/
