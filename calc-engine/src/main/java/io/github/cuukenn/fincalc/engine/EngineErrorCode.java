@@ -21,10 +21,9 @@ import io.github.cuukenn.fincalc.common.error.ErrorCode;
  *       read; script syntax errors keep the loader's own {@code FCS-RULE-*} codes;</li>
  *   <li>{@link #IRR_ROOT_AMBIGUOUS} — WARN-level {@code ValidationIssue} code raised by
  *       {@link CalculationFacade#calculate} when the event-table flow set does not change sign
- *       exactly once, so the IRR root is ambiguous or absent (ledger ruling R30 posture);</li>
- *   <li>{@link #RULE_FALLBACK_PERIOD} — WARN-level {@code ValidationIssue} code raised by
- *       {@link CalculationFacade#calculate} for each period that fell back to the built-in
- *       behaviour under {@code allowPartialRuleSet};</li>
+ *       exactly once, so the IRR root is ambiguous or absent (ledger ruling R30 posture); the
+ *       partial-rule-set fallback periods are disclosed by the rule-driven generator itself
+ *       ({@code FCS-RULE-2009}, arch-seams 收口 2026-11-14), not here;</li>
  *   <li>{@link #METRIC_COMPUTATION_FAILED} — WARN-level {@code ValidationIssue} code raised by
  *       {@link CalculationFacade#calculate} for each §9.5 metric that threw during the metric
  *       run (final-review fix wave; R57 — the code enters with the path that raises it, instead
@@ -75,14 +74,6 @@ public enum EngineErrorCode implements ErrorCode {
      * was applied.
      */
     IRR_ROOT_AMBIGUOUS("FCS-ENG-1005", "FCS-ENG-1005: 现金流符号变化不唯一或不存在, IRR 结果不唯一"),
-
-    /**
-     * Partial-rule-set fallback marker of {@link CalculationFacade#calculate} step 6: a period no
-     * rule covered ran on the built-in equal-principal behaviour
-     * ({@link io.github.cuukenn.fincalc.rule.generator.RuleDrivenGenerator#FALLBACK_MEMO}) and is surfaced as a
-     * WARN issue so the schedule carries its own provenance.
-     */
-    RULE_FALLBACK_PERIOD("FCS-ENG-1006", "FCS-ENG-1006: 第 %s 期未被规则集覆盖, 已回落内置等额本金"),
 
     /**
      * Metric-failure marker of {@link CalculationFacade#calculate} step 6 (final-review fix

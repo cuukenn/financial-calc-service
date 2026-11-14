@@ -5,9 +5,15 @@ import io.github.cuukenn.fincalc.common.money.MoneyUtils;
 import io.github.cuukenn.fincalc.common.money.MoneyScale;
 import io.github.cuukenn.fincalc.common.money.MoneyTolerance;
 import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
+import io.github.cuukenn.fincalc.domain.metric.PeriodicRootHandoff;
+import io.github.cuukenn.fincalc.domain.model.CashFlow;
+import io.github.cuukenn.fincalc.domain.model.CashFlowDirection;
+import io.github.cuukenn.fincalc.domain.model.CashFlowType;
 import io.github.cuukenn.fincalc.domain.model.EffectiveInterestRow;
 import io.github.cuukenn.fincalc.domain.model.EffectiveInterestTable;
 import io.github.cuukenn.fincalc.domain.model.Installment;
+import io.github.cuukenn.fincalc.domain.model.LeaseElement;
+import io.github.cuukenn.fincalc.domain.model.ResidualHandling;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -195,5 +201,89 @@ public final class EffectiveInterestCalculator {
      */
     private static BigDecimal rowOneOpening(Installment first) {
         return MoneyUtils.scale(first.openingBalance(), MoneyScale.OUTPUT);
+    }
+
+    /**
+     * The terminal net investment the §9.7 chain must stop at (CAS 21 第三十八条 / 第三十九条):
+     * the schedule's own closing balance (the ballooned 留购价) plus the money the schedule never
+     * amortizes — a separately settled 留购价, the guaranteed residual, and the unguaranteed
+     * residual, which the lessor recovers by keeping the asset rather than as cash. The rate
+     * search prices exactly this target, which is what makes the chain close (R52's identity).
+     */
+    public static BigDecimal unrecoveredResiduals(LeaseElement element) {
+        if (element == null) {
+            return MoneyUtils.ZERO;
+        }
+        BigDecimal separateOption = element.residualHandling() == ResidualHandling.SEPARATE
+                ? MoneyUtils.zeroIfNull(element.residualValue()) : MoneyUtils.ZERO;
+        return separateOption
+                .add(MoneyUtils.zeroIfNull(element.guaranteedResidual()))
+                .add(MoneyUtils.zeroIfNull(element.unguaranteedResidual()));
+    }
+
+    /**
+     * The net-investment periodic rate of the R52 wiring (renamed once the terminal target learned
+     * about residual money): the IRR of the stream the §9.7 chain itself prices — the first opening
+     * balance at t0, the rent legs, and the terminal net investment re-dated to the last rent's
+     * index when nonzero.
+     *
+     * <p><b>One solve per stream (AGENTS.md §6 N-05).</b> When that stream is a flow set some solve
+     * of the run already priced — the §9.4 event table {@code IRR_PERIOD} was solved over, or the
+     * implicit-rate measure chain's table-plus-unguaranteed-residual set — the run reads the
+     * <em>unrounded</em> root off the {@link PeriodicRootHandoff} ledger instead of solving the same
+     * problem twice. The raw root and not the published scale-10 {@code IRR_PERIOD} is what keeps
+     * every §9.7 row cent-for-cent (AGENTS.md §6 N-04: the 0.01 元容差 is a validation tolerance,
+     * never a licence to price a chain with a rounded rate). Where the streams differ — a separately
+     * settled 留购价, a guaranteed residual listed on top of the balloon, the unguaranteed residual
+     * CAS 21 第三十八条 prices into the net investment while §9.4 keeps the event table cash-only,
+     * an upfront fee or a deposit leg — the chain solves its own root: a different stream has a
+     * different root, and that stated caliber difference is the only reason a run pays for a second
+     * solve.
+     */
+    public static BigDecimal netInvestmentPeriodIrr(Schedule schedule, BigDecimal residualExtra,
+            PeriodicRootHandoff rootHandoff) {
+        List<Installment> installments = schedule.installments();
+        if (installments.isEmpty()) {
+            return null;
+        }
+        List<CashFlow> stream = new ArrayList<>(installments.size() + 1);
+        Installment first = installments.get(0);
+        stream.add(new CashFlow(0, first.startDate(), first.openingBalance(), CashFlowType.PRINCIPAL,
+                CashFlowDirection.OUTFLOW));
+        for (Installment installment : installments) {
+            BigDecimal rent = installment.rentDue();
+            // A zero rent carries no cash and a negative one is a broken schedule the validators
+            // already flag; neither may enter the root search.
+            if (rent != null && rent.signum() > 0) {
+                stream.add(new CashFlow(installment.periodNo(), installment.endDate(), rent,
+                        CashFlowType.RENT, CashFlowDirection.INFLOW));
+            }
+        }
+        Installment last = installments.get(installments.size() - 1);
+        BigDecimal terminal = MoneyUtils.scale(
+                last.closingBalance().add(MoneyUtils.zeroIfNull(residualExtra)), MoneyScale.OUTPUT);
+        if (terminal.signum() != 0) {
+            stream.add(new CashFlow(last.periodNo(), last.endDate(), terminal,
+                    CashFlowType.RESIDUAL, CashFlowDirection.INFLOW));
+        }
+
+        BigDecimal solvedOverRun = rootHandoff.rootFor(stream);
+        if (solvedOverRun != null) {
+            // The stream this chain prices is the very stream some solve of this run — the §9.5
+            // metric line's IRR_PERIOD, or the implicit-rate measure chain — already solved, or its
+            // exact direction mirror (R103): same discount indices, same signed amounts, so it has
+            // the same root, and solving it again is the duplicate AGENTS.md §6 N-05 forbids. Read
+            // the ledger's unrounded root, not the published scale-10 IRR_PERIOD: substituting the
+            // rounded rate would move cents along the chain's rows (AGENTS.md §6 N-04).
+            return solvedOverRun;
+        }
+        // A stated second solve, not a silent one. This stream differs from the §9.4 event table the
+        // run's IRR_PERIOD is a root of whenever the deal carries money the event table does not list
+        // in the same place: an upfront fee or deposit leg, a separately settled 留购价, a guaranteed
+        // residual on top of the balloon, or — CAS 21 第三十八条 — the unguaranteed residual, which is
+        // part of the lessor's net investment the chain must unwind but never becomes cash (§9.4 keeps
+        // the event table cash-only). Different stream, therefore a different root, therefore its own
+        // solve: that is the caliber difference, and it is the only reason this run pays for two.
+        return IrrCalculator.periodIrr(stream);
     }
 }

@@ -99,6 +99,16 @@ public enum RuleErrorCode implements ErrorCode {
     UNSUPPORTED_INTEREST_TREATMENT("FCS-RULE-2008",
             "FCS-RULE-2008: 不支持的利息处理方式: %s"),
 
+    /**
+     * Partial-rule-set fallback disclosure of the rule-driven generator (arch-seams 收口，2026-11-14
+     * 裁定): with {@code allowPartialRuleSet} on, a period no rule matches falls back to the
+     * built-in equal-principal behaviour and the generator itself discloses the period as a WARN
+     * on the schedule it returns — the finding belongs to the module that produced it, so the
+     * engine never re-derives it from the installment memo (the old {@code FCS-ENG-1006} sweep).
+     */
+    RULE_FALLBACK_PERIOD("FCS-RULE-2009",
+            "FCS-RULE-2009: 第 %s 期未被规则集覆盖, 已回落内置等额本金"),
+
     /** Parse-time whitelist check: the identifier is not one of the nine period variables. */
     UNKNOWN_VARIABLE("FCS-RULE-3001", "FCS-RULE-3001: 未知变量: %s"),
 

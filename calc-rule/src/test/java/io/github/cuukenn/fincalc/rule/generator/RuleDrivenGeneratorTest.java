@@ -9,6 +9,7 @@ import io.github.cuukenn.fincalc.domain.calc.CalculationContext;
 import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
 import io.github.cuukenn.fincalc.domain.model.InterestTreatmentKind;
+import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
 import io.github.cuukenn.fincalc.domain.model.PaymentFrequency;
 import io.github.cuukenn.fincalc.domain.model.PaymentTiming;
@@ -37,7 +38,9 @@ import org.junit.jupiter.api.Test;
  * verbatim; the remaining tests pin the binding rulings: R15 (uncovered period blocks by
  * default, falls back with a {@code RULE_FALLBACK} marker when
  * {@code allowPartialRuleSet} is on), the INHERIT fallback's method restriction
- * ({@code FCS-RULE-2007}), and the R17 negative-principal backstop.
+ * ({@code FCS-RULE-2007}), the R17 negative-principal backstop, and the arch-seams 收口
+ * (2026-11-14) rule that the fallback WARN ({@code FCS-RULE-2009}) is emitted here, on the
+ * schedule, not re-derived by the engine from the memo strings.
  */
 class RuleDrivenGeneratorTest {
 
@@ -107,6 +110,39 @@ class RuleDrivenGeneratorTest {
         assertThat(s.installments().get(6).principalDue()).isEqualByComparingTo("0.00");
         assertThat(s.installments().get(11).closingBalance()).isEqualByComparingTo("0.00");
         assertThat(s.hasErrors()).isFalse();
+    }
+
+    // ---- arch-seams 收口（2026-11-14）：fallback WARN 由规则层直接产出，不再由 engine 扫 memo ----
+
+    @Test
+    void fallback_periods_are_disclosed_as_warnings_on_the_schedule() {
+        CompiledRuleSet set = compiler().compile(List.of(
+                rateRow("R1", 10, 1, 6, "0.06")), element(12), true);
+        Schedule s = new RuleDrivenGenerator(set).generate(context(baseElement(),
+                new CalculationOptions(true,
+                        io.github.cuukenn.fincalc.domain.model.CashFlowBasis.INCLUDE_FEES)));
+
+        // 期 7..12 未被覆盖：每期一条 WARN，期号写进 issue，memo 保持 R15 的 RULE_FALLBACK 标记。
+        assertThat(s.issues())
+                .filteredOn(i -> RuleErrorCode.RULE_FALLBACK_PERIOD.code().equals(i.code()))
+                .hasSize(6)
+                .allSatisfy(i -> {
+                    assertThat(i.level()).isEqualTo(IssueLevel.WARN);
+                    assertThat(i.periodNo()).isBetween(7, 12);
+                    assertThat(i.message()).contains("期未被规则集覆盖");
+                });
+        assertThat(s.installments().get(6).memo()).isEqualTo("RULE_FALLBACK");
+        assertThat(s.hasErrors()).isFalse();
+    }
+
+    @Test
+    void fully_covered_schedule_carries_no_fallback_warning() {
+        CompiledRuleSet set = compiler().compile(List.of(
+                rateRow("R1", 10, 1, 12, "0.06")), element(12), false);
+        Schedule s = new RuleDrivenGenerator(set).generate(context(baseElement()));
+
+        assertThat(s.issues()).noneMatch(i ->
+                RuleErrorCode.RULE_FALLBACK_PERIOD.code().equals(i.code()));
     }
 
     // ---- INHERIT fallback: only EQUAL_PRINCIPAL / RULE_DRIVEN methods are supported ----

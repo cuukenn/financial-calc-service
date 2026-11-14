@@ -381,6 +381,8 @@ class CalculationFacadeTest {
     }
 
     // ---- Diagnostics: fallback periods surface as WARN issues on the schedule ----
+    // arch-seams 收口（2026-11-14）：fallback WARN 由规则层直接产出（FCS-RULE-2009），
+    // engine 不再扫 memo —— engine 测试只断言结果面上 issue 存在且为 WARN。
 
     @Test
     void rule_fallback_periods_are_reported_as_warnings() {
@@ -393,7 +395,7 @@ class CalculationFacadeTest {
 
         assertThat(r.schedule().installments()).hasSize(12);
         assertThat(r.schedule().issues())
-                .filteredOn(i -> "FCS-ENG-1006".equals(i.code()))
+                .filteredOn(i -> "FCS-RULE-2009".equals(i.code()))
                 .hasSize(6)
                 .allSatisfy(i -> assertThat(i.level()).isEqualTo(IssueLevel.WARN));
         assertThat(r.schedule().hasErrors()).isFalse();

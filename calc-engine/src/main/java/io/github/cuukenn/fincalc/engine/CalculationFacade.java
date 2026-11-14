@@ -1,8 +1,6 @@
 package io.github.cuukenn.fincalc.engine;
 
 import io.github.cuukenn.fincalc.common.error.BusinessException;
-import io.github.cuukenn.fincalc.common.money.MoneyScale;
-import io.github.cuukenn.fincalc.common.money.MoneyUtils;
 import io.github.cuukenn.fincalc.common.spi.ExtensionRegistry;
 import io.github.cuukenn.fincalc.common.time.SystemClockProvider;
 import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
@@ -13,13 +11,9 @@ import io.github.cuukenn.fincalc.domain.metric.MetricContext;
 import io.github.cuukenn.fincalc.domain.metric.MetricRegistry;
 import io.github.cuukenn.fincalc.domain.metric.PeriodicRootHandoff;
 import io.github.cuukenn.fincalc.domain.model.CashFlow;
-import io.github.cuukenn.fincalc.domain.model.CashFlowDirection;
-import io.github.cuukenn.fincalc.domain.model.CashFlowType;
 import io.github.cuukenn.fincalc.domain.model.EffectiveInterestTable;
-import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
-import io.github.cuukenn.fincalc.domain.model.ResidualHandling;
 import io.github.cuukenn.fincalc.domain.model.RepaymentMethodId;
 import io.github.cuukenn.fincalc.domain.model.ProductProfile;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
@@ -34,7 +28,6 @@ import io.github.cuukenn.fincalc.domain.support.IrrCalculator;
 import io.github.cuukenn.fincalc.domain.support.ValidatorChain;
 import io.github.cuukenn.fincalc.domain.support.cashflow.StandardCashFlowBuilder;
 import io.github.cuukenn.fincalc.rule.function.FunctionRegistry;
-import io.github.cuukenn.fincalc.rule.generator.RuleDrivenGenerator;
 import io.github.cuukenn.fincalc.rule.script.FunctionScriptLoader;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -86,67 +79,29 @@ import java.util.stream.Stream;
  *       finding is appended to the schedule's issues (the schedule is immutable — the enriched
  *       schedule is rebuilt once with the combined list). The engine emits WARN issues for
  *       metrics that threw ({@code FCS-ENG-1007}), for a flow set whose IRR root is therefore
- *       ambiguous or absent ({@code FCS-ENG-1005}, ruling R30 posture) and for
- *       partial-rule-set fallback periods ({@code FCS-ENG-1006}).</li>
- *   <li><b>Step 7</b> — the §9.7 effective-interest table; see the rate decision below. A missing
- *       rate or a table that cannot be built answers {@code null} with a WARN issue — never an
- *       exception, because IRR non-convergence is an expected outcome.</li>
+ *       ambiguous or absent ({@code FCS-ENG-1005}, ruling R30 posture); the partial-rule-set
+ *       fallback periods ({@code FCS-RULE-2009}, arch-seams 收口 2026-11-14) are disclosed by
+ *       the rule-driven generator itself on the raw schedule, so no engine sweep reads the
+ *       installments' memo strings.</li>
+ *   <li><b>Step 7</b> — the §9.7 effective-interest table; see the {@link EffectiveInterestCalculator}
+ *       javadoc for the rate decision: the chain prices the <b>rent-consistent periodic rate</b> —
+ *       the IRR of the exact stream the chain itself prices (the opening net investment at t0, the
+ *       rent legs, and the terminal net investment of R52's identity, which carries the residual
+ *       money the schedule never amortizes) — and reuses an already-solved root of the same stream
+ *       off the run's {@link PeriodicRootHandoff} ledger (N-05). A missing rate or a table that
+ *       cannot be built answers {@code null} with a WARN issue — never an exception, because IRR
+ *       non-convergence is an expected outcome.</li>
  *   <li><b>Step 8</b> — return {@code CalculationResult(runId, schedule, effectiveInterest)};
  *       {@code runId} is {@code UUID.randomUUID()} without dashes.</li>
  * </ol>
  *
- * <p><b>The effective-interest rate decision (ledger ruling R52).</b> The §9.7 table prices a
- * chain that sees only what {@code cashReceived} pays — the rent legs — against the schedule's
- * opening balance, and must close at the schedule's own terminal balance (R47). The event-table
- * IRR ({@code IRR_PERIOD}) cannot feed that chain for a residual-bearing schedule: the §9.4
- * event table lists the residual as a maturity inflow one discount step past the last rent, a
- * leg {@code cashReceived} never receives, so pricing the chain with that root lands hundreds
- * short (Task 22) and the table raises {@code FCS-CALC-3006} on a perfectly valid schedule. The
- * facade therefore prices the table with the <b>rent-consistent periodic rate</b>: the IRR of the
- * exact stream the chain itself prices —
- * <ul>
- *   <li>{@code t0}: the schedule's first opening balance (the net investment, out);</li>
- *   <li>{@code t1..tn}: each installment's {@code rentDue} (in);</li>
- *   <li>{@code tn}: the terminal net investment re-dated to the last rent's index (in), when it is
- *       nonzero — the schedule's own closing balance (the ballooned 留购价) <b>plus the residual
- *       money the schedule never amortizes</b>: a separately settled 留购价, the guaranteed
- *       residual and the unguaranteed residual. CAS 21 第三十八条/第三十九条 allocates finance
- *       income over the lessor's net investment, and that investment unwinds into exactly those
- *       amounts at maturity, so pricing the chain without them (the pre-R147 wiring) priced a
- *       stream the deal does not have.</li>
- * </ul>
- * With that root the chain closes exactly for both shapes: the IRR equation
- * {@code P = Σ rentᵢ/(1+r)ⁱ + T/(1+r)ⁿ} rearranges to
- * {@code P(1+r)ⁿ − Σ rentᵢ(1+r)ⁿ⁻ⁱ = T}, which is precisely the chain's terminal condition
- * (opening compounded minus rents reinvested equals the target balance). Per-row cent rounding
- * and the rate's scale-10 truncation drift the computed closing by at most fractions of a cent
- * per period, inside the calculator's {@code 0.01 × periods} tolerance; the last row absorbs the
- * drift (R45's posture carries over: the interpolated tail leg may exceed 1 period, v1 keeps it
- * as approved). For a fee-free, deposit-free, fully-amortizing schedule the stream coincides with
- * the §9.4 event table, so the rent-consistent rate equals {@code IRR_PERIOD} there. Upfront fees
- * and deposits never enter the stream — the chain does not see them either
- * ({@code rowOneOpening} is the schedule's own opening balance), so fee-bearing schedules keep
- * closing.
- *
- * <p><b>One solve per stream (AGENTS.md §6 N-05).</b> When that stream is a flow set some solve of
- * this run already priced — the §9.4 event table {@code IRR_PERIOD} was solved over, or the
- * implicit-rate measure chain's table-plus-unguaranteed-residual set — the engine reads the run's
- * <em>unrounded</em> root off the {@link PeriodicRootHandoff} ledger instead of solving the same
- * problem twice. The raw root and not the published scale-10 {@code IRR_PERIOD} is what keeps every
- * §9.7 row cent-for-cent (AGENTS.md §6 N-04: the 0.01 元容差 is a validation tolerance, never a
- * licence to price a chain with a rounded rate). Where the streams differ — a separately settled
- * 留购价, a guaranteed residual listed on top of the balloon, the unguaranteed residual CAS 21
- * 第三十八条 prices into the net investment while §9.4 keeps the event table cash-only, an upfront
- * fee or a deposit leg — the chain solves its own root: a different stream has a different root,
- * and that stated caliber difference is the only reason a run pays for a second solve.
- * {@link MetricCodes#LEASE_IMPLICIT_RATE} shares the same ledger: when its stream is the event
- * table (no unguaranteed residual, asset value = principal) it reads {@code IRR_PERIOD}'s root, and
- * when it solves its own it records it, so the §9.7 chain reuses that root instead of solving the
- * identical stream a third time.
- *
- * <p>If the stream has no root ({@code periodIrr == null}) or the calculator still refuses
- * the table, {@code effectiveInterest} is {@code null} and the failure surfaces as a WARN issue
- * carrying the refused code — never an exception.
+ * <p>Step 7's caliber — which stream the chain prices, what the terminal net investment carries
+ * (CAS 21 第三十八条/第三十九条), the one-solve-per-stream rule (AGENTS.md §6 N-05) and the
+ * unrounded-root reuse that keeps every §9.7 row cent-for-cent (N-04) — lives with its code in
+ * {@link EffectiveInterestCalculator#unrecoveredResiduals} and
+ * {@link EffectiveInterestCalculator#netInvestmentPeriodIrr} (arch-seams 收口，2026-11-14); the
+ * facade owns only the orchestration: IRR-missing and no-root refusals, the calculate call, and
+ * the every-refusal-is-a-WARN contract below.
  *
  * <p><b>Known v1 scope notes.</b> The multi-root tie-break「取最接近名义利率的最小正根」is not
  * implemented: it needs {@code element.nominalRate()} inside the solver (R30); the facade keeps
@@ -298,14 +253,6 @@ public final class CalculationFacade {
                     EngineErrorCode.IRR_ROOT_AMBIGUOUS.code(),
                     EngineErrorCode.IRR_ROOT_AMBIGUOUS.message(), null));
         }
-        for (Installment installment : schedule.installments()) {
-            if (RuleDrivenGenerator.isFallbackMemo(installment.memo())) {
-                engineIssues.add(new ValidationIssue(IssueLevel.WARN,
-                        EngineErrorCode.RULE_FALLBACK_PERIOD.code(),
-                        String.format(EngineErrorCode.RULE_FALLBACK_PERIOD.message(),
-                                installment.periodNo()), installment.periodNo()));
-            }
-        }
 
         // Step 7: the §9.7 effective-interest table (nullable, never thrown).
         EffectiveInterestTable effectiveInterest = effectiveInterest(schedule, element, metrics,
@@ -325,9 +272,12 @@ public final class CalculationFacade {
     }
 
     /**
-     * Step 7: the §9.7 table at the rent-consistent rate (see the class javadoc for the rate
-     * decision). Every refusal path answers {@code null} and records a WARN issue carrying the
-     * stable code of the refusal — the run itself never fails here.
+     * Step 7: the §9.7 table at the rent-consistent rate. The rate decision itself — which stream
+     * the chain prices, what the terminal net investment carries (CAS 21 第三十八条/第三十九条),
+     * and the one-solve-per-stream ledger reuse (N-05) — is the {@link EffectiveInterestCalculator}'s
+     * caliber ({@code unrecoveredResiduals} / {@code netInvestmentPeriodIrr}, arch-seams 收口
+     * 2026-11-14); the facade only orchestrates: it turns every refusal path into {@code null}
+     * plus a WARN issue carrying the stable code of the refusal — the run itself never fails here.
      */
     private EffectiveInterestTable effectiveInterest(Schedule schedule, LeaseElement element,
             FinancialMetrics metrics, PeriodicRootHandoff rootHandoff, List<ValidationIssue> issues) {
@@ -337,8 +287,9 @@ public final class CalculationFacade {
                             + ": IRR_PERIOD 不收敛, 实际利率法摊销表未生成", null));
             return null;
         }
-        BigDecimal residualExtra = unrecoveredResiduals(element, schedule);
-        BigDecimal periodIrr = netInvestmentPeriodIrr(schedule, residualExtra, rootHandoff);
+        BigDecimal residualExtra = EffectiveInterestCalculator.unrecoveredResiduals(element);
+        BigDecimal periodIrr = EffectiveInterestCalculator.netInvestmentPeriodIrr(schedule,
+                residualExtra, rootHandoff);
         if (periodIrr == null) {
             issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
                     CalcErrorCode.IRR_NOT_CONVERGED.code()
@@ -359,78 +310,6 @@ public final class CalculationFacade {
                     "实际利率法摊销表未生成: 数值退化 (" + ex.getMessage() + ")", null));
             return null;
         }
-    }
-
-    /**
-     * The terminal net investment the §9.7 chain must stop at (CAS 21 第三十八条 / 第三十九条):
-     * the schedule's own closing balance (the ballooned 留购价) plus the money the schedule never
-     * amortizes — a separately settled 留购价, the guaranteed residual, and the unguaranteed
-     * residual, which the lessor recovers by keeping the asset rather than as cash. The rate
-     * search prices exactly this target, which is what makes the chain close (R52's identity).
-     */
-    private static BigDecimal unrecoveredResiduals(LeaseElement element, Schedule schedule) {
-        if (element == null) {
-            return MoneyUtils.ZERO;
-        }
-        BigDecimal separateOption = element.residualHandling() == ResidualHandling.SEPARATE
-                ? MoneyUtils.zeroIfNull(element.residualValue()) : MoneyUtils.ZERO;
-        return separateOption
-                .add(MoneyUtils.zeroIfNull(element.guaranteedResidual()))
-                .add(MoneyUtils.zeroIfNull(element.unguaranteedResidual()));
-    }
-
-    /**
-     * The net-investment periodic rate of the R52 wiring (renamed once the terminal target learned
-     * about residual money): the IRR of the stream the §9.7 chain itself prices — the first opening
-     * balance at t0, the rent legs, and the terminal net investment re-dated to the last rent's
-     * index when nonzero. See the class javadoc for the closing arithmetic and the shapes this
-     * closes exactly.
-     */
-    private BigDecimal netInvestmentPeriodIrr(Schedule schedule, BigDecimal residualExtra,
-            PeriodicRootHandoff rootHandoff) {
-        List<Installment> installments = schedule.installments();
-        if (installments.isEmpty()) {
-            return null;
-        }
-        List<CashFlow> stream = new ArrayList<>(installments.size() + 1);
-        Installment first = installments.get(0);
-        stream.add(new CashFlow(0, first.startDate(), first.openingBalance(), CashFlowType.PRINCIPAL,
-                CashFlowDirection.OUTFLOW));
-        for (Installment installment : installments) {
-            BigDecimal rent = installment.rentDue();
-            // A zero rent carries no cash and a negative one is a broken schedule the validators
-            // already flag; neither may enter the root search.
-            if (rent != null && rent.signum() > 0) {
-                stream.add(new CashFlow(installment.periodNo(), installment.endDate(), rent,
-                        CashFlowType.RENT, CashFlowDirection.INFLOW));
-            }
-        }
-        Installment last = installments.get(installments.size() - 1);
-        BigDecimal terminal = MoneyUtils.scale(
-                last.closingBalance().add(MoneyUtils.zeroIfNull(residualExtra)), MoneyScale.OUTPUT);
-        if (terminal.signum() != 0) {
-            stream.add(new CashFlow(last.periodNo(), last.endDate(), terminal,
-                    CashFlowType.RESIDUAL, CashFlowDirection.INFLOW));
-        }
-
-        BigDecimal solvedOverRun = rootHandoff.rootFor(stream);
-        if (solvedOverRun != null) {
-            // The stream this chain prices is the very stream some solve of this run — the §9.5
-            // metric line's IRR_PERIOD, or the implicit-rate measure chain — already solved, or its
-            // exact direction mirror (R103): same discount indices, same signed amounts, so it has
-            // the same root, and solving it again is the duplicate AGENTS.md §6 N-05 forbids. Read
-            // the ledger's unrounded root, not the published scale-10 IRR_PERIOD: substituting the
-            // rounded rate would move cents along the chain's rows (AGENTS.md §6 N-04).
-            return solvedOverRun;
-        }
-        // A stated second solve, not a silent one. This stream differs from the §9.4 event table the
-        // run's IRR_PERIOD is a root of whenever the deal carries money the event table does not list
-        // in the same place: an upfront fee or deposit leg, a separately settled 留购价, a guaranteed
-        // residual on top of the balloon, or — CAS 21 第三十八条 — the unguaranteed residual, which is
-        // part of the lessor's net investment the chain must unwind but never becomes cash (§9.4 keeps
-        // the event table cash-only). Different stream, therefore a different root, therefore its own
-        // solve: that is the caliber difference, and it is the only reason this run pays for two.
-        return IrrCalculator.periodIrr(stream);
     }
 
     /** Resolves a convention code, failing with FCS-ENG-1001 instead of the SPI's NOT_FOUND. */

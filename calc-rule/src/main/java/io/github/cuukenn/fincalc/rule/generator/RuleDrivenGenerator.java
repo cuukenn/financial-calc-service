@@ -12,6 +12,7 @@ import io.github.cuukenn.fincalc.common.money.MoneyUtils;
 import io.github.cuukenn.fincalc.domain.calc.CalculationContext;
 import io.github.cuukenn.fincalc.domain.model.DomainErrorCode;
 import io.github.cuukenn.fincalc.domain.model.InterestTreatmentKind;
+import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
 import io.github.cuukenn.fincalc.domain.model.PaymentTiming;
 import io.github.cuukenn.fincalc.domain.model.PeriodDate;
@@ -20,6 +21,7 @@ import io.github.cuukenn.fincalc.domain.model.RepaymentMethodId;
 import io.github.cuukenn.fincalc.domain.model.RuleOutcome;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
 import io.github.cuukenn.fincalc.domain.model.SpecialActionKind;
+import io.github.cuukenn.fincalc.domain.model.ValidationIssue;
 import io.github.cuukenn.fincalc.domain.port.RuleSetView;
 import io.github.cuukenn.fincalc.domain.support.AbstractAmortizationGenerator;
 import io.github.cuukenn.fincalc.rule.RuleErrorCode;
@@ -44,10 +46,12 @@ import io.github.cuukenn.fincalc.rule.model.RuleRow;
  *   <li><strong>Uncovered period (R15, §8.7)</strong> — a period no rule matches is a blocking
  *       error by default: {@code FCS-RULE-2001} with the uncovered period named in the
  *       message. Only when {@link io.github.cuukenn.fincalc.domain.model.CalculationOptions#allowPartialRuleSet()}
- *       is on does the period fall back to the built-in equal-principal behaviour, and the
+ *       is on does the period fall back to the built-in equal-principal behaviour, the
  *       installment's memo records the {@link #FALLBACK_MEMO} marker (the memo is how the
- *       sibling generators record per-installment provenance, and the WARN-level fact needs no
- *       {@code ValidationIssue} because the schedule itself stays valid).</li>
+ *       sibling generators record per-installment provenance), and the generator discloses the
+ *       period itself as a WARN ({@code FCS-RULE-2009}) on the schedule it returns — the
+ *       finding is emitted where it is known, so no caller re-derives it from the memo string
+ *       (arch-seams 收口，2026-11-14 裁定).</li>
  *   <li><strong>Principal plans (§8.2.1)</strong> — {@code NONE} repays nothing;
  *       {@code FIXED} repays {@code principalValue}; {@code CUSTOM} repays the matching entry
  *       of the comma sequence; {@code EQUAL} (and a blank/INHERIT plan, which §8.2.1 defines as
@@ -73,9 +77,12 @@ import io.github.cuukenn.fincalc.rule.model.RuleRow;
  *       their conditions is an uncovered period and follows the R15 rule above.</li>
  * </ul>
  *
- * <p>Generators are stateless: all per-run state (the remaining principal pool, the open
- * amortization span) lives in the {@link PlannedRuleSet} created inside
- * {@link #generate(CalculationContext)}.
+ * <p>Generators are stateless across runs: all per-run state (the remaining principal pool, the
+ * open amortization span) lives in the {@link PlannedRuleSet} created inside
+ * {@link #generate(CalculationContext)}, and the one per-run field this class carries — the
+ * fallback periods collected for the WARN disclosure — is safe only because the engine wires a
+ * fresh instance per run ({@code GeneratorRegistry.withRuleDriven} builds one; never register a
+ * {@code RuleDrivenGenerator} in a registry shared across runs).
  */
 public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
 
@@ -83,13 +90,14 @@ public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
     public static final String FALLBACK_MEMO = "RULE_FALLBACK";
 
     /**
-     * The structured counterpart of the string marker: the facade's WARN sweep reads this, not a
-     * hand-written {@code equals}, so the marker lives in exactly one place (2026-11-11 scan A4).
-     * A {@code null} memo is never a fallback row.
+     * The periods this run let fall back to the built-in equal-principal behaviour (R15),
+     * collected in {@link #allocate} where the unmatched outcome is known — before the template
+     * rewrites the memo with the first-period stub marker, which is why the disclosure emitted
+     * from here sees every fallback period, including period 1 on a stub run. Consumed once in
+     * {@link #generate}; safe only under the one-run-per-instance wiring contract (see the class
+     * javadoc).
      */
-    public static boolean isFallbackMemo(String memo) {
-        return FALLBACK_MEMO.equals(memo);
-    }
+    private final List<Integer> fallbackPeriods = new ArrayList<>();
 
     private final RuleSetView ruleSet;
 
@@ -133,6 +141,10 @@ public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
      * {@code context.ruleSet()} — is made to consume the constructor-bound set together with
      * the run's partial-rule-set option; the planning it performs needs the strict period
      * order the base loop guarantees.
+     *
+     * <p>After the loop, every fallback period collected by {@link #allocate} is disclosed as a
+     * WARN ({@code FCS-RULE-2009}) on the returned schedule — the finding is emitted where it is
+     * known, not re-derived by the engine from the memo strings.
      */
     @Override
     public Schedule generate(CalculationContext context) {
@@ -141,7 +153,19 @@ public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
         CalculationContext bound = new CalculationContext(context.element(),
                 new PlannedRuleSet(ruleSet, context, totalPeriods), context.dayCount(),
                 context.dateRoll(), context.clock(), context.options());
-        return super.generate(bound);
+        Schedule schedule = super.generate(bound);
+        if (fallbackPeriods.isEmpty()) {
+            return schedule;
+        }
+        List<ValidationIssue> combined = new ArrayList<>(schedule.issues());
+        for (int periodNo : fallbackPeriods) {
+            combined.add(new ValidationIssue(IssueLevel.WARN,
+                    RuleErrorCode.RULE_FALLBACK_PERIOD.code(),
+                    String.format(RuleErrorCode.RULE_FALLBACK_PERIOD.message(), periodNo),
+                    periodNo));
+        }
+        return new Schedule(schedule.header(), schedule.installments(), schedule.cashFlows(),
+                combined);
     }
 
     @Override
@@ -162,6 +186,12 @@ public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
                     input.periodNo(), principal.toPlainString());
         }
         requireSupportedAction(outcome, input);
+        if (!outcome.matched()) {
+            // R15 fallback: recorded before the template rewrites the memo with the first-period
+            // stub marker, so the WARN disclosure in generate() sees this period whatever the
+            // memo ends up reading.
+            fallbackPeriods.add(input.periodNo());
+        }
         return new Allocation(principal, interestToPay(outcome, input), null, null,
                 outcome.matched() ? outcome.ruleId() : FALLBACK_MEMO);
     }
