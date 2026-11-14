@@ -76,7 +76,7 @@ public final class LeaseElement {
         this.deposit = builder.deposit;
         // The deposit calibers normalize in the constructor, not at the call sites: every engine
         // reader gets one non-null answer, and an element built without the fields keeps the v1
-        // posture (upfront collection, refund at maturity, no interest) — AGENTS.md §3.1 第 11 条.
+        // posture (upfront collection, refund at maturity, no interest) — AGENTS.md 第 11 条.
         this.depositTiming = builder.depositTiming == null
                 ? DepositTiming.UPFRONT : builder.depositTiming;
         this.depositSettlement = builder.depositSettlement == null

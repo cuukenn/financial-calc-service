@@ -1,7 +1,7 @@
 package io.github.cuukenn.fincalc.domain.model;
 
 /**
- * How the deposit leaves the deal at settlement (AGENTS.md §3.1 第 11 条：退还/抵扣规则）.
+ * How the deposit leaves the deal at settlement (AGENTS.md 第 11 条：退还/抵扣规则）.
  *
  * <p>The calibers (recorded 2026-11-14, form-field-gaps ticket 03):
  *

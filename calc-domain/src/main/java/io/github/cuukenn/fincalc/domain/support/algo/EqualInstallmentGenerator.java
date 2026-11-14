@@ -135,9 +135,9 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
             BigDecimal periodicRate, int remaining, List<PeriodDate> remainingWindows,
             DayCountConvention dayCount, BigDecimal residual, BigDecimal stubOverride) {
         // Each window's rate is derived once per segment solve and then consumed twice — by the
-        // uniformity test and by the bisection's ~50 evaluations (AGENTS.md §6 N-05). The products are
+        // uniformity test and by the bisection's ~50 evaluations (AGENTS.md N-05). The products are
         // the same unrounded {@code annual × yearFraction(window)} in window order, so the rent the
-        // segment prices is bit-identical to the separately-derived version (AGENTS.md §6 N-04).
+        // segment prices is bit-identical to the separately-derived version (AGENTS.md N-04).
         List<BigDecimal> periodRates = PmtSolver.periodRates(annual, remainingWindows, dayCount,
                 stubOverride);
         if (uniform(periodRates)) {

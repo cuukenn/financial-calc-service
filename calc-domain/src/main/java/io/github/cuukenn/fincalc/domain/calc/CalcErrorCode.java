@@ -26,7 +26,7 @@ import io.github.cuukenn.fincalc.common.error.ErrorCode;
 public enum CalcErrorCode implements ErrorCode {
 
     /**
-     * AGENTS.md §3.4 校验一：Σ本金 = 合同本金 − 并入租金的残值（残值单独收取时为合同本金）不成立，
+     * AGENTS.md 校验一：Σ本金 = 合同本金 − 并入租金的残值（残值单独收取时为合同本金）不成立，
      * 误差 ≥ 0.01 元（补充口径规则 2 的比较容差）。Raised by
      * {@code PrincipalConservationValidator} and, while the plan is built, by
      * {@code AbstractAmortizationGenerator#checkConservation}; the finding embeds the two sums, so
@@ -36,7 +36,7 @@ public enum CalcErrorCode implements ErrorCode {
             "FCS-CALC-3001: 本金合计与应还本金不一致"),
 
     /**
-     * AGENTS.md §3.4 校验二：末期余额 = 残值（并入租金时为 BALLOON，单独收取时为 0）不成立，误差
+     * AGENTS.md 校验二：末期余额 = 残值（并入租金时为 BALLOON，单独收取时为 0）不成立，误差
      * ≥ 0.01 元（补充口径规则 2 的比较容差）。Raised by {@code TailBalanceValidator} and by
      * {@code AbstractAmortizationGenerator#checkConservation}; the finding embeds the closing balance
      * and its expectation, so the message is composed at the raising site.
@@ -79,7 +79,7 @@ public enum CalcErrorCode implements ErrorCode {
             "FCS-CALC-3007: 实际利率法要求合法实际利率: %s"),
 
     /**
-     * AGENTS.md §3.4 校验三：逐期恒等式「期初余额 − 本期本金 = 期末余额」在某期被破坏，误差
+     * AGENTS.md 校验三：逐期恒等式「期初余额 − 本期本金 = 期末余额」在某期被破坏，误差
      * ≥ 0.01 元（补充口径规则 2 的比较容差）。Raised per period by
      * {@code PeriodIdentityValidator}.
      */
@@ -87,14 +87,14 @@ public enum CalcErrorCode implements ErrorCode {
             "FCS-CALC-3008: 逐期恒等式不成立: 期初余额 − 本期本金 ≠ 期末余额"),
 
     /**
-     * AGENTS.md §3.4 校验四：Σ租金 = Σ本金 + Σ利息（实付）+ Σ费用 + Σ税 不成立，误差
+     * AGENTS.md 校验四：Σ租金 = Σ本金 + Σ利息（实付）+ Σ费用 + Σ税 不成立，误差
      * ≥ 0.01 元（补充口径规则 2 的比较容差）。Raised by {@code RentCompositionValidator}.
      */
     RENT_COMPOSITION_BROKEN("FCS-CALC-3009",
             "FCS-CALC-3009: 租金构成不成立: Σ租金 ≠ Σ本金 + Σ利息 + Σ费用 + Σ税"),
 
     /**
-     * AGENTS.md §2.3 阈值即硬约束：首付比例 ≥ 15%（2024-09 通知，全国统一下限）。仅在
+     * AGENTS.md 阈值即硬约束：首付比例 ≥ 15%（2024-09 通知，全国统一下限）。仅在
      * {@code ProductProfile#MORTGAGE} 下由 {@code MortgageThresholdValidator} 以 **WARN**
      * 披露（form-field-gaps 15 决策点 ②：合规读数不进 §3.4 的 hasErrors 守恒语义，
      * 前端闸门保留为提交拦截）。仅在要素携带 CAS 21 链（assetValue + downPayment）时可比。
@@ -102,7 +102,7 @@ public enum CalcErrorCode implements ErrorCode {
     MORTGAGE_DOWN_PAYMENT_BELOW_FLOOR("FCS-CALC-3010",
             "FCS-CALC-3010: 房贷首付比例低于下限 15%: %s"),
 
-    /** AGENTS.md §2.3：房贷期限 ≤ 480 月（金规〔2026〕5号，40 年）。披露姿态同 3010。 */
+    /** AGENTS.md：房贷期限 ≤ 480 月（金规〔2026〕5号，40 年）。披露姿态同 3010。 */
     MORTGAGE_TERM_OVER_LIMIT("FCS-CALC-3011",
             "FCS-CALC-3011: 房贷期限超过 480 个月（40 年）: %s 期");
 

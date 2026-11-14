@@ -91,8 +91,8 @@ public final class IrrMetrics implements FinancialMetric {
             // Hand the unrounded root — and the flow set it is a root of — to the run before this
             // metric publishes its §9.5 rounding. The engine's §9.7 chain prices a rent-caliber
             // stream; reading this root is what keeps the run to one solve of that stream instead of
-            // two identical ones (AGENTS.md §6 N-05), and reading it rather than the published
-            // IRR_PERIOD is what keeps every §9.7 row cent-for-cent (AGENTS.md §6 N-04).
+            // two identical ones (AGENTS.md N-05), and reading it rather than the published
+            // IRR_PERIOD is what keeps every §9.7 row cent-for-cent (AGENTS.md N-04).
             context.rootHandoff().record(raw, flows);
             return MoneyUtils.mid(raw);
         }

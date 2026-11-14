@@ -1,7 +1,7 @@
 package io.github.cuukenn.fincalc.domain.model;
 
 /**
- * Who bears a fee (AGENTS.md §3.1 第 12 条「费用承担方」；form-field-gaps ticket 04 第一步).
+ * Who bears a fee (AGENTS.md 第 12 条「费用承担方」；form-field-gaps ticket 04 第一步).
  *
  * <p>The owner decides the fee's cash-flow direction on the lessor event table — the two
  * directions move the lessor's IRR oppositely, which is exactly why the owner must be explicit

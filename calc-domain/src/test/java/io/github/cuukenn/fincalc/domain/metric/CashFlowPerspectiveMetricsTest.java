@@ -303,7 +303,7 @@ class CashFlowPerspectiveMetricsTest {
      *
      * <p>plus the 5 000.00 residual settled separately ({@link ResidualHandling#SEPARATE}) =
      * <b>106 530.00</b>. The fee and tax columns are <em>not</em> added on top: a row's rent already
-     * is principal + interest + fee + tax (AGENTS.md §3.4 check 4), so Σ {@code rentDue} carries
+     * is principal + interest + fee + tax (AGENTS.md check 4), so Σ {@code rentDue} carries
      * them once. The 10 000.00 deposit is excluded too — v1 collects every deposit separately and
      * refunds it at maturity, so it is a §9.4 leg rather than a repayment (R120/R123); this fixture
      * pins that exclusion by carrying a non-zero deposit and expecting it to change nothing.

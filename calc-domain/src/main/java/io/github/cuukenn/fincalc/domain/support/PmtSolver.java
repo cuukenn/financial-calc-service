@@ -35,9 +35,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * the window and the nominal rate alone, never of the candidate rent. Deriving it per evaluation
  * retook the convention's {@code days ÷ year} quotient and its exact product tens of millions of
  * times on the 1200-period / 400-segment cell — the single largest cost the engine pays
- * (AGENTS.md §6 N-05). The refactor changes where the product is computed, not what it is: same
+ * (AGENTS.md N-05). The refactor changes where the product is computed, not what it is: same
  * unrounded multiply, same window order, same {@link MathContext#DECIMAL128} steps, so every schedule
- * amount is bit-identical (AGENTS.md §6 N-03/N-04). The iteration budget and {@link #TOLERANCE} are
+ * amount is bit-identical (AGENTS.md N-03/N-04). The iteration budget and {@link #TOLERANCE} are
  * untouched.
  */
 public final class PmtSolver {
@@ -58,7 +58,7 @@ public final class PmtSolver {
     private static final int MAX_BRACKET_DOUBLINGS = 64;
 
     /**
-     * Diagnostic counters for AGENTS.md §6 N-01 attribution — how many iterative rent solves a run
+     * Diagnostic counters for AGENTS.md N-01 attribution — how many iterative rent solves a run
      * paid for, how many candidate rents it evaluated, and how many balance-walk steps those
      * evaluations took. They carry no calculation meaning (nothing reads them to produce a number)
      * and exist so a cost regression in the segmented cells can be located instead of guessed at.
@@ -156,9 +156,9 @@ public final class PmtSolver {
      * {@link #iterative(BigDecimal, List, DayCountConvention, BigDecimal, BigDecimal)} over window
      * rates the caller already derived — the seam that lets a segmented run derive each window's rate
      * once for the segment instead of once per uniformity test, once more per solve and ~50 more
-     * times inside the bisection (AGENTS.md §6 N-05). The values are the same
+     * times inside the bisection (AGENTS.md N-05). The values are the same
      * {@code annualRate × yearFraction(window)} products in the same order, so the solved rent is
-     * bit-identical (AGENTS.md §6 N-04).
+     * bit-identical (AGENTS.md N-04).
      *
      * <p>{@code annualRate} is consulted only for the zero-rate shortcut a flat nominal rate gets;
      * a window whose own fraction is zero (a same-date window) must not trigger it, which is why the
@@ -217,13 +217,13 @@ public final class PmtSolver {
      * The periodic rate of every window — {@code annualRate × yearFraction(window)} in window order.
      *
      * <p>The product belongs to the window and the nominal rate, not to the candidate rent, so a
-     * bisection that walks the same windows ~50 times needs it once (AGENTS.md §6 N-05). Deriving it
+     * bisection that walks the same windows ~50 times needs it once (AGENTS.md N-05). Deriving it
      * inside the walk retook the convention's {@code days ÷ 360} quotient and the exact product on
      * every evaluation: on the 1200-period / 400-segment cell that is tens of millions of quotients
      * for a number the schedule already determined.
      *
      * <p>No rounding is introduced here: the product is the same unrounded {@link BigDecimal#multiply}
-     * the inline walk performed, in the same order (AGENTS.md §6 N-03/N-04, §1 P-07).
+     * the inline walk performed, in the same order (AGENTS.md N-03/N-04, §1 P-07).
      */
     public static List<BigDecimal> periodRates(BigDecimal annualRate, List<PeriodDate> windows,
             DayCountConvention dayCount) {

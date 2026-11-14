@@ -39,7 +39,7 @@ public final class ValidatorChain {
     }
 
     /**
-     * The chain every built-in calculation uses, in the AGENTS.md §3.4 code-number order: principal
+     * The chain every built-in calculation uses, in the AGENTS.md code-number order: principal
      * conservation ({@link CalcErrorCode#PRINCIPAL_CONSERVATION_BROKEN}), tail balance
      * ({@link CalcErrorCode#TAIL_BALANCE_MISMATCH}), per-period identity
      * ({@link CalcErrorCode#PERIOD_IDENTITY_BROKEN}), rent composition

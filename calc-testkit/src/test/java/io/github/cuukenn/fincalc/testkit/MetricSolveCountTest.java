@@ -31,7 +31,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * AGENTS.md §6 N-05: a run must be able to prove how many root solves it paid for. This test
+ * AGENTS.md N-05: a run must be able to prove how many root solves it paid for. This test
  * reads {@link BisectionNewtonSolver#SOLVE_COUNT} / {@link BisectionNewtonSolver#EVALUATION_COUNT}
  * around the two orchestration shapes and pins the expected counts:
  *
@@ -96,7 +96,7 @@ class MetricSolveCountTest {
     }
 
     /**
-     * AGENTS.md §6 N-01「分段计时可读」taken one level finer: which code of the §9.5 line costs
+     * AGENTS.md N-01「分段计时可读」taken one level finer: which code of the §9.5 line costs
      * what. The registered set is wrapped in timing decorators, same codes, same order, same
      * compute — so the run is the run the facade pays for, and the table is what a hotspot ordering
      * has to be read from. Printed, not asserted: a per-code assertion would be a second gate on
@@ -174,7 +174,7 @@ class MetricSolveCountTest {
     }
 
     /**
-     * Ticket 02 / AGENTS.md §6 N-05: the §9.7 effective-interest chain prices the stream the run has
+     * Ticket 02 / AGENTS.md N-05: the §9.7 effective-interest chain prices the stream the run has
      * already solved. On a plain deal — no upfront fee, no deposit leg, no separately settled 留购价,
      * no residual money — the chain's t0 opening balance and rent legs <em>are</em> the §9.4 event
      * table {@code IRR_PERIOD} was solved over, index for index, so the run pays two solves and not

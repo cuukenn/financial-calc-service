@@ -227,12 +227,12 @@ public final class EffectiveInterestCalculator {
      * balance at t0, the rent legs, and the terminal net investment re-dated to the last rent's
      * index when nonzero.
      *
-     * <p><b>One solve per stream (AGENTS.md §6 N-05).</b> When that stream is a flow set some solve
+     * <p><b>One solve per stream (AGENTS.md N-05).</b> When that stream is a flow set some solve
      * of the run already priced — the §9.4 event table {@code IRR_PERIOD} was solved over, or the
      * implicit-rate measure chain's table-plus-unguaranteed-residual set — the run reads the
      * <em>unrounded</em> root off the {@link PeriodicRootHandoff} ledger instead of solving the same
      * problem twice. The raw root and not the published scale-10 {@code IRR_PERIOD} is what keeps
-     * every §9.7 row cent-for-cent (AGENTS.md §6 N-04: the 0.01 元容差 is a validation tolerance,
+     * every §9.7 row cent-for-cent (AGENTS.md N-04: the 0.01 元容差 is a validation tolerance,
      * never a licence to price a chain with a rounded rate). Where the streams differ — a separately
      * settled 留购价, a guaranteed residual listed on top of the balloon, the unguaranteed residual
      * CAS 21 第三十八条 prices into the net investment while §9.4 keeps the event table cash-only,
@@ -272,9 +272,9 @@ public final class EffectiveInterestCalculator {
             // The stream this chain prices is the very stream some solve of this run — the §9.5
             // metric line's IRR_PERIOD, or the implicit-rate measure chain — already solved, or its
             // exact direction mirror (R103): same discount indices, same signed amounts, so it has
-            // the same root, and solving it again is the duplicate AGENTS.md §6 N-05 forbids. Read
+            // the same root, and solving it again is the duplicate AGENTS.md N-05 forbids. Read
             // the ledger's unrounded root, not the published scale-10 IRR_PERIOD: substituting the
-            // rounded rate would move cents along the chain's rows (AGENTS.md §6 N-04).
+            // rounded rate would move cents along the chain's rows (AGENTS.md N-04).
             return solvedOverRun;
         }
         // A stated second solve, not a silent one. This stream differs from the §9.4 event table the

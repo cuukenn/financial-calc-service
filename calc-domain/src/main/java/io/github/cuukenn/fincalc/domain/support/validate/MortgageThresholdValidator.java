@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * AGENTS.md §2.3 阈值读数（form-field-gaps 15 / A2，仅 {@code ProductProfile#MORTGAGE} 装配）：
+ * AGENTS.md 阈值读数（form-field-gaps 15 / A2，仅 {@code ProductProfile#MORTGAGE} 装配）：
  *
  * <ul>
  *   <li><b>首付比例 ≥ 15%</b>（2024-09 通知，全国统一下限）——仅在要素携带 CAS 21 链

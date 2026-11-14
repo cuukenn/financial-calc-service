@@ -126,7 +126,7 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
 
     /**
      * A deposit participates only under the basis that asks for it. The legs themselves are shaped
-     * by the element's 收取时点 / 退还抵扣规则 (AGENTS.md §3.1 第 11 条; calibers documented on
+     * by the element's 收取时点 / 退还抵扣规则 (AGENTS.md 第 11 条; calibers documented on
      * {@link DepositSettlement}); the event table keeps the deposit money explicit — under
      * {@link DepositSettlement#OFFSET_PRINCIPAL} the two t0 legs (gross principal out, deposit in)
      * net to the {@link LeaseElement#measuredPrincipal()} the schedule amortizes, and under the
@@ -192,7 +192,7 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
     }
 
     /**
-     * Upfront fees that participate in the IRR, split by 承担方 (AGENTS.md §3.1 第 12 条;
+     * Upfront fees that participate in the IRR, split by 承担方 (AGENTS.md 第 12 条;
      * form-field-gaps ticket 04 第一步）：承租人承担 = 出租人收取（INFLOW，v1 姿态），
      * 出租人承担 = 出租人支付第三方（OUTFLOW）——同一笔费用换承担方方向翻转、双方 IRR
      * 反向变化，金额守恒由 R103 镜像保证。两类各一行（金额为 0 的行由 {@link #addFlow}

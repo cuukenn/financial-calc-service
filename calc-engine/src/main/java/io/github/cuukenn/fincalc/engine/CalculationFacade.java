@@ -98,7 +98,7 @@ import org.slf4j.LoggerFactory;
  * </ol>
  *
  * <p>Step 7's caliber — which stream the chain prices, what the terminal net investment carries
- * (CAS 21 第三十八条/第三十九条), the one-solve-per-stream rule (AGENTS.md §6 N-05) and the
+ * (CAS 21 第三十八条/第三十九条), the one-solve-per-stream rule (AGENTS.md N-05) and the
  * unrounded-root reuse that keeps every §9.7 row cent-for-cent (N-04) — lives with its code in
  * {@link EffectiveInterestCalculator#unrecoveredResiduals} and
  * {@link EffectiveInterestCalculator#netInvestmentPeriodIrr} (arch-seams 收口，2026-11-14); the

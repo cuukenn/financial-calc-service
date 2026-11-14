@@ -39,9 +39,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * AGENTS.md §6 N-01: the run-cost gate. Before this test existed the repository had no repeatable
+ * AGENTS.md N-01: the run-cost gate. Before this test existed the repository had no repeatable
  * timing reading at all — the design document's own performance target (120 periods, P99 &lt; 50 ms,
- * since withdrawn by owner decision on 2026-11-14; see AGENTS.md §6 N-02) was nothing but a
+ * since withdrawn by owner decision on 2026-11-14; see AGENTS.md N-02) was nothing but a
  * sentence, and nothing noticed when the engine drifted past it.
  *
  * <p>Four shapes are pinned, in order:
@@ -60,7 +60,7 @@ import org.junit.jupiter.api.Test;
  * measuring pass on 2026-11-12 (Java 11, warm JVM, best of N) with a wide margin over the readings,
  * so a normal machine under load still passes while a real regression cannot hide. The withdrawn
  * 50 ms target is NOT claimed as met here — no absolute target exists any more: the 50 ms design
- * target was withdrawn by owner decision on 2026-11-14 (AGENTS.md §6 N-02).
+ * target was withdrawn by owner decision on 2026-11-14 (AGENTS.md N-02).
  *
  * <p>How the stage breakdown is obtained without touching production code: the orchestration steps
  * are called one by one — generator (step 2), event table (step 3), metrics plus the enriched
@@ -143,7 +143,7 @@ class RunCostBaselineTest {
         System.out.println("[calc-perf] java=" + System.getProperty("java.version")
                 + " cores=" + Runtime.getRuntime().availableProcessors()
                 + " — milliseconds, best of N after warm-up; gates are non-regression ceilings,"
-                + " not a performance target (AGENTS.md §6 N-01/N-02; G6 withdrawn 2026-11-14)");
+                + " not a performance target (AGENTS.md N-01/N-02; G6 withdrawn 2026-11-14)");
         System.out.printf("%-32s %5s %10s %9s %9s %9s %9s %9s%n", "shape", "rows", "schedule",
                 "cashflow", "metrics", "validate", "stages", "fullRun");
 
@@ -153,7 +153,7 @@ class RunCostBaselineTest {
 
         assertThat(segmented480.fullRunMs)
                 .as("160 rate-segment rows must not move a closed-form run "
-                        + "(AGENTS.md §6 N-01; ticket 02's cost line)")
+                        + "(AGENTS.md N-01; ticket 02's cost line)")
                 .isLessThanOrEqualTo(fixed480.fullRunMs * SEGMENTED_VS_FIXED_RATIO);
         assertThat(segmented1200.stageSumMs)
                 .as("ACT_360 at the engine period ceiling must stay within "
@@ -208,7 +208,7 @@ class RunCostBaselineTest {
 
     private static void assertWithinGate(String stage, double reading, double gate, String shape) {
         assertThat(reading)
-                .as(String.format("%s / %s stayed inside the AGENTS.md §6 N-01 gate (%.0f ms)",
+                .as(String.format("%s / %s stayed inside the AGENTS.md N-01 gate (%.0f ms)",
                         shape, stage, gate))
                 .isLessThanOrEqualTo(gate);
     }

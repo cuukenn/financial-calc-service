@@ -44,7 +44,7 @@ public final class BisectionNewtonSolver implements RootSolver {
     public static final int MAX_ITERATIONS = 100;
 
     /**
-     * Monotonic count of {@link #solve} entries since JVM start. Cost accounting only: AGENTS.md §6
+     * Monotonic count of {@link #solve} entries since JVM start. Cost accounting only: AGENTS.md
      * N-05 forbids solving the same root twice inside one measurement, and a count a test can read
      * is how a run shows it paid for each root once — never「看起来快了」as evidence.
      */

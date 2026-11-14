@@ -14,7 +14,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * AGENTS.md §3.4 校验三：逐期恒等式「期初余额 − 本期本金 = 期末余额」。Every installment must
+ * AGENTS.md 校验三：逐期恒等式「期初余额 − 本期本金 = 期末余额」。Every installment must
  * carry the balances its own principal repayment implies, whatever algorithm produced the plan —
  * the safety net for schedules assembled outside the built-in generators.
  */
@@ -34,7 +34,7 @@ public final class PeriodIdentityValidator implements Validator {
     @Override
     public int order() {
         // Slots between TAIL_BALANCE (20) and DATE_MONOTONIC (30) so the chain runs in the
-        // AGENTS.md §3.4 code-number order:
+        // AGENTS.md code-number order:
         // CalcErrorCode.PRINCIPAL_CONSERVATION_BROKEN → TAIL_BALANCE_MISMATCH →
         // PERIOD_IDENTITY_BROKEN → RENT_COMPOSITION_BROKEN → PERIOD_DATE_ORDER_INVALID.
         return 21;
