@@ -1,6 +1,6 @@
 # arch-seams —— facade 两处轻微渗漏的收口决策（待裁定）
 
-Status: proposed（2026-11-14 架构检查裁定为「观察，不构成缺陷」；用户 2026-11-14 同意立项记录，是否收口待口径裁定）
+Status: resolved（两处均已收口实施并提交 a7a92dc，验证记录见 Comments）
 
 ## 背景
 
