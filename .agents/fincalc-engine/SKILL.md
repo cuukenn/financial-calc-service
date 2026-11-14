@@ -1,9 +1,9 @@
 ---
 name: fincalc-engine
-description: 编排门面模块的不可变架构——编排步骤序、注册表装配、一次一解的复用纪律与核心日志分级。改动 calc-engine 前必读。
+description: 测算引擎的不可变架构总览与分模块文档（common/domain/rule/engine）——模块地图、依赖方向、编排流程、扩展缝与纪律。在任何引擎模块上动工前必读。
 ---
 
-# fincalc-engine：编排门面（引擎技能入口）
+# fincalc-engine：测算引擎架构（唯一对外技能）
 
 > 引入规则：本技能是测算引擎**唯一的对外技能**。先读本文件建立全局图景，再按所改模块
 > 加载同目录的分模块文档：`calc-common.md` / `calc-domain.md` / `calc-rule.md` /
