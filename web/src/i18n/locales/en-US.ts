@@ -233,13 +233,13 @@ const enUS: typeof zhCN = {
     },
     gates: {
       // §71: these [法] thresholds are validated in the UI, the copy must not claim the engine checks them (R107/R109).
-      note: 'Client-side gates: down payment ≥ 15%, term ≤ 480 months and the 50%/60% DTI limits are checked by this form; the calculation engine does not check them.',
+      note: 'Client-side gates: down payment ≥ 15%, term ≤ 480 months and the 50%/60% DTI limits are blocked by this form; with product=MORTGAGE the engine also discloses the down-payment and term thresholds as WARN findings (DTI stays front-end: the engine has no income input, M-01).',
       bulletOnly: 'Bullet (principal and interest at maturity) is selectable only when the term is ≤ {max} months (金规〔2026〕5号: only terms ≤ 1 year may repay at maturity).',
       bulletReset: 'Term exceeds {max} months: bullet repayment is not selectable and the choice was reset to equal installments (front-end rule, not engine-validated).',
-      downPaymentFloor: 'Down payment ratio is below the {min} floor (currently {actual}): submit is blocked (front-end floor, not engine-validated).',
+      downPaymentFloor: 'Down payment ratio is below the {min} floor (currently {actual}): submit is blocked (front-end floor; the engine also discloses it as a WARN finding — issue 15/A2, disclosure only).',
       // AGENTS.md §2.3 "the threshold is a hard constraint": an unevaluable floor must not pass silently.
       downPaymentFloorNotEvaluable:
-        'The collateral value is not greater than 0 (the lower of transaction price and appraised value), so LTV and the down payment ratio cannot be computed: the {min} down payment floor cannot be evaluated and submit is blocked (front-end floor, not engine-validated).',
+        'The collateral value is not greater than 0 (the lower of transaction price and appraised value), so LTV and the down payment ratio cannot be computed: the {min} down payment floor cannot be evaluated and submit is blocked (front-end floor; the engine discloses a WARN only when the element carries the chain fields).',
       rateNotComposable: 'The annual rate cannot be composed from the LPR and the spread, check the inputs.',
       // R150: the three repricing gates, all of them in the UI (the engine does not know the word
       // "repricing cycle" — it only sees segmented-rate rule rows).

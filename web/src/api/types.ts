@@ -13,6 +13,7 @@ export type PaymentTiming = 'IN_ADVANCE' | 'IN_ARREARS'
 
 export type ResidualHandling = 'SEPARATE' | 'BALLOON_IN_RENT'
 export type FeeOwner = 'LESSEE' | 'LESSOR'
+export type ProductProfile = 'LEASE' | 'MORTGAGE'
 export type DepositTiming = 'UPFRONT' | 'WITH_FIRST_RENT'
 export type DepositSettlement = 'REFUND' | 'OFFSET_PRINCIPAL' | 'OFFSET_FINAL_RENT'
 
@@ -130,6 +131,8 @@ export interface CalculationRequest {
   depositInterestRate?: string
   /** 首期是否按 129号①「整月+零头」拆分计息；缺省 false = 129号② 一段计。 */
   firstPeriodStub?: boolean
+  /** 业务产品：LEASE（缺省）/ MORTGAGE——仅选择校验装配（引擎 WARN 阈值披露），内核产品盲。 */
+  product?: ProductProfile
   /** 增值税率，小数形式。 */
   vatRate?: string
   /** 币种，ISO-4217 代码。 */

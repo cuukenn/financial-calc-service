@@ -7,6 +7,7 @@ import io.github.cuukenn.fincalc.domain.model.FeeOwner;
 import io.github.cuukenn.fincalc.domain.model.DepositTiming;
 import io.github.cuukenn.fincalc.domain.model.FeeChargeMode;
 import io.github.cuukenn.fincalc.domain.model.PaymentFrequency;
+import io.github.cuukenn.fincalc.domain.model.ProductProfile;
 import io.github.cuukenn.fincalc.domain.model.PaymentTiming;
 import io.github.cuukenn.fincalc.domain.model.RateChangePolicy;
 import io.github.cuukenn.fincalc.domain.model.ResidualHandling;
@@ -135,6 +136,11 @@ public final class CalculationRequestDto {
             + "逐位一致）。仅常规月锚频率可用；IRREGULAR / RULE_DRIVEN 拒绝（FCS-DOM-1021）")
     private final Boolean firstPeriodStub;
 
+    @Schema(description = "业务产品：LEASE（租赁，缺省）/ MORTGAGE（房贷）。仅选择校验装配："
+            + "MORTGAGE 下引擎以 WARN 披露 §2.3 阈值（首付 ≥15%、期限 ≤480 月，"
+            + "FCS-CALC-3010/3011）；测算内核产品盲（R100）。缺省路径与历史请求逐字节一致")
+    private final ProductProfile product;
+
     @Schema(description = "增值税率，小数形式（0.06 = 6%）", example = "0.06")
     private final BigDecimal vatRate;
 
@@ -206,7 +212,8 @@ public final class CalculationRequestDto {
             @JsonProperty("initialDirectCosts") BigDecimal initialDirectCosts,
             @JsonProperty("guaranteedResidual") BigDecimal guaranteedResidual,
             @JsonProperty("unguaranteedResidual") BigDecimal unguaranteedResidual,
-            @JsonProperty("firstPeriodStub") Boolean firstPeriodStub) {
+            @JsonProperty("firstPeriodStub") Boolean firstPeriodStub,
+            @JsonProperty("product") ProductProfile product) {
         this.principal = principal;
         this.nominalRate = nominalRate;
         this.commenceDate = commenceDate;
@@ -225,6 +232,7 @@ public final class CalculationRequestDto {
         this.depositSettlement = depositSettlement;
         this.depositInterestRate = depositInterestRate;
         this.firstPeriodStub = firstPeriodStub;
+        this.product = product;
         this.vatRate = vatRate;
         this.currency = currency;
         this.method = method;
@@ -331,6 +339,10 @@ public final class CalculationRequestDto {
 
     public Boolean firstPeriodStub() {
         return firstPeriodStub;
+    }
+
+    public ProductProfile product() {
+        return product;
     }
 
     public BigDecimal vatRate() {

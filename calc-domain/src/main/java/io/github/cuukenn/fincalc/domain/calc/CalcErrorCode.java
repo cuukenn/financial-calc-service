@@ -91,7 +91,20 @@ public enum CalcErrorCode implements ErrorCode {
      * ≥ 0.01 元（补充口径规则 2 的比较容差）。Raised by {@code RentCompositionValidator}.
      */
     RENT_COMPOSITION_BROKEN("FCS-CALC-3009",
-            "FCS-CALC-3009: 租金构成不成立: Σ租金 ≠ Σ本金 + Σ利息 + Σ费用 + Σ税");
+            "FCS-CALC-3009: 租金构成不成立: Σ租金 ≠ Σ本金 + Σ利息 + Σ费用 + Σ税"),
+
+    /**
+     * AGENTS.md §2.3 阈值即硬约束：首付比例 ≥ 15%（2024-09 通知，全国统一下限）。仅在
+     * {@code ProductProfile#MORTGAGE} 下由 {@code MortgageThresholdValidator} 以 **WARN**
+     * 披露（form-field-gaps 15 决策点 ②：合规读数不进 §3.4 的 hasErrors 守恒语义，
+     * 前端闸门保留为提交拦截）。仅在要素携带 CAS 21 链（assetValue + downPayment）时可比。
+     */
+    MORTGAGE_DOWN_PAYMENT_BELOW_FLOOR("FCS-CALC-3010",
+            "FCS-CALC-3010: 房贷首付比例低于下限 15%: %s"),
+
+    /** AGENTS.md §2.3：房贷期限 ≤ 480 月（金规〔2026〕5号，40 年）。披露姿态同 3010。 */
+    MORTGAGE_TERM_OVER_LIMIT("FCS-CALC-3011",
+            "FCS-CALC-3011: 房贷期限超过 480 个月（40 年）: %s 期");
 
     private final String code;
     private final String message;

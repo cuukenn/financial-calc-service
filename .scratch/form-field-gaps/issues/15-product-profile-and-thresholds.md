@@ -1,6 +1,6 @@
 # 15. 产品抽象与监管阈值下沉（A1 + A2，合并决策包）
 
-Status: needs-owner（2026-11-14 立：本票是**决策提案**，不含实现；三项决策点见文末，拍板后拆实现 issue）
+Status: resolved（2026-11-14 按提案建议口径实施：契约增量接受、WARN 级别、文案随行；三个决策点的裁定见文末「实施记录」）
 Type: grilling
 Priority: P2
 数据角色: 契约形状（A1）+ C 类读数的引擎化（A2）
@@ -56,3 +56,15 @@ Blocked by: —（本票本身就是解锁 A1/A2 的决策件）
 - 既有契约测试（含 MortgageForm 的 14 键 payload 契约测试）逐字节不动：`product` 缺省路径零变化。
 - `product=MORTGAGE` + 首付 14% 的请求：`issues` 含一条 WARN、`hasErrors() == false`、测算照常返回。
 - `product=LEASE`（或缺省）+ 任意要素：issues 与现状逐字节一致。
+
+## 实施记录（2026-11-14，按建议口径）
+
+三个决策点的裁定（连续「继续」指示下按提案建议口径执行，裁定随实现留档，用户可随时否决并回退——增量是可选字段，回退点清晰）：
+
+1. **契约增量：接受**。`CalculationRequestDto.product`（可选，`LEASE` | `MORTGAGE`，缺省 LEASE）——既有调用方与历史请求逐字节不变（`ProductProfileThresholdTest` 缺省路径钉桩）。
+2. **引擎阈值发现：WARN**。`MortgageThresholdValidator`（order 100，跑在守恒网之后）只由 `ValidatorChain.withMortgageThresholds()` 装配；facade 按 `options.product()` 选链，测算内核产品盲（R100）。首付 ≥15% 用**精确乘法**判限（`downPayment < assetValue × 0.15`，P-10 未舍入原值），含本数钉桩；期限 ≤480 月。
+3. **文案随行更新**。zh/en 的 R107/R109 三条门槛文案同步改为「前端拦截 + 引擎 WARN 披露」的如实表述；DTI 留在前端（M-01）的豁免写入文案与本文。
+
+实现面：`ProductProfile` 枚举、`CalculationOptions.product`（2 参构造器保持 v1 姿态）、`FCS-CALC-3010/3011`、`MortgageThresholdValidator`、facade 双链选择、DTO/assembler、web（MortgageForm 请求 `product: 'MORTGAGE'`、类型、文案）。
+
+测试：`ProductProfileThresholdTest` 4 条（14% WARN 含 14.00% 展示、15% 含本数不发、481 期 3011、LEASE/缺省 issues 逐字节一致）；契约测试键数钉桩 14 → 15（web `MortgageForm.spec` 与 server `MortgagePayloadContractTest` javadoc 同步）；全量 `mvn test`（JDK 17）+ web lint/294 vitest/build 全绿。

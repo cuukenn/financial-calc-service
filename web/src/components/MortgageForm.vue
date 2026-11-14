@@ -317,6 +317,8 @@ function buildRequest(annualRateDecimal: string): CalculationRequest {
     residualValue: '0',
     residualHandling: 'SEPARATE',
     rateChangePolicy: 'RESOLVE',
+    // A1（issue 15）：产品身份声明——引擎据以装配 §2.3 阈值 WARN 披露。
+    product: 'MORTGAGE',
   }
   const segments = repricingSegmentsList.value
   const plan = repricingPlan.value
@@ -447,6 +449,8 @@ async function onPrepay(payload: {
     residualValue: '0',
     residualHandling: 'SEPARATE',
     rateChangePolicy: 'RESOLVE',
+    // A1（issue 15）：产品身份声明——引擎据以装配 §2.3 阈值 WARN 披露。
+    product: 'MORTGAGE',
   }
   localError.value = null
   submitError.value = null

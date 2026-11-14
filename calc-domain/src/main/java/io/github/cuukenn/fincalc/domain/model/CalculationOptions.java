@@ -10,10 +10,17 @@ public final class CalculationOptions {
 
     private final boolean allowPartialRuleSet;
     private final CashFlowBasis cashFlowBasis;
+    private final ProductProfile product;
 
     public CalculationOptions(boolean allowPartialRuleSet, CashFlowBasis cashFlowBasis) {
+        this(allowPartialRuleSet, cashFlowBasis, ProductProfile.LEASE);
+    }
+
+    public CalculationOptions(boolean allowPartialRuleSet, CashFlowBasis cashFlowBasis,
+            ProductProfile product) {
         this.allowPartialRuleSet = allowPartialRuleSet;
         this.cashFlowBasis = cashFlowBasis == null ? CashFlowBasis.INCLUDE_FEES : cashFlowBasis;
+        this.product = product == null ? ProductProfile.LEASE : product;
     }
 
     /** (no partial rule sets, include fees in cash flows). */
@@ -27,5 +34,14 @@ public final class CalculationOptions {
 
     public CashFlowBasis cashFlowBasis() {
         return cashFlowBasis;
+    }
+
+    /**
+     * Which business product this run is for; never {@code null} (defaults to
+     * {@link ProductProfile#LEASE}). It selects additional validators only — the calculation core
+     * is product-blind (R100).
+     */
+    public ProductProfile product() {
+        return product;
     }
 }

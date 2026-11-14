@@ -7,6 +7,7 @@ import io.github.cuukenn.fincalc.domain.model.CalculationOptions;
 import io.github.cuukenn.fincalc.domain.model.CashFlowBasis;
 import io.github.cuukenn.fincalc.domain.model.FeeItem;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
+import io.github.cuukenn.fincalc.domain.model.ProductProfile;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
 import io.github.cuukenn.fincalc.domain.model.PaymentTiming;
 import io.github.cuukenn.fincalc.domain.model.PeriodDate;
@@ -89,7 +90,11 @@ public final class CalculationRequestAssembler {
             }
             ruleSet = ruleCompiler.compile(rows, element, allowPartial);
         }
-        CalculationOptions options = new CalculationOptions(allowPartial, cashFlowBasis(dto));
+        // A1（form-field-gaps 15）：产品身份进选项层（校验装配），缺省 LEASE——既有
+        // 调用方与历史请求逐字节一致。
+        ProductProfile product = dto.product() == null ? ProductProfile.LEASE : dto.product();
+        CalculationOptions options =
+                new CalculationOptions(allowPartial, cashFlowBasis(dto), product);
         return new CalculationRequest(element, ruleSet, options);
     }
 

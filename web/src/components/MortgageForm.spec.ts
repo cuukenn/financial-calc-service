@@ -182,7 +182,7 @@ describe('MortgageForm payload mapping (R101)', () => {
     setLocale('zh-CN')
   })
 
-  it('submits exactly the 14 mortgage keys and omits every lease-only key', async () => {
+  it('submits exactly the 15 mortgage keys and omits every lease-only key (15 = 14 + product，issue 15/A1)', async () => {
     const wrapper = mountWithI18n(MortgageForm)
     await submit(wrapper)
 
@@ -205,9 +205,12 @@ describe('MortgageForm payload mapping (R101)', () => {
       residualValue: '0',
       residualHandling: 'SEPARATE',
       rateChangePolicy: 'RESOLVE',
+      product: 'MORTGAGE',
     })
-    expect(Object.keys(req)).toHaveLength(14)
-    expect(Object.keys(req).sort()).toEqual([...MORTGAGE_KEYS].sort())
+    // issue 15/A1：14 键 + product = 15 键（兼容性增量，缺省 LEASE 不影响既有调用方）。
+    expect(Object.keys(req)).toHaveLength(15)
+    expect(Object.keys(req).sort()).toEqual([...MORTGAGE_KEYS, 'product'].sort())
+    expect(req.product).toBe('MORTGAGE')
     for (const key of ABSENT_LEASE_ONLY_KEYS) {
       expect(req, `lease-only key ${key} must be absent`).not.toHaveProperty(key)
     }
@@ -323,7 +326,7 @@ describe('MortgageForm 还款方式 gate (R109: ≤ 12 期 才可选到期一次
       residualHandling: 'SEPARATE',
       rateChangePolicy: 'RESOLVE',
     })
-    expect(Object.keys(lastRequest())).toHaveLength(14)
+    expect(Object.keys(lastRequest())).toHaveLength(15)
   })
 
   it('disables BULLET_LOAN at 13 months, resets a prior selection and never sends it', async () => {

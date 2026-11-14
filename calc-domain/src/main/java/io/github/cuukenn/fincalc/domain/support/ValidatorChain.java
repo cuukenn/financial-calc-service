@@ -7,6 +7,7 @@ import io.github.cuukenn.fincalc.domain.model.Schedule;
 import io.github.cuukenn.fincalc.domain.model.ValidationIssue;
 import io.github.cuukenn.fincalc.domain.port.Validator;
 import io.github.cuukenn.fincalc.domain.support.validate.DateMonotonicValidator;
+import io.github.cuukenn.fincalc.domain.support.validate.MortgageThresholdValidator;
 import io.github.cuukenn.fincalc.domain.support.validate.PeriodIdentityValidator;
 import io.github.cuukenn.fincalc.domain.support.validate.PrincipalConservationValidator;
 import io.github.cuukenn.fincalc.domain.support.validate.RentCompositionValidator;
@@ -53,6 +54,21 @@ public final class ValidatorChain {
         validators.register(new PeriodIdentityValidator());
         validators.register(new RentCompositionValidator());
         validators.register(new DateMonotonicValidator());
+        return new ValidatorChain(validators);
+    }
+
+    /**
+     * The mortgage chain: the defaults chain plus the §2.3 threshold disclosures
+     * ({@code MortgageThresholdValidator}, order 100 — after every conservation net). Assembled
+     * only for runs declaring {@code ProductProfile#MORTGAGE} (form-field-gaps 15 / A2); the
+     * defaults chain stays the byte-identical v1 path for every other run.
+     */
+    public static ValidatorChain withMortgageThresholds() {
+        ExtensionRegistry<Validator> validators = ExtensionRegistry.empty();
+        for (Validator validator : defaults().registry.all()) {
+            validators.register(validator);
+        }
+        validators.register(new MortgageThresholdValidator());
         return new ValidatorChain(validators);
     }
 

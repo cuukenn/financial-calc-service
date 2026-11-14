@@ -21,7 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * Task 7 fix round 1 (R137): the 房贷 payload that the Web 房贷 Tab actually builds is proven
  * against the <em>real</em> engine here, not against a mock.
  *
- * <p>{@code MortgageForm.buildRequest} sends exactly 14 keys; three of them
+ * <p>{@code MortgageForm.buildRequest} sends exactly 15 keys (14 + {@code product}, issue 15/A1);
+ * three of them
  * ({@code residualValue} / {@code residualHandling} / {@code rateChangePolicy}) are mandatory
  * {@code LeaseElement} inputs that the form now sends explicitly instead of leaving the server to
  * default them — AGENTS.md §3.1 输入要素必须显式提供、缺失即报错、不得静默取默认值, and

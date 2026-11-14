@@ -21,6 +21,7 @@ import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
 import io.github.cuukenn.fincalc.domain.model.ResidualHandling;
 import io.github.cuukenn.fincalc.domain.model.RepaymentMethodId;
+import io.github.cuukenn.fincalc.domain.model.ProductProfile;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
 import io.github.cuukenn.fincalc.domain.model.ValidationIssue;
 import io.github.cuukenn.fincalc.domain.port.CashFlowBuilder;
@@ -163,6 +164,8 @@ public final class CalculationFacade {
     private final GeneratorRegistry generators;
     private final MetricRegistry metrics;
     private final ValidatorChain validators;
+    /** The mortgage chain (§2.3 threshold disclosures, A2) — selected per run by the product. */
+    private final ValidatorChain mortgageValidators;
     private final CashFlowBuilder cashFlowBuilder;
 
     private CalculationFacade(FunctionRegistry functions) {
@@ -170,6 +173,7 @@ public final class CalculationFacade {
         this.generators = GeneratorRegistry.defaults();
         this.metrics = MetricRegistry.defaults();
         this.validators = ValidatorChain.defaults();
+        this.mortgageValidators = ValidatorChain.withMortgageThresholds();
         this.cashFlowBuilder = new StandardCashFlowBuilder();
     }
 
@@ -269,7 +273,10 @@ public final class CalculationFacade {
 
         // Step 6: validation plus the engine's own diagnostics.
         List<ValidationIssue> engineIssues = new ArrayList<>();
-        schedule = validators.validate(schedule, element);
+        // A1（form-field-gaps 15）：产品身份只在这里生效——选校验链。测算内核保持
+        // 产品盲（R100）；LEASE / 未声明产品的 run 走缺省链，issues 与 v1 逐字节一致。
+        schedule = (request.options().product() == ProductProfile.MORTGAGE
+                ? mortgageValidators : validators).validate(schedule, element);
         for (String code : failedMetrics) {
             engineIssues.add(new ValidationIssue(IssueLevel.WARN,
                     EngineErrorCode.METRIC_COMPUTATION_FAILED.code(),
