@@ -443,11 +443,31 @@ function onReset(): void {
           ref="formRef"
           :model="form"
           :rules="rules"
+          :label-wrap="true"
           :label-col="{ style: { width: '92px' } }"
           class="compact-form"
           @finish="onFinish"
           @finish-failed="onFinishFailed"
         >
+
+          <!-- 操作按钮放表单顶部：要素卡很长，提交/重置不必滚到底部才能按。 -->
+          <FormItem style="margin-bottom: 4px">
+            <Space>
+              <Button
+                type="primary"
+                html-type="submit"
+                :loading="loading"
+                size="large"
+                data-test="mortgage-submit-btn"
+              >
+                {{ loading ? t('form.submitting') : t('form.submit') }}
+              </Button>
+              <!-- Task 6 §2：显式重置。面板只隐藏不销毁（R130），所以清空必须是表单自己的动作。 -->
+              <Button size="large" data-test="mortgage-reset-btn" @click="onReset()">
+                {{ t('form.reset') }}
+              </Button>
+            </Space>
+          </FormItem>
           <Card
             :title="t('mortgage.basic.title')"
             size="small"
@@ -508,6 +528,7 @@ function onReset(): void {
                   <Select
                     v-model:value="form.repricingCycle"
                     :options="cycleOptions"
+                    :popup-match-select-width="false"
                     data-test="mortgage-repricing-cycle"
                     style="width: 100%"
                   />
@@ -632,8 +653,13 @@ function onReset(): void {
           </Card>
 
           <!-- 月供读数：由本次摊销表派生（等额本息取首期，等额本金/到期一次还本付息取最坏月份）。
-               收入/债务输入与 DTI/杠杆读数已按 input-field-audit 裁定（2026-11-14）整体移除。 -->
-          <Card size="small" data-test="mortgage-card-payment" class="block-card">
+               只在测算后显示 —— 没有结果时一张空读数卡只会让表单显得缺了一块。 -->
+          <Card
+            v-if="result"
+            size="small"
+            data-test="mortgage-card-payment"
+            class="block-card"
+          >
             <dl class="payment-list">
               <div class="payment-item">
                 <dt data-test="mortgage-payment-label">{{ paymentLabel }}</dt>
@@ -655,24 +681,6 @@ function onReset(): void {
             data-test="bullet-reset-alert"
             style="margin-bottom: 12px"
           />
-
-          <FormItem style="margin-top: 16px">
-            <Space>
-              <Button
-                type="primary"
-                html-type="submit"
-                :loading="loading"
-                size="large"
-                data-test="mortgage-submit-btn"
-              >
-                {{ loading ? t('form.submitting') : t('form.submit') }}
-              </Button>
-              <!-- Task 6 §2：显式重置。面板只隐藏不销毁（R130），所以清空必须是表单自己的动作。 -->
-              <Button size="large" data-test="mortgage-reset-btn" @click="onReset()">
-                {{ t('form.reset') }}
-              </Button>
-            </Space>
-          </FormItem>
         </Form>
 
         <!-- 前端 [法] 门槛的阻断提示：文案明说引擎不校验这些门槛（R107/R109）。 -->

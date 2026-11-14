@@ -158,17 +158,16 @@ const enUS: typeof zhCN = {
     // 重定价日 / 重定价周期). It lands as the engine's existing segmented-rate rule rows, no new contract key.
     repricing: {
       cycle: 'Repricing cycle',
-      hint: 'No repricing = the fixed-rate path. Choose 3 / 6 / 12 months (央行公告〔2024〕第 11 号 offers exactly these three; the value gate lives in the UI, the engine only sees segmented rates).',
+      hint: 'No repricing = fixed rate; choose 3 / 6 / 12 months (央行公告〔2024〕第 11 号).',
       cycles: {
-        none: 'No repricing (fixed rate)',
+        none: 'No repricing',
         months: '{months} months',
       },
       anchorDate: 'Repricing date',
       anchorPh: 'Empty = the disbursement anniversary',
       futureLprs: 'LPR of the later segments (%)',
       futureLprsPh: 'e.g. 3.9, 3.1 (in segment order, comma separated)',
-      futureLprsHint:
-        'Give the LPR in force at each repricing, in segment order; the spread stays (P-04: the spread is a contract term, repricing re-fixes the LPR only). A missing segment is never filled in with the current LPR silently.',
+      futureLprsHint: 'Give the LPR at each repricing, in segment order; the spread stays, and a missing segment is never filled in silently.',
       reuse: 'Reuse the current LPR for missing segments (an assumption, not a contract fact)',
       readoutTitle: 'Segment rates (checkable before submit)',
       currentRate: 'Rate in force now',
@@ -182,7 +181,7 @@ const enUS: typeof zhCN = {
     },
     gates: {
       // §71: these [法] thresholds are validated in the UI, the copy must not claim the engine checks them (R107/R109).
-      note: 'Front-end gates: the term cap and the repayment-method rules are enforced by this form; with product=MORTGAGE the engine discloses thresholds as WARN findings (the down-payment/DTI readouts were removed per the input-field-audit ruling, 2026-11-14).',
+      note: 'Front-end gates: the term cap and the repayment-method rules are enforced by this form; engine-side threshold disclosures come back as WARN findings in the calculation result.',
       bulletOnly: 'Bullet (principal and interest at maturity) is selectable only when the term is ≤ {max} months (金规〔2026〕5号: only terms ≤ 1 year may repay at maturity).',
       bulletReset: 'Term exceeds {max} months: bullet repayment is not selectable and the choice was reset to equal installments (front-end rule, not engine-validated).',
       rateNotComposable: 'The annual rate cannot be composed from the LPR and the spread, check the inputs.',

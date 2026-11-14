@@ -490,11 +490,31 @@ function onReset(): void {
           ref="formRef"
           :model="form"
           :rules="rules"
+          :label-wrap="true"
           :label-col="{ style: { width: '92px' } }"
           class="compact-form"
           @finish="onFinish"
           @finish-failed="onFinishFailed"
         >
+
+          <!-- 操作按钮放表单顶部：要素卡很长，提交/重置不必滚到底部才能按。 -->
+          <FormItem style="margin-bottom: 4px">
+            <Space>
+              <Button
+                type="primary"
+                html-type="submit"
+                :loading="loading"
+                size="large"
+                data-test="submit-btn"
+              >
+                {{ loading ? t('form.submitting') : t('form.submit') }}
+              </Button>
+              <!-- Task 6 §2：显式重置。面板只隐藏不销毁（R130），所以清空必须是表单自己的动作。 -->
+              <Button size="large" data-test="calc-form-reset-btn" @click="onReset()">
+                {{ t('form.reset') }}
+              </Button>
+            </Space>
+          </FormItem>
           <!-- 大块 1：租赁要素（基础字段 + 口径 + 还款方式）。 -->
           <Card
             :title="t('form.basic.title')"
@@ -577,7 +597,8 @@ function onReset(): void {
                   />
                 </FormItem>
               </Col>
-              <Col :span="12">
+              <!-- R93-1 同款节奏：支付时点独占一行（原与币种下拉同排，币种移除后不再有半行空洞）。 -->
+              <Col :span="24">
                 <FormItem :label="t('form.basic.timing')" name="timing">
                   <Select
                     v-model:value="form.timing"
@@ -799,24 +820,6 @@ function onReset(): void {
               </Col>
             </Row>
           </Card>
-
-          <FormItem style="margin-top: 16px">
-            <Space>
-              <Button
-                type="primary"
-                html-type="submit"
-                :loading="loading"
-                size="large"
-                data-test="submit-btn"
-              >
-                {{ loading ? t('form.submitting') : t('form.submit') }}
-              </Button>
-              <!-- Task 6 §2：显式重置。面板只隐藏不销毁（R130），所以清空必须是表单自己的动作。 -->
-              <Button size="large" data-test="calc-form-reset-btn" @click="onReset()">
-                {{ t('form.reset') }}
-              </Button>
-            </Space>
-          </FormItem>
         </Form>
 
         <Alert

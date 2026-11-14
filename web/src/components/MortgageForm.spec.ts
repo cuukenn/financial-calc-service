@@ -439,8 +439,8 @@ describe('MortgageForm 显式重置 (Task 6 §2)', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
-    // 依赖这次跑结果的月供读数回到未计算态。
-    expect(wrapper.find('[data-test="mortgage-monthly-payment"]').text()).toBe('—')
+    // 依赖这次跑结果的月供读数随 result 一起消失（未测算时不出示空壳卡）。
+    expect(wrapper.find('[data-test="mortgage-card-payment"]').exists()).toBe(false)
   })
 
   it('reset restores the form defaults including the previously edited inputs', async () => {
@@ -554,7 +554,7 @@ describe('MortgageForm 显式重置 (Task 6 §2)', () => {
     expect(calculate).toHaveBeenCalledTimes(1)
     // 上一次跑的结果与读数必须已经不在（Task 5 评审点出的 stale readout 路径）。
     expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
-    expect(wrapper.find('[data-test="mortgage-monthly-payment"]').text()).toBe('—')
+    expect(wrapper.find('[data-test="mortgage-card-payment"]').exists()).toBe(false)
   })
 
   it('a 贷款金额 > 0 rule block clears the previous run and its stale readouts too', async () => {
@@ -573,7 +573,7 @@ describe('MortgageForm 显式重置 (Task 6 §2)', () => {
     await settleFormState()
     expect(fieldHasError(wrapper.element as HTMLElement, '[data-test="mortgage-principal"]')).toBe(true)
     expect(wrapper.find('[data-test="result-card"]').exists()).toBe(false)
-    expect(wrapper.find('[data-test="mortgage-monthly-payment"]').text()).toBe('—')
+    expect(wrapper.find('[data-test="mortgage-card-payment"]').exists()).toBe(false)
   })
 })
 
