@@ -24,11 +24,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class CalculationController {
 
     private final CalculationFacade facade;
-    private final CalculationRequestAssembler requestAssembler = new CalculationRequestAssembler();
+    // A3（2026-11-11 scan）：编译注册表 = facade 的脚本注册表，规则行里的 .fcs 函数
+    // 引用与运行时同源——两个 FunctionRegistry 一旦分叉，带脚本的规则行要么编译失败
+    // 要么解析出另一套函数。
+    private final CalculationRequestAssembler requestAssembler;
     private final CalculationResponseAssembler responseAssembler = new CalculationResponseAssembler();
 
     public CalculationController(CalculationFacade facade) {
         this.facade = facade;
+        this.requestAssembler = new CalculationRequestAssembler(facade.functions());
     }
 
     /**

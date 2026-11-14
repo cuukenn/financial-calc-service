@@ -406,6 +406,12 @@ function buildRequest(): CalculationRequest {
         chargeMode: fee.chargeMode,
         // 承担方（ticket 04）：缺省承租人承担；字段总带上，契约显式优于缺席（§3.1）。
         owner: fee.owner,
+        // U5：费用税率（百分数口径展示值）与 IRR 参与开关逐笔显式给出；
+        // 税率留空不携带（后端 null = 不单列税），开关恒带（false 是契约缺省，显式优于缺席）。
+        ...(fee.vatRate.trim() === ''
+          ? {}
+          : { vatRate: parseRateInput(fee.vatRate) ?? fee.vatRate.trim() }),
+        includeInIrr: fee.includeInIrr,
       }
       return feeInput
     })

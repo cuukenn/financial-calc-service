@@ -292,7 +292,7 @@ public final class CalculationFacade {
                     EngineErrorCode.IRR_ROOT_AMBIGUOUS.message(), null));
         }
         for (Installment installment : schedule.installments()) {
-            if (RuleDrivenGenerator.FALLBACK_MEMO.equals(installment.memo())) {
+            if (RuleDrivenGenerator.isFallbackMemo(installment.memo())) {
                 engineIssues.add(new ValidationIssue(IssueLevel.WARN,
                         EngineErrorCode.RULE_FALLBACK_PERIOD.code(),
                         String.format(EngineErrorCode.RULE_FALLBACK_PERIOD.message(),

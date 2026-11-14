@@ -89,6 +89,8 @@ const zhCN = {
     feesOther: {
       title: '费用与其他',
       fees: {
+        vatRatePh: '税率 如 6 或 6%',
+        includeIrr: '计入 IRR',
         title: '费用（可选）',
         typePh: '费用类型',
         amountPh: '金额',

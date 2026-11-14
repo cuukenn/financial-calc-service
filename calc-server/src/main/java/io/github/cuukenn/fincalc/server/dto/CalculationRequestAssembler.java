@@ -33,9 +33,17 @@ import java.util.List;
  *
  * <p>Every field is mapped explicitly; absent optional fields fall back to the model's own
  * defaults as documented on the DTO. Rule rows, when present, are compiled through
- * {@link RuleCompiler} over {@link FunctionRegistry#defaults()} with
+ * {@link RuleCompiler} over the injected {@link FunctionRegistry} (see the constructors) with
  * {@code allowPartialRuleSet} (request flag, default {@code false}); a failed compilation
  * throws {@code RuleValidationException extends BusinessException} → HTTP 400 under R77.
+ *
+ * <p><b>The registry must be the facade's.</b> The facade loads {@code classpath:functions/*.fcs}
+ * plus an external directory into <em>its</em> registry; an assembler compiled over a private
+ * {@code FunctionRegistry.defaults()} would reject (or resolve differently) any rule row that
+ * references a script function — the two registries fork the moment a script exists
+ * (2026-11-11 scan A3). {@code CalculationController} therefore injects
+ * {@code facade.functions()}; the no-arg constructor keeps the defaults-only posture for
+ * callers that run without scripts (tests).
  *
  * <p>{@code method} is parsed by name; an unknown name raises
  * {@link EngineErrorCode#GENERATOR_NOT_REGISTERED} (FCS-ENG-1002, HTTP 400) — semantically the
@@ -48,8 +56,18 @@ public final class CalculationRequestAssembler {
 
     private final RuleCompiler ruleCompiler;
 
+    /** Defaults-only registry: for callers that run without script functions (tests). */
     public CalculationRequestAssembler() {
-        this.ruleCompiler = new RuleCompiler(FunctionRegistry.defaults());
+        this(FunctionRegistry.defaults());
+    }
+
+    /**
+     * @param functions the registry rule rows compile against; pass {@code facade.functions()}
+     *                  so rule-row function references resolve against the same script set the
+     *                  run itself uses; never {@code null}
+     */
+    public CalculationRequestAssembler(FunctionRegistry functions) {
+        this.ruleCompiler = new RuleCompiler(functions);
     }
 
     /**

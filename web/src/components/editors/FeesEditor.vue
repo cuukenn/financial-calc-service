@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Input, Select, Typography } from 'ant-design-vue'
+import { Button, Checkbox, Input, Select, Typography } from 'ant-design-vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -27,7 +27,8 @@ const feeOwnerOptions = computed(() =>
 )
 
 function addFee(): void {
-  fees.value.push({ type: '', amount: '', chargeMode: 'UPFRONT', owner: 'LESSEE' })
+  fees.value.push({ type: '', amount: '', chargeMode: 'UPFRONT', owner: 'LESSEE',
+    vatRate: '', includeInIrr: false })
 }
 
 function removeFee(index: number): void {
@@ -70,6 +71,15 @@ function removeFee(index: number): void {
           style="width: 140px"
           data-test="fee-owner"
         />
+        <Input
+          v-model:value="fee.vatRate"
+          :placeholder="t('form.feesOther.fees.vatRatePh')"
+          style="width: 110px"
+          data-test="fee-vat-rate"
+        />
+        <Checkbox v-model:checked="fee.includeInIrr" data-test="fee-include-irr">
+          {{ t('form.feesOther.fees.includeIrr') }}
+        </Checkbox>
         <Button danger @click="removeFee(idx)">
           {{ t('form.feesOther.fees.remove') }}
         </Button>

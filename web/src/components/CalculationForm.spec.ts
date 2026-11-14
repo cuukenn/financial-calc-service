@@ -209,6 +209,25 @@ describe('CalculationForm', () => {
     expect(req.principal).toBe('1000000')
   })
 
+  it('sends per-fee vatRate and includeInIrr from the editor (U5)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="fee-add"]').trigger('click')
+    await wrapper.find('[data-test="fee-row"] input[placeholder="费用类型"]').setValue('HANDLING')
+    await wrapper.find('[data-test="fee-row"] input[placeholder="金额"]').setValue('20000')
+    await wrapper.find('[data-test="fee-vat-rate"]').setValue('6')
+    // AntD Checkbox 的 attrs 落点不可靠：按行内 checkbox 类型选择。
+    await wrapper.find('[data-test="fee-row"] input[type="checkbox"]').setValue(true)
+    await submit(wrapper)
+
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.fees).toHaveLength(1)
+    expect(req.fees![0]!.type).toBe('HANDLING')
+    expect(req.fees![0]!.amount).toBe('20000')
+    // 税率百分数口径展示值 6 → 0.06（R92-5 同款换算）；IRR 开关显式 true。
+    expect(req.fees![0]!.vatRate).toBe('0.06')
+    expect(req.fees![0]!.includeInIrr).toBe(true)
+  })
+
   it('sends the deposit calibers and the percent-denominated interest rate (ticket 03)', async () => {
     const wrapper = mountWithI18n(CalculationForm)
     await wrapper.find('[data-test="deposit"]').setValue('50000')

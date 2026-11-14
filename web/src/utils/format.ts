@@ -1,3 +1,5 @@
+import { formatDecimalPercent, isDecimalText } from './ratio'
+
 /**
  * R90a/R90b 数值显示格式化（纯函数，供指标卡与各表格共用，禁止散落 toFixed）。
  *
@@ -31,11 +33,18 @@ export function formatMoney(value: string | null | undefined): string {
   return MONEY_FORMAT.format(n)
 }
 
-/** 百分比：×100 后固定 4 位小数 + '%'（0.061677800455 → 6.1678%）。 */
+/**
+ * 百分比：×100 后固定 4 位小数 + '%'（0.061677800455 → 6.1678%）。
+ *
+ * U7（2026-11-11 scan）：实现换成 `utils/ratio.ts` 的十进制字符串长算
+ * （`formatDecimalPercent`，BigInt 定点、HALF_UP）——浮点 `×100 + toFixed` 会让
+ * `0.0049999991` 这类边界值在显示层再丢一次精度（P-01 的精神同样约束展示层）。
+ * 兜底约定不变：null/空 → '—'，非数值原样透出（调用方的占位契约不动）。
+ */
 export function formatPercent(value: string | null | undefined): string {
-  const n = toNumber(value)
-  if (n === null) return value === null || value === undefined || value === '' ? '—' : value
-  return `${(n * 100).toFixed(4)}%`
+  if (value === null || value === undefined || value === '') return '—'
+  if (!isDecimalText(value)) return value
+  return formatDecimalPercent(value, 4)
 }
 
 /** 一般数值：固定 4 位小数，无千分位（0.26841 → 0.2684；久期/回收期/凸性/租费率等）。 */

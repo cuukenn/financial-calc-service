@@ -87,6 +87,8 @@ const enUS: typeof zhCN = {
     feesOther: {
       title: 'Fees & Others',
       fees: {
+        vatRatePh: 'VAT rate, e.g. 6 or 6%',
+        includeIrr: 'Include in IRR',
         title: 'Fees (optional)',
         typePh: 'Fee type',
         amountPh: 'Amount',

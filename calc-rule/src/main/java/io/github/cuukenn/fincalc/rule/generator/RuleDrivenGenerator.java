@@ -82,6 +82,15 @@ public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
     /** Memo recorded on installments produced by an allowed partial-rule-set fallback (R15). */
     public static final String FALLBACK_MEMO = "RULE_FALLBACK";
 
+    /**
+     * The structured counterpart of the string marker: the facade's WARN sweep reads this, not a
+     * hand-written {@code equals}, so the marker lives in exactly one place (2026-11-11 scan A4).
+     * A {@code null} memo is never a fallback row.
+     */
+    public static boolean isFallbackMemo(String memo) {
+        return FALLBACK_MEMO.equals(memo);
+    }
+
     private final RuleSetView ruleSet;
 
     /**
