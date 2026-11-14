@@ -1,4 +1,4 @@
-import type { EChartsOption } from 'echarts'
+import type { EChartsCoreOption } from 'echarts/core'
 
 import type { CashFlowEvent, Installment } from '@/api/types'
 
@@ -38,7 +38,7 @@ function periodTicks(installments: Installment[], labels: ChartLabels): string[]
 export function buildCompositionOption(
   installments: Installment[],
   labels: ChartLabels,
-): EChartsOption {
+): EChartsCoreOption {
   return {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { data: [labels.principal, labels.interest] },
@@ -66,7 +66,7 @@ export function buildCompositionOption(
 export function buildBalanceOption(
   installments: Installment[],
   labels: ChartLabels,
-): EChartsOption {
+): EChartsCoreOption {
   return {
     tooltip: { trigger: 'axis' },
     grid: { left: 80, right: 24, bottom: 40, containLabel: true },
@@ -102,7 +102,7 @@ export interface CumulativeCashflowLabels {
 export function buildCumulativeCashflowOption(
   cashFlows: CashFlowEvent[],
   labels: CumulativeCashflowLabels,
-): EChartsOption {
+): EChartsCoreOption {
   /** 同一日期可能多笔事件（租金 + 本金 + 利息 …），先按日期聚合净额。 */
   const netByDate = new Map<string, number>()
   for (const flow of cashFlows) {

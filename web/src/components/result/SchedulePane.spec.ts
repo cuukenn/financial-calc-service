@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
 // EChart 会真的 init 一个 canvas：结果区的图表与分页无关，mock 掉即可。
-vi.mock('echarts', () => ({
+vi.mock('echarts/core', () => ({
+  use: vi.fn(),
   init: () => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() }),
 }))
 

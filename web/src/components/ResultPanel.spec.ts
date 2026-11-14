@@ -7,7 +7,8 @@ import { setLocale } from '@/i18n'
 import { mountWithI18n } from '@/test-utils/mount'
 import { activateTab } from '@/test-utils/tabs'
 
-vi.mock('echarts', () => ({
+vi.mock('echarts/core', () => ({
+  use: vi.fn(),
   init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
 }))
 

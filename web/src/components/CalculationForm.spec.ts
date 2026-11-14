@@ -23,7 +23,8 @@ vi.mock('@/api/client', () => ({
 }))
 
 // jsdom 无 canvas：ECharts 仅需在挂载时不炸即可，渲染细节由 options 纯函数测试覆盖。
-vi.mock('echarts', () => ({
+vi.mock('echarts/core', () => ({
+  use: vi.fn(),
   init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
 }))
 

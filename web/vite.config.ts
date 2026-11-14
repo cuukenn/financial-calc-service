@@ -12,6 +12,26 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // U1（2026-11-11 scan）：vendor 拆块——总量的减法已经由 echarts/core + 去掉
+        // AntD 整包挂载做完（2839.9 → 1793.0 kB，−37%），这一步只做缓存的减法：
+        // 库代码与业务代码分开哈希，业务迭代不再打掉整包缓存。echarts 因按需
+        // register 已经小很多，与业务同块即可；antd 单独成块（它是剩余大头的来源，
+        // 再往下要靠 unplugin 按需解析组件+图标，属下一轮）。
+        manualChunks(id: string) {
+          if (id.includes('node_modules')) {
+            if (id.includes('echarts') || id.includes('zrender')) return 'echarts'
+            if (id.includes('ant-design-vue') || id.includes('@ant-design')
+              || id.includes('dayjs')) return 'antd'
+            return 'vendor'
+          }
+          return undefined
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': {

@@ -12,7 +12,8 @@ import zhCN from '@/i18n/locales/zh-CN'
 import { mountWithI18n } from '@/test-utils/mount'
 
 // jsdom 无 canvas：共用样式表的 DOM 对账不需要图表，只要挂载时不炸。
-vi.mock('echarts', () => ({
+vi.mock('echarts/core', () => ({
+  use: vi.fn(),
   init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
 }))
 
