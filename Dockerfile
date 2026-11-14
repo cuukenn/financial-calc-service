@@ -42,9 +42,9 @@ COPY calc-server calc-server
 COPY --from=web-build /build/web/dist/ calc-server/src/main/resources/static/
 RUN --mount=type=cache,target=/root/.m2 mvn -B -q -pl calc-server -am package -DskipTests
 
-# 按 layers.idx 拆层（Boot 2.7 用 layertools jarmode）
-RUN java -Djarmode=layertools -jar /build/calc-server/target/calc-server-*.jar extract \
-    --destination /extracted
+# 按 layers.idx 拆层（Boot 3.3+ 用 tools jarmode；--launcher 产出 JarLauncher 启动形态）
+RUN java -Djarmode=tools -jar /build/calc-server/target/calc-server-*.jar extract \
+    --layers --launcher --destination /extracted
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
@@ -54,5 +54,5 @@ COPY --from=backend-build /extracted/spring-boot-loader/ ./
 COPY --from=backend-build /extracted/snapshot-dependencies/ ./
 COPY --from=backend-build /extracted/application/ ./
 EXPOSE 8080
-# 分层启动经 JarLauncher（Boot 2.7 的 loader 包无 .launch）
-ENTRYPOINT ["java", "org.springframework.boot.loader.JarLauncher"]
+# 分层启动经 JarLauncher（Boot 3.2+ 的 launch 包）
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]

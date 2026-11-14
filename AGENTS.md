@@ -1,6 +1,9 @@
-# AGENTS.md — 测算标准硬约束
+# AGENTS.md — 测算标准硬约束与工程事实
 
-本文件只规定**测算标准**的硬约束：数值精度、指标名称、标准要素。适用于本项目所有生成器、指标、校验、API 与报表。
+**文档分工**：`README.md` 给人看（用法/部署/发布/口径要点）；本文件给 agent 看（测算硬约束 + 工程事实与规范）。
+口径冲突时以本文件为准。
+
+本文件规定**测算标准**的硬约束（数值精度、指标名称、标准要素）与**工程规范**。适用于本项目所有生成器、指标、校验、API 与报表。
 
 标注含义：
 
@@ -11,7 +14,7 @@
 
 冲突规则：合同/产品条款有明确约定的，从其约定并在结果中标注口径；无约定时按本文件。不得把 [实] 口径写成 [法] 强制。
 
-> **复核记录**：2026-11-07 —— 已对照下列现行原文逐条复核：银发〔2005〕129号、央行公告〔2019〕第15/16号、央行公告〔2024〕第11号、《印花税法》、CAS 21（财会〔2018〕35号）、《金融租赁公司管理办法》（金融监管总局令 2024年第4号）、《融资租赁公司监督管理暂行办法》（银保监发〔2020〕22号）。修正：P-04 LPR 报价步长（0.05%，非 0.01%）；P-03/P-06 拆分 129号/会计制度 与实务精度；P-14 补零头天数；§2.3 补金租集中度/同业拆借/拨备率及融资租赁单一股东、重大关联交易；§2.1/§2.4 按 CAS 21 原文补全租赁收款额、使用权资产；§3.5 重定价周期改为 3/6/12 个月。
+> **复核记录**：2026-11-07 对照现行原文逐条复核（银发〔2005〕129号、央行公告〔2019〕15/16号、〔2024〕11号、《印花税法》、CAS 21、金租办法 2024、融资租赁暂行办法 2020），修正了 P-03/P-04/P-06/P-14、§2.1/§2.3/§2.4/§3.5。
 
 ---
 
@@ -176,7 +179,7 @@
 - **印花税**：融资租赁合同为《印花税法》（2022-07-01 施行）**独立税目**，税率为租金总额的 **0.005%**（万分之零点五，不含单列增值税）。
 - **会计**：CAS 21（2018 修订）为租赁计量的现行准则。
 
-> 本轮硬约束到此为止：只覆盖精度、指标名称、标准要素、强制阈值与指标口径；不包含实现状态、项目结构、构建方式和待办清单。
+> §1–§5 为测算硬约束；§6 为性能闸门；§7 为工程事实与规范（打包/部署/发布/日志）。
 
 ---
 
@@ -230,3 +233,30 @@ Issues and specs live as markdown files under `.scratch/`. See `docs/agents/issu
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` at the repo root plus `docs/adr/`. See `docs/agents/domain.md`.
+
+---
+
+## 7. 工程事实与规范（2026-11-14）
+
+> 面向 agent 的仓库事实：改动前先对齐这里，不要凭记忆或旧会话。
+
+| 项 | 事实 |
+|---|---|
+| 仓库 / 分支 | `github.com/cuukenn/financial-calc-service`，分支 **master**（不是 main） |
+| 构建 / 测试 | JDK ≥ 17；`mvn -o test`（6 模块 510 个测试；闸门 `RunCostBaselineTest` 见 §6 N-01） |
+| 运行时栈 | Spring Boot **3.5.16**（calc-bom `spring-boot.version`；spring-boot-maven-plugin 同版本，勿再钉 2.7） |
+| 打包形态 | **一体化 jar**：前端 dist 在构建期拷入 `calc-server/src/main/resources/static`（gitignore，勿提交）→ `BOOT-INF/classes/static`。本地 `mvn package` 不带前端 = 纯 API jar。Dockerfile 用 tools jarmode 拆四层（dependencies/loader/snapshot/application）逐层 COPY，入口 `org.springframework.boot.loader.launch.JarLauncher` |
+| 部署 | 根目录 `Dockerfile` + `docker-compose.yml`（单容器单端口 8080，无独立前端服务）。验证：`docker compose up -d --build` 后 `/` 200、`/api` 复现黄金值、`/api/v1/nonexistent` 仍 FCS-SRV-1005 |
+| 静态资源托管 | `UiResourceConfig` 只注册显式 UI 路径（`/` → index.html、`/assets/**`）；`add-mappings: false` 的 R77 统一 404 语义不变——未匹配路径一律 `FCS-SRV-1005` |
+| 发布 | `git tag vX.Y.Z && git push origin vX.Y.Z` → Release 工作流（前端 build/test → 拷入静态资源 → `mvn package`）附一体化 jar + compose + Dockerfile。v0.1.0 是旧四件产物结构（jar 不含前端），已裁定不重发 |
+
+### 日志规范
+
+四级语义（SLF4J；`application.yml` 默认 `io.github.cuukenn.fincalc=INFO`）：
+
+- **INFO**：run 生命周期（开始/结束，含 runId、耗时、期数、issue 数）、HTTP 请求完成行、启动装配摘要。
+- **DEBUG**：引擎步骤装配明细；客户端请求格式误用。
+- **WARN**：业务 400 拒绝、指标不可算、IRR 不唯一、§9.7 拒绝路径——**口径以响应体 ValidationIssue 为准，日志只做旁路观测，禁止双写口径**。
+- **ERROR**：系统异常与未捕获异常（带堆栈）。
+
+硬规则：**calc-domain 零日志**（框架无关，DependencyDirectionTest 守卫）；日志不得携带任何参与测算的中间数值（N-04 逐位一致不受日志影响）；engine 经 slf4j-api（无绑定，宿主提供 logback）。
