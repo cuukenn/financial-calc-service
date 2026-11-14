@@ -45,13 +45,13 @@ import java.util.Objects;
  * both modes because it is a separate receipt line. Dropping either would erase money the lessor
  * receives and silently misprice every yield metric.
  *
- * <p>Known v1 gaps: a {@link FeeChargeMode#DEDUCT_FROM_PRINCIPAL} fee has no leg because v1 does
- * not net fees — the {@code FeeAllocator} extension point arrives with the fee work (Plan 2);
- * until then such contracts price the gross principal. A deposit that offsets the principal is
- * netted the other way round (form-field-gaps ticket 03): the schedule amortizes
- * {@link LeaseElement#measuredPrincipal()} and the event table keeps both t0 legs explicit.
+ * <p>Known v1 gaps: an {@link FeeChargeMode#AMORTIZED} fee still has no leg — folding it into
+ * rent needs the {@code FeeAllocator} work (Plan 2). A {@link FeeChargeMode#DEDUCT_FROM_PRINCIPAL}
+ * fee used to be the same gap; since the 2026-11-14 收口轮 it nets into
+ * {@link LeaseElement#measuredPrincipal()} with its t0 leg explicit (the deposit-offset pattern).
+ * A deposit that offsets the principal is netted the same way (form-field-gaps ticket 03).
  * Rent legs land on {@code installment.endDate()} because v1 schedules are {@code IN_ARREARS}
- * only.
+ * only (IN_ADVANCE is rejected loudly by every generator's {@code validate}).
  */
 public final class StandardCashFlowBuilder implements CashFlowBuilder {
 
@@ -202,16 +202,24 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
             RoundingPolicy rounding, LocalDate t0) {
         BigDecimal lesseeBorne = MoneyUtils.ZERO;
         BigDecimal lessorBorne = MoneyUtils.ZERO;
+        BigDecimal deducted = MoneyUtils.ZERO;
         for (FeeItem fee : element.fees()) {
-            if (fee.chargeMode() == FeeChargeMode.UPFRONT && fee.includeInIrr()) {
-                if (fee.owner() == FeeOwner.LESSOR) {
-                    lessorBorne = lessorBorne.add(fee.amount());
-                } else {
-                    lesseeBorne = lesseeBorne.add(fee.amount());
+            if (fee.includeInIrr() && fee.amount() != null) {
+                if (fee.chargeMode() == FeeChargeMode.UPFRONT) {
+                    if (fee.owner() == FeeOwner.LESSOR) {
+                        lessorBorne = lessorBorne.add(fee.amount());
+                    } else {
+                        lesseeBorne = lesseeBorne.add(fee.amount());
+                    }
+                } else if (fee.chargeMode() == FeeChargeMode.DEDUCT_FROM_PRINCIPAL) {
+                    // 抵减本金的费用：出租人借出全额本金、当场收回费用 → 净融资额即
+                    // {@link LeaseElement#measuredPrincipal()}；两腿显式，净额一致。
+                    deducted = deducted.add(fee.amount());
                 }
             }
         }
         addFlow(flows, t0, money(lesseeBorne, rounding), CashFlowType.FEE, CashFlowDirection.INFLOW);
+        addFlow(flows, t0, money(deducted, rounding), CashFlowType.FEE, CashFlowDirection.INFLOW);
         addFlow(flows, t0, money(lessorBorne, rounding), CashFlowType.FEE, CashFlowDirection.OUTFLOW);
     }
 

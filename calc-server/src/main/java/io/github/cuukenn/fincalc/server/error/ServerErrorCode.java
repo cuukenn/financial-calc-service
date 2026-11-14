@@ -59,7 +59,14 @@ public enum ServerErrorCode implements ErrorCode {
      * {@code spring.mvc.throw-exception-if-no-handler-found: true}); caller error, HTTP 404,
      * message names the requested path.
      */
-    NO_HANDLER("FCS-SRV-1005", "FCS-SRV-1005: 请求路径不存在: %s");
+    NO_HANDLER("FCS-SRV-1005", "FCS-SRV-1005: 请求路径不存在: %s"),
+
+    /**
+     * §15：请求体大小上限（design §15 的 strict 1MB JSON filter，form-field-gaps 收口轮
+     * 2026-11-14 实施）。Tomcat 的 form/multipart 上限不覆盖普通 JSON 体，过滤器按
+     * Content-Length 与流式计数双路径拦（HTTP 413，统一错误体）。
+     */
+    REQUEST_BODY_TOO_LARGE("FCS-SRV-1006", "FCS-SRV-1006: 请求体超过上限: %s");
 
     private final String code;
     private final String message;

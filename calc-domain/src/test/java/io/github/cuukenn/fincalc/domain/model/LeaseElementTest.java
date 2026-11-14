@@ -332,6 +332,27 @@ class LeaseElementTest {
                 .hasMessageContaining("FCS-DOM-1021");
     }
 
+    @Test
+    void measured_principal_nets_deduct_from_principal_fees() {
+        FeeItem deducted = FeeItem.builder()
+                .type("FILING")
+                .amount(new BigDecimal("30000"))
+                .chargeMode(FeeChargeMode.DEDUCT_FROM_PRINCIPAL)
+                .build();
+        LeaseElement element = baseBuilder()
+                .fees(Collections.singletonList(deducted))
+                .build();
+        // 抵减本金的费用按合同扣减融资额——与 IRR 参与无关（includeInIrr 只管现金流腿）。
+        assertThat(element.measuredPrincipal()).isEqualByComparingTo("970000");
+        // 与保证金抵减叠加。
+        LeaseElement stacked = baseBuilder()
+                .fees(Collections.singletonList(deducted))
+                .deposit(new BigDecimal("50000"))
+                .depositSettlement(DepositSettlement.OFFSET_PRINCIPAL)
+                .build();
+        assertThat(stacked.measuredPrincipal()).isEqualByComparingTo("920000");
+    }
+
     private LeaseElement.Builder baseBuilder() {
         return LeaseElement.builder()
                 .principal(new BigDecimal("1000000"))

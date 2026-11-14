@@ -525,6 +525,57 @@ class StandardCashFlowBuilderTest {
                 .build();
     }
 
+    @Test
+    void deduct_from_principal_fee_nets_the_financed_principal_and_keeps_both_legs() {
+        FeeItem deducted = FeeItem.builder()
+                .type("FILING")
+                .amount(new BigDecimal("30000"))
+                .chargeMode(FeeChargeMode.DEDUCT_FROM_PRINCIPAL)
+                .includeInIrr(true)
+                .build();
+        LeaseElement element = element().toBuilder()
+                .fees(Collections.singletonList(deducted))
+                .build();
+        Schedule schedule = generate(element);
+
+        // 摊销本金吃净额：首期期初 = 1,000,000 − 30,000。
+        assertThat(schedule.installments().get(0).openingBalance())
+                .isEqualByComparingTo("970000.00");
+
+        List<CashFlow> flows = builder.build(schedule, element, CalculationOptions.defaults());
+        // 两腿显式：本金全额流出 + 费用流入，净额与摊销本金一致。
+        assertThat(flows.get(0).type()).isEqualTo(CashFlowType.PRINCIPAL);
+        assertThat(flows.get(0).amount()).isEqualByComparingTo("1000000.00");
+        assertThat(flows).anySatisfy(f -> {
+            assertThat(f.type()).isEqualTo(CashFlowType.FEE);
+            assertThat(f.date()).isEqualTo(T0);
+            assertThat(f.direction()).isEqualTo(INFLOW);
+            assertThat(f.amount()).isEqualByComparingTo("30000.00");
+        });
+        assertThat(schedule.hasErrors()).isFalse();
+    }
+
+    @Test
+    void a_deduct_fee_without_irr_participation_still_nets_but_has_no_leg() {
+        FeeItem deducted = FeeItem.builder()
+                .type("FILING")
+                .amount(new BigDecimal("30000"))
+                .chargeMode(FeeChargeMode.DEDUCT_FROM_PRINCIPAL)
+                .includeInIrr(false)
+                .build();
+        LeaseElement element = element().toBuilder()
+                .fees(Collections.singletonList(deducted))
+                .build();
+        Schedule schedule = generate(element);
+
+        // 净额是合同事实（includeInIrr 只管现金流腿，不管摊销基数）。
+        assertThat(schedule.installments().get(0).openingBalance())
+                .isEqualByComparingTo("970000.00");
+        List<CashFlow> flows = builder.build(schedule, element, CalculationOptions.defaults());
+        assertThat(flows).noneMatch(f -> f.type() == CashFlowType.FEE);
+        assertThat(schedule.hasErrors()).isFalse();
+    }
+
     private static Schedule schedule() {
         return generate(element());
     }

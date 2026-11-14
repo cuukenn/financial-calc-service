@@ -445,17 +445,29 @@ public final class LeaseElement {
     /**
      * The principal the schedule amortizes: the contract principal less a deposit whose settlement
      * is {@link DepositSettlement#OFFSET_PRINCIPAL} — the deposit is consumed at collection against
-     * the financed amount, so rent and balances are measured on the net — and the contract principal
-     * under every other settlement. Generators, the principal-conservation validator and the rule
-     * pool all read this, so no amortization site can disagree with another about what the schedule
-     * must repay; the event table keeps the deposit legs explicit and nets to the same number.
+     * the financed amount, so rent and balances are measured on the net — less every
+     * {@link FeeChargeMode#DEDUCT_FROM_PRINCIPAL} fee (consumed at collection the same way), and the
+     * contract principal under every other settlement. Generators, the principal-conservation
+     * validator and the rule pool all read this, so no amortization site can disagree with another
+     * about what the schedule must repay; the event table keeps the legs explicit and nets to the
+     * same number.
      */
     public BigDecimal measuredPrincipal() {
+        BigDecimal measured = principal;
         if (depositSettlement == DepositSettlement.OFFSET_PRINCIPAL
                 && deposit != null && deposit.signum() > 0) {
-            return principal.subtract(deposit);
+            measured = measured.subtract(deposit);
         }
-        return principal;
+        // DEDUCT_FROM_PRINCIPAL 费用在收取时抵减融资额（FeeAllocator 缺口的第一半收口）：
+        // 事件表保留两腿显式（本金全额流出 + 费用流入），摊销本金吃净额——与保证金
+        // OFFSET_PRINCIPAL 同一套「两腿显式、净额入账」模式。
+        for (FeeItem fee : fees) {
+            if (fee.chargeMode() == FeeChargeMode.DEDUCT_FROM_PRINCIPAL
+                    && fee.amount() != null && fee.amount().signum() > 0) {
+                measured = measured.subtract(fee.amount());
+            }
+        }
+        return measured;
     }
 
     /** Fees charged alongside the rent; unmodifiable. */
