@@ -10,7 +10,7 @@
  * 而是按「年化读数与 `XIRR` / `TRUE_ANNUAL_RATE` 的差异超过容差」—— 定义上两者都是
  * 年化收益率，出现差异只可能是指数错了。此处只做标注，不改引擎口径（R135）。
  *
- * 十进制字符串运算，不引入浮点（P-01）。
+ * 十进制字符串运算，不引入浮点。
  */
 import { compareDecimal, decimalSubtract, isDecimalText } from '@/utils/ratio'
 

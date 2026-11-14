@@ -52,7 +52,7 @@ describe('parseRateInput (R92-5/R92-6 percent-style rate input)', () => {
   })
 })
 
-describe('composeLprRate (P-04: 年利率 = LPR + 加点)', () => {
+describe('composeLprRate (年利率 = LPR + 加点)', () => {
   it('composes a decimal annual rate from a percent LPR and a bp spread', () => {
     expect(composeLprRate('3.5', '0')).toBe('0.035')
     expect(composeLprRate('3.5', '35')).toBe('0.0385')
@@ -74,7 +74,7 @@ describe('composeLprRate (P-04: 年利率 = LPR + 加点)', () => {
   })
 })
 
-describe('isLprStepAligned (P-04: LPR 报价步长 0.05 个百分点 = 5bp)', () => {
+describe('isLprStepAligned (LPR 报价步长 0.05 个百分点 = 5bp)', () => {
   it('accepts integer multiples of 5bp, including zero and negatives', () => {
     expect(isLprStepAligned('0')).toBe(true)
     expect(isLprStepAligned('5')).toBe(true)

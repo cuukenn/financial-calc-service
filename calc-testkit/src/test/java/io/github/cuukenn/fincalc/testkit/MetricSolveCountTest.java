@@ -31,7 +31,7 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 /**
- * AGENTS.md N-05: a run must be able to prove how many root solves it paid for. This test
+ * A run must be able to prove how many root solves it paid for. This test
  * reads {@link BisectionNewtonSolver#SOLVE_COUNT} / {@link BisectionNewtonSolver#EVALUATION_COUNT}
  * around the two orchestration shapes and pins the expected counts:
  *
@@ -96,11 +96,11 @@ class MetricSolveCountTest {
     }
 
     /**
-     * AGENTS.md N-01「分段计时可读」taken one level finer: which code of the §9.5 line costs
+     * 「分段计时可读」taken one level finer: which code of the §9.5 line costs
      * what. The registered set is wrapped in timing decorators, same codes, same order, same
      * compute — so the run is the run the facade pays for, and the table is what a hotspot ordering
      * has to be read from. Printed, not asserted: a per-code assertion would be a second gate on
-     * numbers this machine cannot hold still, and N-01 pins the cost gate in
+     * numbers this machine cannot hold still, and the cost gate lives in
      * {@link RunCostBaselineTest}.
      */
     @Test
@@ -174,7 +174,7 @@ class MetricSolveCountTest {
     }
 
     /**
-     * Ticket 02 / AGENTS.md N-05: the §9.7 effective-interest chain prices the stream the run has
+     * Ticket 02 / the §9.7 effective-interest chain prices the stream the run has
      * already solved. On a plain deal — no upfront fee, no deposit leg, no separately settled 留购价,
      * no residual money — the chain's t0 opening balance and rent legs <em>are</em> the §9.4 event
      * table {@code IRR_PERIOD} was solved over, index for index, so the run pays two solves and not
@@ -238,7 +238,7 @@ class MetricSolveCountTest {
      * residual and asset value = principal, the CAS 21 measure chain's stream <em>is</em> the §9.4
      * event table — so {@code LEASE_IMPLICIT_RATE} reads {@code IRR_PERIOD}'s unrounded root off the
      * ledger and the staged line pays two solves, not three. A duplicated solve here would be the
-     * exact duplicate N-05 forbids: same stream, same root, no caliber difference to state.
+     * exact duplicate the one-solve rule forbids: same stream, same root, no caliber difference to state.
      */
     @Test
     void the_implicit_rate_reads_the_runs_root_when_its_stream_is_the_event_table() {
@@ -272,7 +272,7 @@ class MetricSolveCountTest {
      * A code that cannot compute must say so before spending a solve. {@code LEASE_IMPLICIT_RATE}
      * needs the asset value CAS 21 measures against; with none in the element it answers
      * {@code null} and the run pays for nothing — a solver call on a stream whose answer is already
-     * known to be unusable is the duplicate §6 N-05 forbids, not a harmless probe.
+     * known to be unusable is the duplicate the one-solve rule forbids, not a harmless probe.
      */
     @Test
     void lease_implicit_rate_declares_itself_uncomputable_before_any_solve() {

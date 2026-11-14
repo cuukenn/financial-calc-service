@@ -126,12 +126,12 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
 
     /**
      * A deposit participates only under the basis that asks for it. The legs themselves are shaped
-     * by the element's 收取时点 / 退还抵扣规则 (AGENTS.md 第 11 条; calibers documented on
+     * by the element's 收取时点 / 退还抵扣规则 ( calibers documented on
      * {@link DepositSettlement}); the event table keeps the deposit money explicit — under
      * {@link DepositSettlement#OFFSET_PRINCIPAL} the two t0 legs (gross principal out, deposit in)
      * net to the {@link LeaseElement#measuredPrincipal()} the schedule amortizes, and under the
      * refund/offset-final-rent settlements the deposit (plus its interest when carried) is its own
-     * maturity rows that never fold into 租金 (M-03/M-04).
+     * maturity rows that never fold into 租金（读数不进租金）。
      */
     private boolean depositIncluded(CalculationOptions options, LeaseElement element) {
         return options.cashFlowBasis() == CashFlowBasis.INCLUDE_DEPOSIT
@@ -152,7 +152,7 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
      * {@link DepositSettlement#OFFSET_PRINCIPAL} has no settlement leg because the deposit is
      * consumed at collection.
      *
-     * <p>Interest (P-03/P-06): the deposit earns its element rate over the days it actually
+     * <p>Interest ): the deposit earns its element rate over the days it actually
      * occupies — ACT/360, 算头不算尾, simple — and the interest is its own maturity outflow, never
      * folded into rent or the deposit principal leg.
      */
@@ -173,8 +173,8 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
 
     /**
      * Deposit interest at the element's rate over the days the deposit actually occupies:
-     * 保证金 × 年利率 × 实际占用天数 ÷ 360 (P-03 日利率、算头不算尾、单利), rounded to the
-     * element's output scale (P-05/P-06). A same-day settlement accrues zero days and no row; a
+     * 保证金 × 年利率 × 实际占用天数 ÷ 360 (日利率、算头不算尾、单利), rounded to the
+     * element's output scale . A same-day settlement accrues zero days and no row; a
      * settlement cannot precede collection because maturity is the schedule's last end date and
      * the collection date is t0 or the first rent's date.
      */
@@ -192,7 +192,7 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
     }
 
     /**
-     * Upfront fees that participate in the IRR, split by 承担方 (AGENTS.md 第 12 条;
+     * Upfront fees that participate in the IRR, split by 承担方 (
      * form-field-gaps ticket 04 第一步）：承租人承担 = 出租人收取（INFLOW，v1 姿态），
      * 出租人承担 = 出租人支付第三方（OUTFLOW）——同一笔费用换承担方方向翻转、双方 IRR
      * 反向变化，金额守恒由 R103 镜像保证。两类各一行（金额为 0 的行由 {@link #addFlow}

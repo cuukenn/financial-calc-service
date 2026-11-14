@@ -9,10 +9,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
 /**
- * 首期 stub 的年利率占比（AGENTS.md 第 9 条「首期 stub」；form-field-gaps ticket 05）。
+ * 首期 stub 的年利率占比（首期 stub」；form-field-gaps ticket 05）。
  *
  * <p>P-14①（银发〔2005〕129 号逐笔计息法之一）：计息期为整年（月）的部分按年（月）利率、
- * 零头天数部分按日利率（P-03：日利率 = 年利率 ÷ 360）——两种 129 号算法单笔内不得混用，
+ * 零头天数部分按日利率（日利率 = 年利率 ÷ 360）——两种 129 号算法单笔内不得混用，
  * 所以开了 stub 的单子，**首期窗口整体**走 ①：整月部分 = k/12，零头 = 实际天数/360。
  * 关窗之后的各期照旧按该期自己的 yearFraction 计（那是它们的整期，① ② 在整期上等价）。
  *

@@ -77,7 +77,7 @@ public final class IrrCalculator {
     }
 
     /**
-     * The same walk over day weights the caller already holds (AGENTS.md N-05: an XIRR solve
+     * The same walk over day weights the caller already holds (an XIRR solve
      * evaluates this function ~120 times over the same flow set, and each evaluation used to redo
      * the origin scan and the 480 {@code days ÷ 365} quotients the flow set itself determines).
      *
@@ -155,7 +155,7 @@ public final class IrrCalculator {
             return null;
         }
         // The day weights belong to the flow set, not to the rate: derive them once for the whole
-        // solve instead of ~120 times inside it (AGENTS.md N-05). Same quotients, same order —
+        // solve instead of ~120 times inside it. Same quotients, same order —
         // the root the solver lands on is the one the per-evaluation walk would have produced.
         List<BigDecimal> weights = yearWeights(flows);
         return solver.solve(rate -> xnpv(flows, rate, weights), RATE_LOWER, RATE_UPPER,

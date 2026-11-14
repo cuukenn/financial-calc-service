@@ -38,7 +38,7 @@ export function formatMoney(value: string | null | undefined): string {
  *
  * U7（2026-11-11 scan）：实现换成 `utils/ratio.ts` 的十进制字符串长算
  * （`formatDecimalPercent`，BigInt 定点、HALF_UP）——浮点 `×100 + toFixed` 会让
- * `0.0049999991` 这类边界值在显示层再丢一次精度（P-01 的精神同样约束展示层）。
+ * `0.0049999991` 这类边界值在显示层再丢一次精度（同样约束展示层）。
  * 兜底约定不变：null/空 → '—'，非数值原样透出（调用方的占位契约不动）。
  */
 export function formatPercent(value: string | null | undefined): string {

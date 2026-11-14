@@ -19,7 +19,7 @@ import io.github.cuukenn.fincalc.engine.CalculationResult;
 import org.junit.jupiter.api.Test;
 
 /**
- * AGENTS.md 第 9 条「首末期规则」（form-field-gaps ticket 05）：
+ * 首末期规则」（form-field-gaps ticket 05）：
  *
  * <ul>
  *   <li>首期 stub（129号① 整月+零头）：默认关（129号② 一段计）；THIRTY_360 的对齐月频窗口

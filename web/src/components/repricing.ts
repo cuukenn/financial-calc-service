@@ -6,7 +6,7 @@
  * 按段重解租金、`annualRate()` 逐期取规则利率），所以这里不新增契约、不新增字段口径
  * —— 重定价是既有能力的一次参数化（AGENTS.md §3.2「分段计息（利率调整…）」）。
  *
- * 口径（央行公告〔2019〕第 16 号 / 〔2024〕第 11 号，AGENTS.md §2.2、P-04）：
+ * 口径（央行公告〔2019〕第 16 号 / 〔2024〕第 11 号）：
  * - 重定价周期只有 **3 / 6 / 12 个月**（房贷口径；其它值在表单就拒绝，不静默改成 12）；
  * - 段内利率不变，段起点换利率；每段利率 = **该段起点的 LPR + 同一加点**；
  * - LPR 序列必须由用户给出：表单**不得静默沿用首期 LPR**。缺段 LPR 又没勾选「沿用当前
@@ -15,7 +15,7 @@
  * 期次边界与引擎的 `PeriodBuilder` 逐字对齐（月频、IN_ARREARS）：
  * 第 1 期起点 = 放款日；第 k 期起点 = 首期还款日 + (k − 2) 个月（保月末），
  * 即第 k 期的起点就是第 k − 1 期的到期日。分段只按**期**给引擎，日期只用来决定
- * 哪一期落在哪一段——日期本身不进入任何金额计算（P-01）。
+ * 哪一期落在哪一段——日期本身不进入任何金额计算。
  */
 
 import type { RuleRow } from '@/api/types'
@@ -62,7 +62,7 @@ function pad(value: number): string {
 
 /**
  * 月对日加月，保月末（31 日 + 1 月 = 2 月末），与引擎 `DateUtils.plusMonthsKeepEOM` 同
- * 口径。纯日历运算：年月日都是整数序号，不是金额、不是利率，P-01 管不到这里；
+ * 口径。纯日历运算：年月日都是整数序号，不是金额、不是利率，不涉金额精度；
  * 真正的金额一律由引擎从这些边界推出的「期」上算出来。
  */
 export function addMonthsKeepEom(iso: string, months: number): string {
@@ -195,7 +195,7 @@ export interface SegmentRateInput {
 }
 
 export interface SegmentRatePlan {
-  /** 与段同序的年化小数字符串（P-02）；`null` 表示该段 LPR 缺失且未获准沿用。 */
+  /** 与段同序的年化小数字符串；`null` 表示该段 LPR 缺失且未获准沿用。 */
   rates: (string | null)[]
   /** 按「沿用当前 LPR」假设填上的段序号——结果区要把它作为假设披露，不得伪装成合同值。 */
   assumedSegments: number[]
@@ -204,7 +204,7 @@ export interface SegmentRatePlan {
 }
 
 /**
- * 每段利率 = 该段 LPR + 同一加点（P-04：加点是合同条款，重定价只重定 LPR）。
+ * 每段利率 = 该段 LPR + 同一加点（加点是合同条款，重定价只重定 LPR）。
  * 任何一段解析不出合法利率都会以 `null` 显式返回，绝不静默取默认值（AGENTS.md §3.1）。
  */
 export function planSegmentRates(input: SegmentRateInput): SegmentRatePlan {

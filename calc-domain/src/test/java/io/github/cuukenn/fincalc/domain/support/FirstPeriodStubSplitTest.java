@@ -10,7 +10,7 @@ import io.github.cuukenn.fincalc.domain.model.PaymentFrequency;
 import org.junit.jupiter.api.Test;
 
 /**
- * 129号① 整月 + 零头拆分（AGENTS.md P-14①；form-field-gaps ticket 05）：整月按月利率
+ * 129号① 整月 + 零头拆分（P-14①；form-field-gaps ticket 05）：整月按月利率
  * （占比 1/12 每月）、零头按日利率（占比 1/360 每天），算头不算尾。
  */
 class FirstPeriodStubSplitTest {

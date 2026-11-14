@@ -12,7 +12,7 @@ public enum CashFlowType {
 
     /**
      * Interest the deposit earns while held, paid out at settlement as its own row — never folded
-     * into rent or the deposit principal leg (AGENTS.md 第 11 条；form-field-gaps ticket 03:
+     * into rent or the deposit principal leg (form-field-gaps ticket 03:
      * 保证金计息时利息单独成行并标注口径）.
      */
     DEPOSIT_INTEREST

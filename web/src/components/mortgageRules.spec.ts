@@ -52,7 +52,7 @@ describe('isBulletRepaymentAllowed (R109: 到期一次还本付息 only for 期�
   })
 })
 
-describe('isAmountText (P-01/P-05: decimal money text, no float artefacts)', () => {
+describe('isAmountText (decimal money text, no float artefacts)', () => {
   it('accepts plain decimal amounts and leaves presence to the required rule', () => {
     expect(isAmountText('2380000')).toBe(true)
     expect(isAmountText('2380000.01')).toBe(true)
@@ -72,7 +72,7 @@ describe('isAmountText (P-01/P-05: decimal money text, no float artefacts)', () 
   })
 })
 
-describe('isSpreadStepAligned (P-04: LPR 报价步长 0.05 个百分点 = 5bp)', () => {
+describe('isSpreadStepAligned (LPR 报价步长 0.05 个百分点 = 5bp)', () => {
   it('accepts integer multiples of 5bp and refuses a 12bp input', () => {
     expect(isSpreadStepAligned('0')).toBe(true)
     expect(isSpreadStepAligned('35')).toBe(true)

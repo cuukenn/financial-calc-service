@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  * The periodic roots one run has solved, each handed over at full precision together with the flow
- * set it is a root of (AGENTS.md N-05: within one measurement the same root problem must not be
+ * set it is a root of (within one measurement the same root problem must not be
  * solved twice).
  *
  * <p>Two places in a run build a flow set and need its internal rate of return. The §9.5 metric
@@ -24,7 +24,7 @@ import java.util.List;
  *
  * <p>{@link MetricCodes#IRR_PERIOD} publishes its root rounded to the §9.5 scale of 10. A consumer
  * that needs the root itself — the §9.7 chain prices every row with it — cannot read the published
- * value without changing the cents every row carries (AGENTS.md N-04 forbids using the 0.01 元
+ * value without changing the cents every row carries (the 0.01 元
  * validation tolerance as a licence for that), so the unrounded answers travel beside the metric
  * bag on this channel. Recording the flow set is what makes the reuse decidable rather than
  * assumed: a consumer may read a root only when its own stream is the very one that root is a root
@@ -34,7 +34,7 @@ import java.util.List;
  * lessor's net investment, including the unguaranteed residual, while §9.4's event table is
  * cash-only) instead of a silent duplicate.
  *
- * <p><b>Why nothing else travels on this channel.</b> AGENTS.md rule 1 (先测量再优化) was applied to
+ * <p><b>Why nothing else travels on this channel.</b> rule 1 (先测量再优化) was applied to
  * the §9.5 line at the 480-period cell before adding any further reuse, per code
  * ({@code MetricSolveCountTest#the_metric_line_costs_are_attributable_to_each_code}): the whole line
  * is 1 180 ms of which {@code XIRR} is 970 and {@code IRR_PERIOD} 193, and every remaining one of the

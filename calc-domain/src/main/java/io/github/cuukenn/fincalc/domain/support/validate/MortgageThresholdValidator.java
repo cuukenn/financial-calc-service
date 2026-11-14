@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * AGENTS.md 阈值读数（form-field-gaps 15 / A2，仅 {@code ProductProfile#MORTGAGE} 装配）：
+ * 阈值读数（form-field-gaps 15 / A2，仅 {@code ProductProfile#MORTGAGE} 装配）：
  *
  * <ul>
  *   <li><b>首付比例 ≥ 15%</b>（2024-09 通知，全国统一下限）——仅在要素携带 CAS 21 链
@@ -26,7 +26,7 @@ import java.util.List;
  * <p><b>级别一律 WARN</b>（form-field-gaps 15 决策点 ②）：引擎 ERROR 会点亮
  * {@code hasErrors()}——§9 的校验语义是「租金表不守恒，需人工复核」，合规读数混进去会
  * 污染 §3.4 四项校验的信号。前端闸门（提交拦截）保留，本校验器是随结果的合规披露层
- * （M-03：读数分区，不得像测算结果）。
+ * （读数分区：不得像测算结果）。
  *
  * <p>不在 §3.4 的 code 顺序里：只由 {@code ValidatorChain.withMortgageThresholds()} 装配，
  * 缺省链（LEASE / 未声明产品的每一笔 run）不带它——issues 与 v1 逐字节一致。
@@ -39,7 +39,7 @@ public final class MortgageThresholdValidator implements Validator {
     /** §2.3：房贷期限上限（金规〔2026〕5号，40 年）。 */
     public static final int MAX_TERM_MONTHS = 480;
 
-    /** 首付比例的内部比较精度（P-07：不低于 10 位）。 */
+    /** 首付比例的内部比较精度（不低于 10 位）。 */
     private static final int RATIO_SCALE = 10;
 
     @Override

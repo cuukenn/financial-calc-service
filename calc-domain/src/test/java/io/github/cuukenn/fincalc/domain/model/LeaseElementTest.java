@@ -224,7 +224,7 @@ class LeaseElementTest {
     }
 
     /**
-     * M-01: 首付款 / IDC / 未担保余值 cannot move any number without the asset value (the chain
+     * 首付款 / IDC / 未担保余值 cannot move any number without the asset value (the chain
      * has no denominator), so a lone amount is rejected instead of being silently ignored.
      */
     @Test

@@ -196,7 +196,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
             String memo = allocation.memo();
             if (index == 0 && stubYearFraction != null) {
-                // P-09 的「随结果披露」同类口径：首期拆分要显式可见，不得只改数字不留痕。
+                // 「随结果披露」同类口径：首期拆分要显式可见，不得只改数字不留痕。
                 memo = (memo == null ? "" : memo + ";") + "首期按整月+零头计息（129号①）";
             }
             installments.add(new Installment(periodNo, period.startDate(), period.endDate(), days,
@@ -224,7 +224,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
      * header ({@code roundingDifference}). {@code FIRST_PERIOD} / {@code PROPORTIONAL} need a
      * backward solve — the forward drift only surfaces at the end — so a caller that asks for them
      * is refused loudly instead of silently getting the last-period posture (form-field-gaps
-     * ticket 05; this also retires the dead {@code tailAdjustPolicy} input, M-01).
+     * ticket 05; this also retires the dead {@code tailAdjustPolicy} input).
      */
     private static void requireSupportedTailPolicy(LeaseElement element) {
         TailAdjustPolicy policy = element.rounding().tailAdjustPolicy();
@@ -236,7 +236,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
     /**
      * Verifies that principal is conserved and that the schedule ends where the residual policy
-     * says it should. Returns the absorbed rounding difference, signed (P-09: 不得取绝对值后丢弃
+     * says it should. Returns the absorbed rounding difference, signed (不得取绝对值后丢弃
      * 符号): closing balance minus expected closing, i.e. positive means the tail adjustment
      * added to the final rent (the schedule left more balance than the residual policy asks for
      * and the final rent absorbs it by charging more), negative means it reduced it.

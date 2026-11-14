@@ -69,13 +69,13 @@ const { t } = useI18n()
 /** 房贷场景的三种还款方式（AGENTS.md §2.2）；BULLET_LOAN 即 Task 2 的 BulletLoanGenerator。 */
 const MORTGAGE_METHOD_VALUES = ['EQUAL_INSTALLMENT', 'EQUAL_PRINCIPAL', 'BULLET_LOAN'] as const
 
-/** 表单状态：金额与利率一律为十进制小数字符串（P-01 禁止 float 参与计算）。 */
+/** 表单状态：金额与利率一律为十进制小数字符串（禁止 float 参与计算）。 */
 interface MortgageFormState {
   /** 贷款金额（AGENTS.md §2.2 规范名）。 */
   principal: string
   /** 当前 LPR，百分数口径（'3.5' = 3.5%）。本项目无 LPR 数据源，由用户自填。 */
   lprPercent: string
-  /** 加点（基点，1bp = 0.01 个百分点），只接受 5bp 整数倍（P-04）。 */
+  /** 加点（基点，1bp = 0.01 个百分点），只接受 5bp 整数倍。 */
   spreadBp: string
   commenceDate: string
   firstRepaymentDate: string
@@ -132,10 +132,10 @@ const bulletResetNotice = ref(false)
 
 // ============ 派生值（源状态最小化，其余全部 computed） ============
 
-/** P-04：年利率 = LPR + 加点（十进制串运算，不经过浮点）。 */
+/** 年利率 = LPR + 加点（十进制串运算，不经过浮点）。 */
 const annualRate = computed(() => composeLprRate(form.lprPercent, form.spreadBp))
 
-/** 提交给引擎的那个数字必须可见：小数字符串 + 2 位百分数（P-02 / P-10）。 */
+/** 提交给引擎的那个数字必须可见：小数字符串 + 2 位百分数。 */
 const annualRateText = computed(() =>
   annualRate.value === null
     ? t('mortgage.basic.composedRateInvalid')
@@ -192,7 +192,7 @@ watch(
 /**
  * 重定价分段（R150）。`repricingCycle === 0` 时是 `null` —— 固定利率路径，payload 与本模块
  * 引入前逐位一致。分段只决定「哪一期用哪个利率」：日期用来定位期次，不进入任何金额计算
- * （P-01），利率仍然由引擎从这些边界上的期次算出（§3.2 分段计息）。
+ * ，利率仍然由引擎从这些边界上的期次算出（§3.2 分段计息）。
  */
 const repricingSegmentsList = computed(() => {
   if (form.repricingCycle === NO_REPRICING || !isRepricingCycle(form.repricingCycle)) {
@@ -214,7 +214,7 @@ const repricingSegmentsList = computed(() => {
   }
 })
 
-/** 每段利率 = 该段 LPR + 同一加点（P-04：加点是合同条款，重定价只重定 LPR）。 */
+/** 每段利率 = 该段 LPR + 同一加点（加点是合同条款，重定价只重定 LPR）。 */
 const repricingPlan = computed(() => {
   const segments = repricingSegmentsList.value
   if (segments === null) return null
@@ -278,7 +278,7 @@ function buildRequest(annualRateDecimal: string): CalculationRequest {
     commenceDate: form.commenceDate,
     firstRentDate: form.firstRepaymentDate,
     periods: form.periods ?? 0,
-    // §2.3：期限 > 1 年按月还本付息；30/360 使月利率 = 年利率 ÷ 12（P-03）。
+    // 期限 > 1 年按月还本付息；30/360 使月利率 = 年利率 ÷ 12。
     frequency: 'MONTHLY',
     timing: 'IN_ARREARS',
     dayCountCode: 'THIRTY_360',

@@ -175,7 +175,7 @@ describe('段覆盖检查', () => {
   })
 })
 
-describe('每段利率（P-04：段利率 = 该段 LPR + 同一加点）', () => {
+describe('每段利率（段利率 = 该段 LPR + 同一加点）', () => {
   const segments = repricingSegments({
     commenceDate: '2026-11-01',
     firstRepaymentDate: '2026-12-01',

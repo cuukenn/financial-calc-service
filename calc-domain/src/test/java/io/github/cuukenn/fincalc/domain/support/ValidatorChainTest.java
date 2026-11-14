@@ -130,7 +130,7 @@ class ValidatorChainTest {
 
     @Test
     void registers_the_default_validators_in_code_number_order() {
-        // AGENTS.md: 3001 本金守恒 → 3002 末期余额 → 3008 逐期恒等式 → 3009 租金构成 →
+        // 校验序：3001 本金守恒 → 3002 末期余额 → 3008 逐期恒等式 → 3009 租金构成 →
         // 3004 日期单调殿后。
         assertThat(ValidatorChain.defaults().codes()).containsExactly(
                 "PRINCIPAL_CONSERVATION", "TAIL_BALANCE", "PERIOD_IDENTITY",

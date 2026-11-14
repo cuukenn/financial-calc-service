@@ -10,7 +10,7 @@ import io.github.cuukenn.fincalc.domain.support.validate.TailBalanceValidator;
 import org.junit.jupiter.api.Test;
 
 /**
- * AGENTS.md 补充口径规则 2 fixes one money comparison line (0.01 元): differences above it must be
+ *  fixes one money comparison line (0.01 元): differences above it must be
  * disclosed, never silently absorbed. The §3.4 validators must therefore judge against one value —
  * four private copies could drift, and a validator holding a wider line would absorb a drift its
  * sibling reports.

@@ -25,7 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * three of them
  * ({@code residualValue} / {@code residualHandling} / {@code rateChangePolicy}) are mandatory
  * {@code LeaseElement} inputs that the form now sends explicitly instead of leaving the server to
- * default them — AGENTS.md 输入要素必须显式提供、缺失即报错、不得静默取默认值, and
+ * default them — 输入要素必须显式提供、缺失即报错、不得静默取默认值, and
  * {@code CalculationRequestAssembler} only defaults {@code rounding} / {@code gracePeriod}. The
  * bodies below are byte-for-byte the payload shape the form produces (money-as-string, the form's
  * own default 要素), so the values asserted are what the Tab will really show.

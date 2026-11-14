@@ -83,7 +83,7 @@ describe('quoteEarlySettlement', () => {
     expect(quote!.periodNo).toBe(1)
     expect(quote!.accruedDays).toBe(0)
     expect(quote!.accruedInterest).toBe('0')
-    // canonical 字符串去尾零；展示层 formatMoney 补足 2 位（P-05）。
+    // canonical 字符串去尾零；展示层 formatMoney 补足 2 位。
     expect(compareDecimal(quote!.settlementAmount, '1000000.00')).toBe(0)
   })
 
@@ -119,7 +119,7 @@ describe('quoteEarlySettlement', () => {
     expect(amount!.settlementAmount).toBe('602750.5')
   })
 
-  it('charges overdue penalty at principal × rate × days ÷ 360 (P-03)', () => {
+  it('charges overdue penalty at principal × rate × days ÷ 360 ', () => {
     const quote = quoteEarlySettlement(schedule(), {
       settlementDate: '2024-06-16',
       penaltyMode: 'AMOUNT',

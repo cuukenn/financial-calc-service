@@ -20,7 +20,7 @@ import java.util.List;
  * unguaranteed residual is zero: it is the pricing rate written from the other end. It separates
  * from IRR only through that non-cash residual, which is added here and nowhere else.
  *
- * <p><b>One solve per root problem (AGENTS.md N-05).</b> The priced stream is matched against the
+ * <p><b>One solve per root problem.</b> The priced stream is matched against the
  * run's {@link io.github.cuukenn.fincalc.domain.metric.PeriodicRootHandoff} ledger before solving:
  * with no unguaranteed residual it <em>is</em> the event table and {@code IRR_PERIOD}'s unrounded
  * root is reused; with one it is solved here and recorded, so the engine's §9.7 chain — which prices
@@ -59,7 +59,7 @@ public final class LeaseImplicitRateMetric implements FinancialMetric {
                     CashFlowType.RESIDUAL, CashFlowDirection.INFLOW));
         }
 
-        // AGENTS.md N-05: one solve per root problem. When the unguaranteed residual is zero and
+        // One solve per root problem. When the unguaranteed residual is zero and
         // principal = asset value + IDC, this stream IS the event table IRR_PERIOD solved over —
         // the javadoc above states that equality — so the ledger hands back its unrounded root and
         // this code costs no solve at all. When the residual is priced in, the stream genuinely

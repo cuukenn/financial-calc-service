@@ -1,7 +1,7 @@
 package io.github.cuukenn.fincalc.domain.model;
 
 /**
- * When the deposit is collected (AGENTS.md 第 11 条：保证金的收取时点）.
+ * When the deposit is collected (保证金的收取时点）.
  */
 public enum DepositTiming {
 

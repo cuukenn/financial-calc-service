@@ -18,7 +18,7 @@ import java.util.Collections;
 import org.junit.jupiter.api.Test;
 
 /**
- * AGENTS.md 第 12 条「费用承担方」（form-field-gaps ticket 04 第一步，验收标准 1）：
+ * 费用承担方」（form-field-gaps ticket 04 第一步，验收标准 1）：
  * 同一笔费用换承担方，出租方 IRR 与承租人视角指标按方向变化，且金额守恒。
  *
  * <p>经济含义：出租人承担的费用是出租人的真实现金流出，压低出租方收益；同时承租人

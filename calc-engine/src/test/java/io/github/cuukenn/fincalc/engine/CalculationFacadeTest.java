@@ -406,7 +406,7 @@ class CalculationFacadeTest {
      * existing bullet fixtures all run THIRTY_360 monthly, where every period accrues exactly
      * {@code 5000.00} — a clean 2-dp figure, so nothing flows through the bucket as a tail. Under
      * ACT_360 the 31-day and 29-day periods accrue 5166.66̅ and 4833.33̅, each rounded to the cent
-     * per P-06, and the year contains 366 actual days.
+     * and the year contains 366 actual days.
      *
      * <p>What this pins, and why it is not the same assertion as the 30/360 case:
      * <ol>
@@ -418,7 +418,7 @@ class CalculationFacadeTest {
      *       visible in the period rows, not an absorbed discrepancy between the two columns;</li>
      *   <li>the balance tail reported by the header ({@code roundingDifference}) stays 0.00: the
      *       principal leg is untouched by the interest rounding, and the two tails are separate
-     *       disclosures (P-09).</li>
+     *       disclosures .</li>
      * </ol>
      */
     @Test

@@ -14,7 +14,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * AGENTS.md 校验四：Σ租金 = Σ本金 + Σ利息（实付 {@code interestPaid}）+ Σ费用 + Σ税
+ * 校验四：Σ租金 = Σ本金 + Σ利息（实付 {@code interestPaid}）+ Σ费用 + Σ税
  * （税为 {@code null} 计 0）。The rent of every period must decompose exactly into the amounts
  * the schedule itself reports as its components.
  */
@@ -34,7 +34,7 @@ public final class RentCompositionValidator implements Validator {
     @Override
     public int order() {
         // Slots between TAIL_BALANCE (20) and DATE_MONOTONIC (30) so the chain runs in the
-        // AGENTS.md code-number order:
+        // code-number order:
         // CalcErrorCode.PRINCIPAL_CONSERVATION_BROKEN → TAIL_BALANCE_MISMATCH →
         // PERIOD_IDENTITY_BROKEN → RENT_COMPOSITION_BROKEN → PERIOD_DATE_ORDER_INVALID.
         return 22;

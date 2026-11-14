@@ -83,7 +83,7 @@ const enUS: typeof zhCN = {
         remove: 'Remove',
         add: '+ Add fee',
       },
-      // §2.1 / M-01: this field is the purchase option price (nominal) — a real terminal
+      // this field is the purchase option price (nominal) — a real terminal
       // cash flow. The residual value (unguaranteed) is not modelled: its only consumer is the
       // lease implicit rate (CAS 21), which is not implemented yet.
       residualValue: 'Purchase option price (nominal)',
@@ -133,13 +133,13 @@ const enUS: typeof zhCN = {
       principal: 'Loan amount',
       principalPh: 'e.g. 2380000',
       lpr: 'Current LPR (%)',
-      // P-04: this project has no LPR data source, the user enters the LPR as a percent (3.5 = 3.5%).
+      // this project has no LPR data source, the user enters the LPR as a percent (3.5 = 3.5%).
       lprPh: 'e.g. 3.5',
       spread: 'Spread (bp)',
-      // P-04: LPR quoting step is 0.05pp = 5bp, only multiples of 5bp are accepted.
+      // LPR quoting step is 0.05pp = 5bp, only multiples of 5bp are accepted.
       spreadPh: 'e.g. 35 (must be a multiple of 5bp)',
       composedRate: 'Annual rate (LPR + spread)',
-      composedRateHint: 'Decimal annual rate actually sent to the engine (P-02)',
+      composedRateHint: 'Decimal annual rate actually sent to the engine',
       composedRateInvalid: 'Not parseable, check the LPR and the spread',
       commenceDate: 'Disbursement date',
       firstRepaymentDate: 'First repayment date',
@@ -205,7 +205,7 @@ const enUS: typeof zhCN = {
       lpr: 'Please enter the current LPR',
       lprFormat: 'Invalid LPR format: enter a percent-scale decimal number (e.g. 3.5)',
       spread: 'Please enter the spread',
-      spreadStep: 'The spread must be an integer multiple of 5bp (P-04: LPR quoting step is 0.05 percentage points), it is never rounded silently',
+      spreadStep: 'The spread must be an integer multiple of 5bp , it is never rounded silently',
       commenceDate: 'Please select the disbursement date',
       firstRepaymentDate: 'Please select the first repayment date',
       firstRepaymentBeforeCommence: 'The first repayment date must not precede the disbursement date (the engine rejects it)',
@@ -334,7 +334,7 @@ const enUS: typeof zhCN = {
       },
     },
     scheduleTab: {
-    tailAbsorption: 'Tail absorption: last period (default; single-point signed disclosure per P-09)',
+    tailAbsorption: 'Tail absorption: last period (default; single-point signed disclosure)',
       compositionTitle: 'Composition (principal vs interest)',
       balanceTitle: 'Balance curve',
       tableTitle: 'Amortization schedule',
@@ -365,7 +365,7 @@ const enUS: typeof zhCN = {
       prepayPaymentDateOnly: 'The recalculation must be done on a payment date (the settlement date equals some period end date)',
       settlementAmount: 'Settlement amount',
       invalid: 'Not computable: the settlement date must fall inside the term (first start date to last end date)',
-      caliber: 'Caliber: interest for the actual borrowing period (Civil Code art. 677); accrued interest = remaining principal × period rate × accrual days ÷ period days, head-inclusive/tail-exclusive, to the cent (P-03/P-06); settlement = principal + accrued interest + penalty + overdue penalty — never a discount off the remaining rent total (§2.5).',
+      caliber: 'Caliber: interest for the actual borrowing period (Civil Code art. 677); accrued interest = remaining principal × period rate × accrual days ÷ period days, head-inclusive/tail-exclusive, to the cent (); settlement = principal + accrued interest + penalty + overdue penalty — never a discount off the remaining rent total (§2.5).',
     },
     cashflowTab: {
       tableTitle: 'Cash-flow table',

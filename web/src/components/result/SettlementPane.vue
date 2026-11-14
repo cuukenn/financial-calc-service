@@ -27,7 +27,7 @@ import { quoteEarlySettlement } from './earlySettlement'
 /**
  * 提前结清试算 pane（form-field-gaps 07 租赁 / 08 房贷）：输入结清日 + 违约金（率/金额），
  * 房贷场景另给罚息（逾期天数 + 罚息利率）。全部读数由摊销表与结清日推出（B 类派生，
- * M-02 可复算），公式与口径见 `./earlySettlement.ts`。
+ * 可由摊销表复算），公式与口径见 `./earlySettlement.ts`。
  */
 const props = withDefaults(
   defineProps<{

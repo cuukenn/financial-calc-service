@@ -90,7 +90,7 @@ import org.slf4j.LoggerFactory;
  *       the IRR of the exact stream the chain itself prices (the opening net investment at t0, the
  *       rent legs, and the terminal net investment of R52's identity, which carries the residual
  *       money the schedule never amortizes) — and reuses an already-solved root of the same stream
- *       off the run's {@link PeriodicRootHandoff} ledger (N-05). A missing rate or a table that
+ *       off the run's {@link PeriodicRootHandoff} ledger. A missing rate or a table that
  *       cannot be built answers {@code null} with a WARN issue — never an exception, because IRR
  *       non-convergence is an expected outcome.</li>
  *   <li><b>Step 8</b> — return {@code CalculationResult(runId, schedule, effectiveInterest)};
@@ -98,8 +98,8 @@ import org.slf4j.LoggerFactory;
  * </ol>
  *
  * <p>Step 7's caliber — which stream the chain prices, what the terminal net investment carries
- * (CAS 21 第三十八条/第三十九条), the one-solve-per-stream rule (AGENTS.md N-05) and the
- * unrounded-root reuse that keeps every §9.7 row cent-for-cent (N-04) — lives with its code in
+ * (CAS 21 第三十八条/第三十九条), the one-solve-per-stream rule and the
+ * unrounded-root reuse that keeps every §9.7 row cent-for-cent — lives with its code in
  * {@link EffectiveInterestCalculator#unrecoveredResiduals} and
  * {@link EffectiveInterestCalculator#netInvestmentPeriodIrr} (arch-seams 收口，2026-11-14); the
  * facade owns only the orchestration: IRR-missing and no-root refusals, the calculate call, and
@@ -297,7 +297,7 @@ public final class CalculationFacade {
     /**
      * Step 7: the §9.7 table at the rent-consistent rate. The rate decision itself — which stream
      * the chain prices, what the terminal net investment carries (CAS 21 第三十八条/第三十九条),
-     * and the one-solve-per-stream ledger reuse (N-05) — is the {@link EffectiveInterestCalculator}'s
+     * and the one-solve-per-stream ledger reuse — is the {@link EffectiveInterestCalculator}'s
      * caliber ({@code unrecoveredResiduals} / {@code netInvestmentPeriodIrr}, arch-seams 收口
      * 2026-11-14); the facade only orchestrates: it turns every refusal path into {@code null}
      * plus a WARN issue carrying the stable code of the refusal — the run itself never fails here.

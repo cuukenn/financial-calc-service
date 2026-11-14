@@ -2,7 +2,7 @@
  * 房贷表单校验规则（纯模块：不依赖组件，可脱离 DOM 单测）。
  *
  * 分工：这里只放「前端 [法] 门槛」的判定与 AntD 规则装配；数值本身一律是
- * 十进制小数字串（P-01），阈值比较一律用未舍入原值（P-10，见 utils/ratio）。
+ * 十进制小数字串），阈值比较一律用未舍入原值（见 utils/ratio）。
  * 首付 ≥ 15% 这一档需要派生比例，留在 MortgageForm 的提交闸门里（那里才算出
  * 贷款成数），本模块负责其余与语言无关的判定。
  *
@@ -38,7 +38,7 @@ export interface MortgageRuleModel {
 
 /**
  * 金额/百分数输入：留空交给 required 规则，非空必须是可解析的非负十进制串
- * （P-05 金额以元为单位、恒为非负；'1,000' / '1e5' 这类写法拒绝，不猜、不换算）。
+ * （金额以元为单位、恒为非负；'1,000' / '1e5' 这类写法拒绝，不猜、不换算）。
  */
 export function isAmountText(value: unknown): boolean {
   if (value === undefined || value === null) return true
@@ -64,7 +64,7 @@ export function isBulletRepaymentAllowed(periods: number | null | undefined): bo
     : false
 }
 
-/** P-04：加点必须是 5bp（0.05 个百分点）的整数倍，12bp 直接拒绝，不静默就近取整。 */
+/** 加点必须是 5bp（0.05 个百分点）的整数倍，12bp 直接拒绝，不静默就近取整。 */
 export function isSpreadStepAligned(value: unknown): boolean {
   return typeof value === 'string' && isLprStepAligned(value)
 }

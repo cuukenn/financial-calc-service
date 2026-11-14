@@ -43,7 +43,7 @@ final class MetricSupport {
      *
      * <p>This is the <b>single</b> place that knows the view, so no metric re-decides what a
      * perspective means and a new flow-driven metric cannot forget to ask. The flip keeps every
-     * amount positive (AGENTS.md 补充口径规则 3) and moves the sign into
+     * amount positive () and moves the sign into
      * {@link CashFlow#direction()}, so {@link #signed(CashFlow)} negates by construction and the
      * same {@link io.github.cuukenn.fincalc.domain.support.IrrCalculator} runs on either side.
      */

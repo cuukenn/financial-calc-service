@@ -384,7 +384,7 @@ class StandardCashFlowBuilderTest {
                 .filter(f -> f.type() == CashFlowType.DEPOSIT_INTEREST).collect(toList());
         assertThat(interest).hasSize(1);
         // 2024-01-01 → 2025-01-01 = 366 actual days, leap year: 50000 × 3% × 366/360 = 1525.00
-        // (P-03 日利率 ACT/360、算头不算尾、单利；P-05/P-06 算至分）.
+        // (日利率 ACT/360、算头不算尾、单利；算至分）.
         assertThat(interest.get(0).amount()).isEqualByComparingTo("1525.00");
         assertThat(interest.get(0).date()).isEqualTo(LAST);
         assertThat(interest.get(0).direction()).isEqualTo(OUTFLOW);

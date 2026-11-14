@@ -19,7 +19,7 @@ import java.util.function.Function;
  * dimensionless while an NPV is in yuan: the two numbers are not comparable, and on a flat NPV
  * (a sparse flow set, a near-degenerate deal) a function value of 1e-10 yuan can sit a whole
  * 1e-5 of rate away from the root. Accepting such a point would report an unconverged yield as a
- * converged one, which is the one thing a yield metric may not do (AGENTS.md P-11). Only an exact
+ * converged one, which is the one thing a yield metric may not do (P-11). Only an exact
  * zero — a point that <em>is</em> the root — is accepted outside the bracket test.
  *
  * <p><b>Every iteration contracts.</b> A Newton step is accepted only when it lands in the inner
@@ -44,9 +44,8 @@ public final class BisectionNewtonSolver implements RootSolver {
     public static final int MAX_ITERATIONS = 100;
 
     /**
-     * Monotonic count of {@link #solve} entries since JVM start. Cost accounting only: AGENTS.md
-     * N-05 forbids solving the same root twice inside one measurement, and a count a test can read
-     * is how a run shows it paid for each root once — never「看起来快了」as evidence.
+     * Monotonic count of {@link #solve} entries since JVM start. Cost accounting only: a run must pay for each root exactly once, and a count a test can read
+     * is how it proves that — never「看起来快了」as evidence.
      */
     public static final AtomicLong SOLVE_COUNT = new AtomicLong();
 

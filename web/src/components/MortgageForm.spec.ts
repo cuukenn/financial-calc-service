@@ -234,7 +234,7 @@ describe('MortgageForm payload mapping (R101)', () => {
     expect(lastRequest().nominalRate).toBe('0.0385')
   })
 
-  it('rejects a 加点 that is not a multiple of 5bp instead of silently rounding it (P-04)', async () => {
+  it('rejects a 加点 that is not a multiple of 5bp instead of silently rounding it ', async () => {
     const wrapper = mountWithI18n(MortgageForm)
     await wrapper.find('[data-test="mortgage-spread"]').setValue('12')
     await submit(wrapper)

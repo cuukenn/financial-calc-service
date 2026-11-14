@@ -10,7 +10,7 @@ import {
   pickMonthlyPayment,
 } from './ratio'
 
-describe('decimalDivide (P-01: decimal-string long division, no float)', () => {
+describe('decimalDivide (decimal-string long division, no float)', () => {
   it('divides exactly at the requested scale', () => {
     expect(decimalDivide('2380000', '2800000', 10)).toBe('0.85')
     expect(decimalDivide('2800000', '2800000', 10)).toBe('1')

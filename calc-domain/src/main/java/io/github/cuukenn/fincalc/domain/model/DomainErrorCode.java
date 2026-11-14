@@ -67,7 +67,7 @@ public enum DomainErrorCode implements ErrorCode {
 
     TAIL_ADJUST_POLICY_UNSUPPORTED("FCS-DOM-1020",
             "FCS-DOM-1020: 尾差吸收位置 %s 暂未支持（首期吸收/按期均摊需要逆解重建）:"
-            + " v1 只支持 LAST_PERIOD（末期吸收，P-09 单点带符号披露），显式拒绝而非静默忽略"),
+            + " v1 只支持 LAST_PERIOD（末期吸收，单点带符号披露），显式拒绝而非静默忽略"),
 
     FIRST_PERIOD_STUB_NOT_APPLICABLE("FCS-DOM-1021",
             "FCS-DOM-1021: 首期 stub（129号① 整月+零头拆分）不适用于 %s"),

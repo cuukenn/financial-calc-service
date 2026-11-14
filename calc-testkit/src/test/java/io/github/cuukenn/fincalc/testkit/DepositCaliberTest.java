@@ -19,7 +19,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * The three deposit settlements of AGENTS.md 第 11 条, end to end (form-field-gaps ticket 03):
+ * The three deposit settlements of  end to end (form-field-gaps ticket 03):
  * the calibers are pinned on {@code StandardCashFlowBuilderTest} and {@code LeaseElementTest}; this
  * class pins what a whole run prices with them.
  *

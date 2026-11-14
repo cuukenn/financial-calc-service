@@ -76,7 +76,7 @@ public final class LeaseElement {
         this.deposit = builder.deposit;
         // The deposit calibers normalize in the constructor, not at the call sites: every engine
         // reader gets one non-null answer, and an element built without the fields keeps the v1
-        // posture (upfront collection, refund at maturity, no interest) — AGENTS.md 第 11 条.
+        // posture (upfront collection, refund at maturity, no interest) — .
         this.depositTiming = builder.depositTiming == null
                 ? DepositTiming.UPFRONT : builder.depositTiming;
         this.depositSettlement = builder.depositSettlement == null
@@ -189,7 +189,7 @@ public final class LeaseElement {
         requireNonNegative("guaranteedResidual", guaranteedResidual);
         requireNonNegative("unguaranteedResidual", unguaranteedResidual);
         if (assetValue == null) {
-            // M-01: an amount that cannot move any cash flow or balance is a decoration, not an
+            // an amount that cannot move any cash flow or balance is a decoration, not an
             // input. Without an asset value the chain has no denominator, so these three would be
             // silently ignored (the down payment would even enter as a lone t0 inflow).
             requireAssetValueWhenPositive("downPayment", downPayment);
@@ -269,7 +269,7 @@ public final class LeaseElement {
         if (depositSettlement == DepositSettlement.OFFSET_PRINCIPAL) {
             // 抵减本金 consumes the deposit at collection: it never occupies a period, so there is
             // no time over which interest could accrue — carrying a rate is a caliber contradiction,
-            // not a no-op (AGENTS.md 补充口径规则: 显式声明与口径矛盾的输入即报错).
+            // not a no-op (口径规则: 显式声明与口径矛盾的输入即报错).
             throw new BusinessException(DomainErrorCode.DEPOSIT_INTEREST_RATE_CONFLICTS_WITH_OFFSET,
                     depositInterestRate);
         }

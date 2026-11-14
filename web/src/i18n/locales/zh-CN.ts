@@ -85,7 +85,7 @@ const zhCN = {
         remove: '删除',
         add: '+ 添加费用',
       },
-      // §2.1 / M-01：这个字段就是**留购价（名义货价）** —— 承租人期末取得所有权的对价，
+      // 这个字段就是**留购价（名义货价）** —— 承租人期末取得所有权的对价，
       // 是真实现金流。残值（未担保余值）不参与本口径的现金流，唯一消费者是租赁内含利率
       // （CAS 21），该指标尚未实现，故不设该字段。
       residualValue: '留购价（名义货价）',
@@ -134,13 +134,13 @@ const zhCN = {
       principal: '贷款金额',
       principalPh: '如 2380000',
       lpr: '当前 LPR（%）',
-      // P-04：本项目无 LPR 数据源，LPR 由用户按百分数口径自填（3.5 = 3.5%）。
+      // 本项目无 LPR 数据源，LPR 由用户按百分数口径自填（3.5 = 3.5%）。
       lprPh: '如 3.5',
       spread: '加点（bp）',
-      // P-04：LPR 报价步长 0.05 个百分点 = 5bp，加点只接受 5bp 整数倍。
+      // LPR 报价步长 0.05 个百分点 = 5bp，加点只接受 5bp 整数倍。
       spreadPh: '如 35（须为 5bp 的整数倍）',
       composedRate: '年利率（LPR + 加点）',
-      composedRateHint: '提交给引擎的年化小数字利率（P-02）',
+      composedRateHint: '提交给引擎的年化小数字利率',
       composedRateInvalid: '无法解析，请检查 LPR 与加点',
       commenceDate: '放款日',
       firstRepaymentDate: '首期还款日',
@@ -206,7 +206,7 @@ const zhCN = {
       lpr: '请输入当前 LPR',
       lprFormat: 'LPR 格式无效：请输入百分数口径的十进制数（如 3.5）',
       spread: '请输入加点',
-      spreadStep: '加点必须是 5bp 的整数倍（P-04：LPR 报价步长 0.05 个百分点），不做静默取整',
+      spreadStep: '加点必须是 5bp 的整数倍（LPR 报价步长 0.05 个百分点），不做静默取整',
       commenceDate: '请选择放款日',
       firstRepaymentDate: '请选择首期还款日',
       firstRepaymentBeforeCommence: '首期还款日不得早于放款日（引擎会拒绝该组合）',
@@ -332,7 +332,7 @@ const zhCN = {
       },
     },
     scheduleTab: {
-    tailAbsorption: '尾差吸收：末期（默认，P-09 单点带符号披露，见「尾差调整」列/表头差额）',
+    tailAbsorption: '尾差吸收：末期（默认，单点带符号披露，见「尾差调整」列/表头差额）',
       compositionTitle: '构成（本金 vs 利息）',
       balanceTitle: '余额曲线',
       tableTitle: '摊销计划',
@@ -363,7 +363,7 @@ const zhCN = {
       prepayPaymentDateOnly: '部分还款重算须在还款日当日办理（结清日 = 某期期末日）',
       settlementAmount: '结清金额',
       invalid: '无法计算：结清日须落在租期内（首期起始日至末期期末日）',
-      caliber: '口径：按实际借款期间计息（民法典第 677 条）；应计利息 = 剩余本金 × 该期期利率 × 实际计息天数 ÷ 该期天数，算头不算尾、算至分（P-03/P-06）；结清金额 = 剩余本金 + 应计利息 + 违约金 + 罚息，不按剩余期数租金总额打折（§2.5）。',
+      caliber: '口径：按实际借款期间计息（民法典第 677 条）；应计利息 = 剩余本金 × 该期期利率 × 实际计息天数 ÷ 该期天数，算头不算尾、算至分；结清金额 = 剩余本金 + 应计利息 + 违约金 + 罚息，不按剩余期数租金总额打折。',
     },
     cashflowTab: {
       tableTitle: '现金流表',

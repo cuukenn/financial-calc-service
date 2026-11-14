@@ -1,7 +1,7 @@
 package io.github.cuukenn.fincalc.domain.model;
 
 /**
- * How the deposit leaves the deal at settlement (AGENTS.md 第 11 条：退还/抵扣规则）.
+ * How the deposit leaves the deal at settlement (退还/抵扣规则）.
  *
  * <p>The calibers (recorded 2026-11-14, form-field-gaps ticket 03):
  *
@@ -18,7 +18,7 @@ package io.github.cuukenn.fincalc.domain.model;
  *       rent: cash-wise this is the deposit collected early and returned at maturity against the
  *       last rent, which is the same event pair as a refund dated at maturity, so the event table
  *       is identical to {@link #REFUND}; the schedule's rent column stays the amortization rent
- *       and the offset lives in the deposit rows, never netted into 租金 (§5 M-03/M-04 posture).
+ *       and the offset lives in the deposit rows, never netted into 租金（读数不进租金）。
  *       The presentation label is the caller's; the cash is the run's.</li>
  * </ul>
  */

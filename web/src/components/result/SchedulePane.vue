@@ -81,7 +81,7 @@ function isMoneyColumn(key: string): boolean {
     <Typography.Title :level="5">{{ t('result.scheduleTab.balanceTitle') }}</Typography.Title>
     <EChart :option="balanceOption" data-test="balance-chart" />
     <Typography.Title :level="5">{{ t('result.scheduleTab.tableTitle') }}</Typography.Title>
-    <!-- P-09：尾差单点吸收（末期），带符号差额已在表头 roundingDifference 披露；
+    <!-- 尾差单点吸收（末期），带符号差额已在表头 roundingDifference 披露；
          ticket 05 把这件事在界面上显式说出来，不再隐式。 -->
     <Typography.Text type="secondary" style="display: block; margin-bottom: 8px"
       data-test="tail-absorption-note"

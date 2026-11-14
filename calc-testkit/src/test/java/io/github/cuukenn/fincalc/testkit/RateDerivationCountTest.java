@@ -18,7 +18,7 @@ import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 
 /**
- * AGENTS.md N-05, ticket 04(b): the iterative rent path used to re-derive every window's year
+ * ticket 04(b): the iterative rent path used to re-derive every window's year
  * fraction on every evaluation of the balance walk — a 1200-period {@code ACT_360} solve pays
  * roughly 150 evaluations, so one run re-derived the same 1200 quotients ~150 times over. The walk
  * now consumes a rate list derived once per solve ({@link PmtSolver#periodRates}); the wall clock

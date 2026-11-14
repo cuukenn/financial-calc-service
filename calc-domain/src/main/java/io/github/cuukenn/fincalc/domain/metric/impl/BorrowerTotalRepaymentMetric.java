@@ -18,7 +18,7 @@ import java.util.List;
  *
  * <p><b>Only {@code rentDue}, never its components.</b> A row's rent already <em>is</em>
  * {@code principalDue + interestPaid + fee + tax} ({@code AbstractAmortizationGenerator}, and
- * AGENTS.md check 4 asserts Σ租金 = Σ本金 + Σ利息 + Σ费用 + Σ税), so a total that added
+ * check 4 asserts Σ租金 = Σ本金 + Σ利息 + Σ费用 + Σ税), so a total that added
  * Σ {@code fee} or Σ {@code tax} on top of Σ {@code rentDue} would count that money twice. The
  * column sum here is the rent column and nothing else.
  *
@@ -39,7 +39,7 @@ import java.util.List;
  * there is no second branch here and no test for one: the {@code DepositBasis} type the R103 brief
  * named does not exist in this codebase.
  *
- * <p><b>P-08.</b> The cells are summed first and the total is rounded once at the output boundary;
+ * <p>The cells are summed first and the total is rounded once at the output boundary;
  * rounding every row first is how a cent of reconciliation difference gets invented.
  *
  * <p>Present-but-null on a {@link CashFlowPerspective#LESSOR} run and when the context carries no
@@ -50,8 +50,8 @@ import java.util.List;
  * which is the CAS 21 第三十八条（五）/ IFRS 16 Appendix A <em>lessor</em> rule. CAS 21
  * 第十八条（五） counts only the amounts <em>expected to be payable</em> under a residual value
  * guarantee on the lessee's side, so this figure is a deliberately conservative lessee reading and
- * must be labelled as such (AGENTS.md M-04). Closing that gap needs an expected-payable input,
- * which would change a cash flow and is therefore an A-class field (M-01) - not added.
+ * must be labelled as such — a display aid, not a contract amount. Closing that gap needs an expected-payable input,
+ * which would change a cash flow and is therefore an A-class field - not added.
  */
 public final class BorrowerTotalRepaymentMetric implements FinancialMetric {
 

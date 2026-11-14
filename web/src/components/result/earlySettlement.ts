@@ -1,19 +1,19 @@
 /**
  * 提前结清试算（AGENTS.md §2.5；form-field-gaps tickets 07 租赁 / 08 房贷，纯函数、B 类结果派生）。
  *
- * 口径（M-01/M-02：全部量由摊销表与结清日推出，不新增输入要素、不二次建模）：
+ * 口径（全部量由摊销表与结清日推出，不新增输入要素、不二次建模）：
  *
  * - **剩余本金** = 结清日所在期的期初余额（摊销表自带，不是租金总额打折 —— §2.5 硬约束）。
  * - **实际计息天数** = 该期起始日 → 结清日，**算头不算尾**（含起始日、不含结清日），按摊销表
  *   自己的计息基准：30/360 族（THIRTY_360 / THIRTY_E_360）用 30/360 差值，ACT 族用实际天数 ——
  *   分母用摊销表该期的 `days` 字段（同一基准），分子分母同基才不发明汇率。
  * - **应计利息** = 剩余本金 × 该期期利率（`appliedRate`，引擎已按 `年利率 × yearFraction` 算好）
- *   × 天数 ÷ 该期天数，算至分（P-05/P-06，HALF_UP）。整期时（d = 该期天数）逐位等于该期
- *   `interestPaid`（同一乘法、同一舍入点）；30/360 与 ACT_360 月频下与 P-03「日利率 = 年利率 ÷
- *   360」严格等价；ACT/365 等约定基准按 P-03 的「按约定执行」条款继承摊销表口径。
+ *   × 天数 ÷ 该期天数，算至分（HALF_UP）。整期时（d = 该期天数）逐位等于该期
+ *   `interestPaid`（同一乘法、同一舍入点）；30/360 与 ACT_360 月频下与 「日利率 = 年利率 ÷
+ *   360」严格等价；ACT/365 等约定基准按「按约定执行」条款继承摊销表口径。
  * - **提前还款违约金**：按剩余本金的比例（RATE）或固定金额（AMOUNT），合同约定优先。
  * - **罚息**（房贷）：剩余本金 × 罚息年利率 × 逾期天数 ÷ 360；逾期天数 0 或利率 0 即不计罚息。
- * - **结清金额** = 剩余本金 + 应计利息 + 违约金 + 罚息（P-08：各明细先算至分、再求和）。
+ * - **结清金额** = 剩余本金 + 应计利息 + 违约金 + 罚息（各明细先算至分、再求和）。
  * - **节省利息** = 结清日及之后各期 `interestPaid` 合计 − 应计利息（不打折、不近似）。
  *
  * 结清日落在某期中间时，应计利息与摊销表中该期利息可对账：d ≤ 期天数 ⇒ 应计 ≤ 该期利息，
@@ -157,7 +157,7 @@ export function quoteEarlySettlement(
   const accruedDays = accruedDaysBetween(dayCountCode, holder.startDate, request.settlementDate)
   if (accruedDays < 0 || holder.days <= 0) return null
 
-  // 应计利息 = 剩余本金 × 期利率 × 天数 ÷ 该期天数，算至分（P-05/P-06，HALF_UP）。
+  // 应计利息 = 剩余本金 × 期利率 × 天数 ÷ 该期天数，算至分（HALF_UP）。
   const proportional = decimalMultiply(remainingPrincipal, holder.appliedRate)
   const accruedInterest =
     proportional === null
@@ -193,7 +193,7 @@ export function quoteEarlySettlement(
       ) ?? '0'
   }
 
-  // 结清金额 = 各明细（均已是分精度）之和（P-08：先明细求和再舍入 —— 明细已舍入到分，
+  // 结清金额 = 各明细（均已是分精度）之和（先明细求和再舍入 —— 明细已舍入到分，
   // 合计即分精度精确和）。
   const settlementAmount =
     decimalAdd(

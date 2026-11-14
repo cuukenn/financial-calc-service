@@ -6,7 +6,7 @@
  * 构成新的「总成本」口径 —— 印花税是租金总额派生出来的读数，不是又一笔现金流。
  *
  * 0.005% = 1/20000，所以这里用**除法**而不是乘法：`utils/ratio.ts` 只提供十进制
- * 精确加/减/除，不引入浮点（P-01）。税额按 P-05 输出 2 位（分），HALF_UP；
+ * 精确加/减/除，不引入浮点。税额输出 2 位（分），HALF_UP；
  * 计税依据保留后端原值，展示时才格式化。
  */
 import { decimalDivide, decimalSubtract, isDecimalText } from '@/utils/ratio'
@@ -23,7 +23,7 @@ export const STAMP_DUTY_RATE_TEXT = '0.005%'
 export interface StampDuty {
   /** 计税依据：Σ租金 − 单列增值税（原值，未格式化）。 */
   base: string
-  /** 应纳税额：计税依据 × 0.005%，2 位小数（P-05）。 */
+  /** 应纳税额：计税依据 × 0.005%，2 位小数。 */
   amount: string
 }
 

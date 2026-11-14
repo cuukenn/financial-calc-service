@@ -32,7 +32,7 @@ import java.util.List;
  *
  * <p>The flip itself keeps every amount positive and moves the sign into the {@code direction}
  * field, so the lessee's funded principal is an inflow and the rents are outflows without a
- * negative amount anywhere (AGENTS.md 补充口径规则 3).
+ * negative amount anywhere ().
  *
  * <p>Scale: {@link io.github.cuukenn.fincalc.common.money.MoneyScale#INTERMEDIATE} (10), the §9.5
  * scale for a solved periodic root — a rate finer than the solver's {@code 1e-10} tolerance would

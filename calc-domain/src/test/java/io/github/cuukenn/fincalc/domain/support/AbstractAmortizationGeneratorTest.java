@@ -61,7 +61,7 @@ class AbstractAmortizationGeneratorTest {
 
     @Test
     void tail_rounding_difference_keeps_positive_sign() {
-        // 末期少摊 0.006 元本金（小于 0.01 元容差，属可吸收舍入）：差额为正，按 P-09 带符号记录。
+        // 末期少摊 0.006 元本金（小于 0.01 元容差，属可吸收舍入）：差额为正，带符号记录。
         Schedule s = new TailDeltaStub(new BigDecimal("-0.006")).generate(context(fineElement()));
 
         assertThat(s.hasErrors()).isFalse();
@@ -70,7 +70,7 @@ class AbstractAmortizationGeneratorTest {
 
     @Test
     void tail_rounding_difference_keeps_negative_sign() {
-        // 末期多摊 0.006 元本金：差额为负，必须以负号记录（P-09：不得取绝对值后丢弃符号）。
+        // 末期多摊 0.006 元本金：差额为负，必须以负号记录（不得取绝对值后丢弃符号）。
         Schedule s = new TailDeltaStub(new BigDecimal("0.006")).generate(context(fineElement()));
 
         assertThat(s.hasErrors()).isFalse();

@@ -39,7 +39,7 @@ public final class ValidatorChain {
     }
 
     /**
-     * The chain every built-in calculation uses, in the AGENTS.md code-number order: principal
+     * The chain every built-in calculation uses, in the code-number order: principal
      * conservation ({@link CalcErrorCode#PRINCIPAL_CONSERVATION_BROKEN}), tail balance
      * ({@link CalcErrorCode#TAIL_BALANCE_MISMATCH}), per-period identity
      * ({@link CalcErrorCode#PERIOD_IDENTITY_BROKEN}), rent composition
@@ -58,7 +58,7 @@ public final class ValidatorChain {
     }
 
     /**
-     * The mortgage chain: the defaults chain plus the §2.3 threshold disclosures
+     * The mortgage chain: the defaults chain plus the mortgage threshold disclosures
      * ({@code MortgageThresholdValidator}, order 100 — after every conservation net). Assembled
      * only for runs declaring {@code ProductProfile#MORTGAGE} (form-field-gaps 15 / A2); the
      * defaults chain stays the byte-identical v1 path for every other run.
