@@ -40,12 +40,14 @@ import org.junit.jupiter.api.Test;
 
 /**
  * AGENTS.md §6 N-01: the run-cost gate. Before this test existed the repository had no repeatable
- * timing reading at all — the design document's own gate G6 (120 periods, P99 &lt; 50 ms) was nothing
- * but a sentence, and nothing noticed when the engine drifted past it.
+ * timing reading at all — the design document's own performance target (120 periods, P99 &lt; 50 ms,
+ * since withdrawn by owner decision on 2026-11-14; see AGENTS.md §6 N-02) was nothing but a
+ * sentence, and nothing noticed when the engine drifted past it.
  *
  * <p>Four shapes are pinned, in order:
  * <ol>
- *   <li>120 periods, fixed rate, no rule set — the cell G6 talks about;</li>
+ *   <li>120 periods, fixed rate, no rule set — the cell the withdrawn performance target talked
+ *       about;</li>
  *   <li>480 periods (the UI ceiling), fixed rate, no rule set;</li>
  *   <li>480 periods with 160 three-month rate-segment rows — the mortgage repricing shape of
  *       ticket 02 / R150, i.e. a segmented run that keeps the closed-form rent;</li>
@@ -56,9 +58,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p><b>These gates are non-regression ceilings, not the design target.</b> They were read off one
  * measuring pass on 2026-11-12 (Java 11, warm JVM, best of N) with a wide margin over the readings,
- * so a normal machine under load still passes while a real regression cannot hide. G6 is NOT claimed
- * as met here — N-02 forbids writing it as achieved until the metric-layer work (tickets 02/03 of
- * {@code .scratch/calc-perf}) actually closes the gap.
+ * so a normal machine under load still passes while a real regression cannot hide. The withdrawn
+ * 50 ms target is NOT claimed as met here — no absolute target exists any more: the 50 ms design
+ * target was withdrawn by owner decision on 2026-11-14 (AGENTS.md §6 N-02).
  *
  * <p>How the stage breakdown is obtained without touching production code: the orchestration steps
  * are called one by one — generator (step 2), event table (step 3), metrics plus the enriched
@@ -141,7 +143,7 @@ class RunCostBaselineTest {
         System.out.println("[calc-perf] java=" + System.getProperty("java.version")
                 + " cores=" + Runtime.getRuntime().availableProcessors()
                 + " — milliseconds, best of N after warm-up; gates are non-regression ceilings,"
-                + " not the G6 target (AGENTS.md §6 N-01/N-02)");
+                + " not a performance target (AGENTS.md §6 N-01/N-02; G6 withdrawn 2026-11-14)");
         System.out.printf("%-32s %5s %10s %9s %9s %9s %9s %9s%n", "shape", "rows", "schedule",
                 "cashflow", "metrics", "validate", "stages", "fullRun");
 
