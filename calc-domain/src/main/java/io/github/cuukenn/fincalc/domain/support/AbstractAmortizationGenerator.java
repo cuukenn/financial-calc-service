@@ -6,11 +6,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
+import io.github.cuukenn.fincalc.common.error.BusinessException;
 import io.github.cuukenn.fincalc.common.money.MoneyTolerance;
 import io.github.cuukenn.fincalc.common.money.MoneyUtils;
 import io.github.cuukenn.fincalc.domain.calc.CalcErrorCode;
 import io.github.cuukenn.fincalc.domain.calc.CalculationContext;
 import io.github.cuukenn.fincalc.domain.metric.FinancialMetrics;
+import io.github.cuukenn.fincalc.domain.model.DomainErrorCode;
 import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.IssueLevel;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
@@ -18,7 +20,9 @@ import io.github.cuukenn.fincalc.domain.model.PaymentTiming;
 import io.github.cuukenn.fincalc.domain.model.PeriodDate;
 import io.github.cuukenn.fincalc.domain.model.RoundingPolicy;
 import io.github.cuukenn.fincalc.domain.model.RuleOutcome;
+import io.github.cuukenn.fincalc.domain.model.TailAdjustPolicy;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
+import io.github.cuukenn.fincalc.domain.support.FirstPeriodStubSplit;
 import io.github.cuukenn.fincalc.domain.model.ScheduleHeader;
 import io.github.cuukenn.fincalc.domain.model.ValidationIssue;
 import io.github.cuukenn.fincalc.domain.port.DayCountConvention;
@@ -127,6 +131,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         Objects.requireNonNull(context, "context");
         LeaseElement element = context.element();
         validate(element);
+        requireSupportedTailPolicy(element);
 
         List<PeriodDate> periods = periods(context);
         if (periods.isEmpty()) {
@@ -145,6 +150,13 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         BigDecimal cumulativeInterest = money(MoneyUtils.ZERO, rounding);
         int totalPeriods = periods.size();
 
+        // 首期 stub（129号①）：首期窗口整体按「整月 + 零头」计息，与后面的整期窗口并存
+        // 不算混用——①只作用于这一笔的首期，其余各期是它们自己的整期（①②在整期上等价）。
+        // 求解侧（EqualInstallmentGenerator）吃同一个拆分值，两边不各算各的。
+        BigDecimal stubYearFraction = element.firstPeriodStub() && totalPeriods > 0
+                ? FirstPeriodStubSplit.yearFraction(periods.get(0).startDate(),
+                        periods.get(0).endDate(), element.frequency())
+                : null;
         for (int index = 0; index < totalPeriods; index++) {
             PeriodDate period = periods.get(index);
             int periodNo = index + 1;
@@ -153,7 +165,9 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
             RuleOutcome outcome = resolveRule(context.ruleSet(), periodNo, openingBalance, days,
                     element.nominalRate());
             BigDecimal rate = annualRate(element, outcome);
-            BigDecimal periodicRate = periodRate(element, period, rate, dayCount);
+            BigDecimal periodicRate = index == 0 && stubYearFraction != null
+                    ? rate.multiply(stubYearFraction)
+                    : periodRate(element, period, rate, dayCount);
             BigDecimal accruedInterest = money(openingBalance.multiply(periodicRate), rounding);
             boolean lastPeriod = index == totalPeriods - 1;
 
@@ -180,10 +194,15 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
             state.cumulativePrincipal(cumulativePrincipal);
             state.cumulativeInterest(cumulativeInterest);
 
+            String memo = allocation.memo();
+            if (index == 0 && stubYearFraction != null) {
+                // P-09 的「随结果披露」同类口径：首期拆分要显式可见，不得只改数字不留痕。
+                memo = (memo == null ? "" : memo + ";") + "首期按整月+零头计息（129号①）";
+            }
             installments.add(new Installment(periodNo, period.startDate(), period.endDate(), days,
                     openingBalance, principalDue, accruedInterest, interestPaid, fee, tax, rentDue,
                     closingBalance, cumulativePrincipal, cumulativeInterest, rate,
-                    allocation.memo()));
+                    memo));
             balance = closingBalance;
         }
 
@@ -197,6 +216,22 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
                 periods.get(0).startDate(), periods.get(periods.size() - 1).endDate(),
                 solver, roundingDifference);
         return new Schedule(header, installments, Collections.emptyList(), issues);
+    }
+
+    /**
+     * The tail-absorption posture of v1: the rounding drift always lands on the last row (the only
+     * row that can close the identity under per-row HALF_UP rounding), disclosed signed on the
+     * header ({@code roundingDifference}). {@code FIRST_PERIOD} / {@code PROPORTIONAL} need a
+     * backward solve — the forward drift only surfaces at the end — so a caller that asks for them
+     * is refused loudly instead of silently getting the last-period posture (form-field-gaps
+     * ticket 05; this also retires the dead {@code tailAdjustPolicy} input, M-01).
+     */
+    private static void requireSupportedTailPolicy(LeaseElement element) {
+        TailAdjustPolicy policy = element.rounding().tailAdjustPolicy();
+        if (policy != TailAdjustPolicy.LAST_PERIOD) {
+            throw new BusinessException(DomainErrorCode.TAIL_ADJUST_POLICY_UNSUPPORTED,
+                    policy.name());
+        }
     }
 
     /**

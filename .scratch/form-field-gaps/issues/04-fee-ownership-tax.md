@@ -1,6 +1,6 @@
 # 04. 费用：承担方与含税/不含税口径
 
-Status: ready-for-agent（2026-11-14 裁定拆两步：承担方先行可落地；含税口径 blocked on VAT_SPLIT 解冻，见文末「裁定」）
+Status: resolved（2026-11-14 第一步「承担方」落地；第二步含税口径 blocked on VAT_SPLIT 解冻，见文末）
 Type: task
 Priority: P2
 数据角色: A 参与测算 —— 费用承担方决定现金流方向，含税口径决定税额
@@ -37,3 +37,10 @@ Blocked by: —
 3. 实现顺序建议：先落承担方（含 FeesEditor UI + DTO + 方向测试），验收标准 1 单独达成；验收标准 2 等第二步。
 
 **实施前须补的钉子**：`CashFlowType.FEE` 的 SAME_DAY_ORDER 在 t0 已有固定序（PRINCIPAL → FEE → DEPOSIT）；出租人承担的费用是 t0 OUTFLOW，方向翻转不影响排序语义，测试钉住即可。
+
+## 落地记录（2026-11-14，第一步：承担方）
+
+- `FeeOwner` 枚举（LESSEE 缺省 = v1 姿态 / LESSOR）；`FeeItem.owner` 构造器归一化；`StandardCashFlowBuilder.addUpfrontFees` 按承担方拆两行（先收后付，同日排序同型按插入序，金额为 0 的行丢弃）。
+- DTO `FeeDto.owner` + assembler 映射；web `FeesEditor` 承担方下拉 + payload + zh/en i18n。
+- 测试：`StandardCashFlowBuilderTest` 25 绿（承担方拆行/方向翻转/LESSEE 镜像金额守恒）；`FeeOwnerCaliberTest` 2 绿——**换承担方双方 IRR 同向移动**（出租人承担 → 出租方 IRR 0.0019 < 承租人承担 0.0082，承租人视角经 R103 镜像同向下降——IRR 的符号翻转不变性决定了「镜像互换」不成立，测试注释写明）；无 owner 的既有要素保持 v1 数字。
+- **验收标准 1 达成**（方向变化 + 金额守恒）。验收标准 2（含税反算）保持 blocked on `VAT_SPLIT` 解冻裁定。

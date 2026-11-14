@@ -121,6 +121,7 @@ public final class CalculationRequestAssembler {
                 .depositTiming(dto.depositTiming())
                 .depositSettlement(dto.depositSettlement())
                 .depositInterestRate(dto.depositInterestRate())
+                .firstPeriodStub(Boolean.TRUE.equals(dto.firstPeriodStub()))
                 .fees(toFees(dto.fees()))
                 .explicitRents(dto.explicitRents())
                 .vatRate(dto.vatRate())
@@ -170,6 +171,7 @@ public final class CalculationRequestAssembler {
                     .type(dto.type())
                     .amount(dto.amount())
                     .chargeMode(dto.chargeMode())
+                    .owner(dto.owner())
                     .vatRate(dto.vatRate())
                     .includeInIrr(Boolean.TRUE.equals(dto.includeInIrr()))
                     .build());

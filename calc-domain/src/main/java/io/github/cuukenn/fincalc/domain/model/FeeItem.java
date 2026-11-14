@@ -10,6 +10,7 @@ public final class FeeItem {
     private final String type;
     private final BigDecimal amount;
     private final FeeChargeMode chargeMode;
+    private final FeeOwner owner;
     private final BigDecimal vatRate;
     private final boolean includeInIrr;
 
@@ -17,6 +18,9 @@ public final class FeeItem {
         this.type = builder.type;
         this.amount = builder.amount;
         this.chargeMode = builder.chargeMode;
+        // 归一化在构造器：引擎读者永远拿到一个非空答案，未携带 owner 的既有要素保持
+        // v1 姿态（承租人承担 = 出租人收取 = INFLOW）。
+        this.owner = builder.owner == null ? FeeOwner.LESSEE : builder.owner;
         this.vatRate = builder.vatRate;
         this.includeInIrr = builder.includeInIrr;
     }
@@ -40,6 +44,14 @@ public final class FeeItem {
         return chargeMode;
     }
 
+    /**
+     * Who bears the fee; never {@code null} (defaults to {@link FeeOwner#LESSEE}, the v1 posture).
+     * The owner decides the fee row's direction on the lessor event table.
+     */
+    public FeeOwner owner() {
+        return owner;
+    }
+
     /** VAT rate applied to this fee; {@code null} means no separate VAT treatment. */
     public BigDecimal vatRate() {
         return vatRate;
@@ -56,6 +68,7 @@ public final class FeeItem {
         private String type;
         private BigDecimal amount;
         private FeeChargeMode chargeMode;
+        private FeeOwner owner;
         private BigDecimal vatRate;
         private boolean includeInIrr;
 
@@ -74,6 +87,12 @@ public final class FeeItem {
 
         public Builder chargeMode(FeeChargeMode chargeMode) {
             this.chargeMode = chargeMode;
+            return this;
+        }
+
+        /** Who bears the fee; {@code null} means the v1 posture (lessee-borne inflow). */
+        public Builder owner(FeeOwner owner) {
+            this.owner = owner;
             return this;
         }
 

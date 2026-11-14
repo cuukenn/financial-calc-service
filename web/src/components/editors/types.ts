@@ -12,9 +12,13 @@ export interface RuleRowDraft {
   annualRate: string
 }
 
+/** 费用承担方（后端 FeeDto.owner 注册值）。 */
+export type FeeOwnerDraft = 'LESSEE' | 'LESSOR'
+
 /** 一笔费用草稿。 */
 export interface FeeDraft {
   type: string
   amount: string
   chargeMode: string
+  owner: FeeOwnerDraft
 }

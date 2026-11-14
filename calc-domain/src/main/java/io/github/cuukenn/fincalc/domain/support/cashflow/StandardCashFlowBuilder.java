@@ -12,6 +12,7 @@ import io.github.cuukenn.fincalc.domain.model.CashFlowType;
 import io.github.cuukenn.fincalc.domain.model.DepositSettlement;
 import io.github.cuukenn.fincalc.domain.model.DepositTiming;
 import io.github.cuukenn.fincalc.domain.model.FeeChargeMode;
+import io.github.cuukenn.fincalc.domain.model.FeeOwner;
 import io.github.cuukenn.fincalc.domain.model.FeeItem;
 import io.github.cuukenn.fincalc.domain.model.Installment;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
@@ -190,15 +191,28 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
                 .divide(BigDecimal.valueOf(360), rounding.scale(), rounding.mode());
     }
 
+    /**
+     * Upfront fees that participate in the IRR, split by 承担方 (AGENTS.md §3.1 第 12 条;
+     * form-field-gaps ticket 04 第一步）：承租人承担 = 出租人收取（INFLOW，v1 姿态），
+     * 出租人承担 = 出租人支付第三方（OUTFLOW）——同一笔费用换承担方方向翻转、双方 IRR
+     * 反向变化，金额守恒由 R103 镜像保证。两类各一行（金额为 0 的行由 {@link #addFlow}
+     * 丢弃），同日排序同型按插入序，先收后付。
+     */
     private void addUpfrontFees(List<CashFlow> flows, LeaseElement element,
             RoundingPolicy rounding, LocalDate t0) {
-        BigDecimal total = MoneyUtils.ZERO;
+        BigDecimal lesseeBorne = MoneyUtils.ZERO;
+        BigDecimal lessorBorne = MoneyUtils.ZERO;
         for (FeeItem fee : element.fees()) {
             if (fee.chargeMode() == FeeChargeMode.UPFRONT && fee.includeInIrr()) {
-                total = total.add(fee.amount());
+                if (fee.owner() == FeeOwner.LESSOR) {
+                    lessorBorne = lessorBorne.add(fee.amount());
+                } else {
+                    lesseeBorne = lesseeBorne.add(fee.amount());
+                }
             }
         }
-        addFlow(flows, t0, money(total, rounding), CashFlowType.FEE, CashFlowDirection.INFLOW);
+        addFlow(flows, t0, money(lesseeBorne, rounding), CashFlowType.FEE, CashFlowDirection.INFLOW);
+        addFlow(flows, t0, money(lessorBorne, rounding), CashFlowType.FEE, CashFlowDirection.OUTFLOW);
     }
 
     /**

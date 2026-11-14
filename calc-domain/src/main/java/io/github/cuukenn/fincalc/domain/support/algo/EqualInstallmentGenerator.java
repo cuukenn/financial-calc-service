@@ -14,6 +14,7 @@ import io.github.cuukenn.fincalc.domain.model.RepaymentMethodId;
 import io.github.cuukenn.fincalc.domain.model.RuleOutcome;
 import io.github.cuukenn.fincalc.domain.port.DayCountConvention;
 import io.github.cuukenn.fincalc.domain.support.AbstractAmortizationGenerator;
+import io.github.cuukenn.fincalc.domain.support.FirstPeriodStubSplit;
 import io.github.cuukenn.fincalc.domain.support.PmtSolver;
 
 /**
@@ -78,7 +79,13 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
         if (context.ruleSet() == null) {
             // R71: no rule set means a single segment at the nominal rate — the pre-segmented
             // behavior, unchanged.
-            if (PmtSolver.isConstantPeriodRate(dayCount)
+            BigDecimal stubOverride = firstStubOverride(element, periods);
+            // The closed form stays exclusive to the stub-free path: a stub first window prices
+            // 129号①, whose rate generally leaves the uniform-rate domain the annuity formula
+            // assumes (and on THIRTY_360 month-end edges it differs from the 30/360 fraction
+            // too), so the bisection over the mixed rate list prices it.
+            if (stubOverride == null
+                    && PmtSolver.isConstantPeriodRate(dayCount)
                     && closedFormPricing(context, periods)) {
                 BigDecimal rate = periodRate(element, periods.get(0), element.nominalRate(),
                         dayCount);
@@ -86,7 +93,7 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
                 state.solver("CLOSED_FORM");
             } else {
                 state.pmt(PmtSolver.iterative(principal, periods, dayCount, element.nominalRate(),
-                        residual));
+                        residual, stubOverride));
                 state.solver("ITERATIVE");
             }
             return;
@@ -102,7 +109,8 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
                 BigDecimal initialAnnual = initialAnnualRate(context, periods);
                 state.pmt(solveSegment(principal, initialAnnual,
                         periodRate(element, periods.get(0), initialAnnual, dayCount),
-                        periods.size(), periods, dayCount, residual));
+                        periods.size(), periods, dayCount, residual,
+                        firstStubOverride(element, periods)));
                 state.solver("FIXED_RENT");
                 break;
             case DRIFT:
@@ -125,12 +133,13 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
      */
     private static BigDecimal solveSegment(BigDecimal opening, BigDecimal annual,
             BigDecimal periodicRate, int remaining, List<PeriodDate> remainingWindows,
-            DayCountConvention dayCount, BigDecimal residual) {
+            DayCountConvention dayCount, BigDecimal residual, BigDecimal stubOverride) {
         // Each window's rate is derived once per segment solve and then consumed twice — by the
         // uniformity test and by the bisection's ~50 evaluations (AGENTS.md §6 N-05). The products are
         // the same unrounded {@code annual × yearFraction(window)} in window order, so the rent the
         // segment prices is bit-identical to the separately-derived version (AGENTS.md §6 N-04).
-        List<BigDecimal> periodRates = PmtSolver.periodRates(annual, remainingWindows, dayCount);
+        List<BigDecimal> periodRates = PmtSolver.periodRates(annual, remainingWindows, dayCount,
+                stubOverride);
         if (uniform(periodRates)) {
             return PmtSolver.closedForm(opening, periodicRate, remaining, residual);
         }
@@ -222,15 +231,35 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
         BigDecimal annual = annualRate(input.element(), input.ruleOutcome());
         if (input.element().rateChangePolicy() == RateChangePolicy.DRIFT) {
             return solveSegment(input.openingBalance(), annual, input.periodRate(), remaining,
-                    remainingWindows, dayCount, residual);
+                    remainingWindows, dayCount, residual, firstStubOverride(input.element(),
+                            remainingWindows, input.periodNo()));
         }
         BigDecimal segmentRate = state.segmentRate();
         if (segmentRate == null || annual.compareTo(segmentRate) != 0) {
             state.segmentRate(annual);
             state.segmentRent(solveSegment(input.openingBalance(), annual, input.periodRate(),
-                    remaining, remainingWindows, dayCount, residual));
+                    remaining, remainingWindows, dayCount, residual, firstStubOverride(
+                            input.element(), remainingWindows, input.periodNo())));
         }
         return state.segmentRent();
+    }
+
+    /**
+     * The stub override for a solve over {@code windows}: the year fraction of 129号① when the
+     * element carries the stub and {@code windows} starts at the schedule's first window — the
+     * solve and the amortization row must price the same split, or the schedule would not close.
+     */
+    private static BigDecimal firstStubOverride(LeaseElement element, List<PeriodDate> windows) {
+        return windows.isEmpty() || !element.firstPeriodStub()
+                ? null
+                : FirstPeriodStubSplit.yearFraction(windows.get(0).startDate(),
+                        windows.get(0).endDate(), element.frequency());
+    }
+
+    /** {@code periodNo <= 0} marks the whole-schedule solves of {@link #prepare}. */
+    private static BigDecimal firstStubOverride(LeaseElement element, List<PeriodDate> windows,
+            int periodNo) {
+        return periodNo == 1 ? firstStubOverride(element, windows) : null;
     }
 
     private static BigDecimal money(BigDecimal value, LeaseElement element) {

@@ -65,6 +65,13 @@ public enum DomainErrorCode implements ErrorCode {
     DEPOSIT_INTEREST_RATE_CONFLICTS_WITH_OFFSET("FCS-DOM-1019",
             "FCS-DOM-1019: 抵减本金方式下保证金不占用期间、不得计息: %s"),
 
+    TAIL_ADJUST_POLICY_UNSUPPORTED("FCS-DOM-1020",
+            "FCS-DOM-1020: 尾差吸收位置 %s 暂未支持（首期吸收/按期均摊需要逆解重建）:"
+            + " v1 只支持 LAST_PERIOD（末期吸收，P-09 单点带符号披露），显式拒绝而非静默忽略"),
+
+    FIRST_PERIOD_STUB_NOT_APPLICABLE("FCS-DOM-1021",
+            "FCS-DOM-1021: 首期 stub（129号① 整月+零头拆分）不适用于 %s"),
+
     PERIOD_SEQUENCE_INVALID("FCS-DOM-2001",
             "FCS-DOM-2001: 期次日期必须严格递增且 start < end: 第 %s 期 [%s, %s]"),
 

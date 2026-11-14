@@ -12,6 +12,7 @@ export type PaymentFrequency = 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL
 export type PaymentTiming = 'IN_ADVANCE' | 'IN_ARREARS'
 
 export type ResidualHandling = 'SEPARATE' | 'BALLOON_IN_RENT'
+export type FeeOwner = 'LESSEE' | 'LESSOR'
 export type DepositTiming = 'UPFRONT' | 'WITH_FIRST_RENT'
 export type DepositSettlement = 'REFUND' | 'OFFSET_PRINCIPAL' | 'OFFSET_FINAL_RENT'
 
@@ -48,6 +49,8 @@ export interface FeeInput {
   amount: string
   /** UPFRONT（期初一次性）/ DEDUCT_FROM_PRINCIPAL（抵减本金）/ AMORTIZED（摊入租金）。 */
   chargeMode: string
+  /** 费用承担方：LESSEE（承租人承担、出租人收取，缺省）/ LESSOR（出租人承担，事件表流出）。 */
+  owner?: FeeOwner
   /** 该笔费用的增值税率，小数形式。 */
   vatRate?: string
   /** 是否计入 IRR 现金流；缺省 false。 */
@@ -125,6 +128,8 @@ export interface CalculationRequest {
   depositSettlement?: DepositSettlement
   /** 保证金计息年利率，小数形式；缺省 = 不计息。 */
   depositInterestRate?: string
+  /** 首期是否按 129号①「整月+零头」拆分计息；缺省 false = 129号② 一段计。 */
+  firstPeriodStub?: boolean
   /** 增值税率，小数形式。 */
   vatRate?: string
   /** 币种，ISO-4217 代码。 */

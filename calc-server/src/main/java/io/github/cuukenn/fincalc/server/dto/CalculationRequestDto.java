@@ -3,6 +3,7 @@ package io.github.cuukenn.fincalc.server.dto;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.github.cuukenn.fincalc.domain.model.DepositSettlement;
+import io.github.cuukenn.fincalc.domain.model.FeeOwner;
 import io.github.cuukenn.fincalc.domain.model.DepositTiming;
 import io.github.cuukenn.fincalc.domain.model.FeeChargeMode;
 import io.github.cuukenn.fincalc.domain.model.PaymentFrequency;
@@ -130,6 +131,10 @@ public final class CalculationRequestDto {
             + "利息按 ACT/360 实际占用天数、算头不算尾、单利，单独成行返还")
     private final BigDecimal depositInterestRate;
 
+    @Schema(description = "首期是否按 129号①「整月 + 零头」拆分计息（缺省 false = 129号② 一段计，"
+            + "逐位一致）。仅常规月锚频率可用；IRREGULAR / RULE_DRIVEN 拒绝（FCS-DOM-1021）")
+    private final Boolean firstPeriodStub;
+
     @Schema(description = "增值税率，小数形式（0.06 = 6%）", example = "0.06")
     private final BigDecimal vatRate;
 
@@ -200,7 +205,8 @@ public final class CalculationRequestDto {
             @JsonProperty("downPayment") BigDecimal downPayment,
             @JsonProperty("initialDirectCosts") BigDecimal initialDirectCosts,
             @JsonProperty("guaranteedResidual") BigDecimal guaranteedResidual,
-            @JsonProperty("unguaranteedResidual") BigDecimal unguaranteedResidual) {
+            @JsonProperty("unguaranteedResidual") BigDecimal unguaranteedResidual,
+            @JsonProperty("firstPeriodStub") Boolean firstPeriodStub) {
         this.principal = principal;
         this.nominalRate = nominalRate;
         this.commenceDate = commenceDate;
@@ -218,6 +224,7 @@ public final class CalculationRequestDto {
         this.depositTiming = depositTiming;
         this.depositSettlement = depositSettlement;
         this.depositInterestRate = depositInterestRate;
+        this.firstPeriodStub = firstPeriodStub;
         this.vatRate = vatRate;
         this.currency = currency;
         this.method = method;
@@ -320,6 +327,10 @@ public final class CalculationRequestDto {
 
     public BigDecimal depositInterestRate() {
         return depositInterestRate;
+    }
+
+    public Boolean firstPeriodStub() {
+        return firstPeriodStub;
     }
 
     public BigDecimal vatRate() {
@@ -477,6 +488,10 @@ public final class CalculationRequestDto {
                 example = "UPFRONT")
         private final FeeChargeMode chargeMode;
 
+        @Schema(description = "费用承担方：LESSEE（承租人承担、出租人收取，缺省）/ LESSOR"
+                + "（出租人承担、出租人支付第三方 —— 事件表记流出，IRR 反向变化）")
+        private final FeeOwner owner;
+
         @Schema(description = "该笔费用的增值税率，小数形式", example = "0.06")
         private final BigDecimal vatRate;
 
@@ -488,11 +503,13 @@ public final class CalculationRequestDto {
                 @JsonProperty("type") String type,
                 @JsonProperty("amount") BigDecimal amount,
                 @JsonProperty("chargeMode") FeeChargeMode chargeMode,
+                @JsonProperty("owner") FeeOwner owner,
                 @JsonProperty("vatRate") BigDecimal vatRate,
                 @JsonProperty("includeInIrr") Boolean includeInIrr) {
             this.type = type;
             this.amount = amount;
             this.chargeMode = chargeMode;
+            this.owner = owner;
             this.vatRate = vatRate;
             this.includeInIrr = includeInIrr;
         }
@@ -507,6 +524,10 @@ public final class CalculationRequestDto {
 
         public FeeChargeMode chargeMode() {
             return chargeMode;
+        }
+
+        public FeeOwner owner() {
+            return owner;
         }
 
         public BigDecimal vatRate() {

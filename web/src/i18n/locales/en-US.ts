@@ -52,6 +52,9 @@ const enUS: typeof zhCN = {
     },
     rentStructure: {
       title: 'Rent Structure',
+      firstPeriodStub: 'Split the first period into full months + odd days (129 art. ①)',
+      firstPeriodStubHint: 'Off by default: one year-fraction segment for the first window (129 art. ②)',
+      firstPeriodStubNote: 'The first window prices as full months at the monthly rate plus remainder days at the daily rate (annual ÷ 360); the two 129 methods never mix within one deal. The first row of the schedule carries the caliber note.',
       ruleRows: {
         title: 'Rule rows (optional: segmented rates)',
         hint:
@@ -324,6 +327,10 @@ const enUS: typeof zhCN = {
       DEDUCT_FROM_PRINCIPAL: 'Deducted from principal',
       AMORTIZED: 'Amortized into rent',
     },
+    feeOwner: {
+      LESSEE: 'Borne by lessee',
+      LESSOR: 'Borne by lessor',
+    },
     method: {
       EQUAL_INSTALLMENT: 'Equal installment (annuity)',
       EQUAL_PRINCIPAL: 'Equal principal',
@@ -383,6 +390,7 @@ const enUS: typeof zhCN = {
       },
     },
     scheduleTab: {
+    tailAbsorption: 'Tail absorption: last period (default; single-point signed disclosure per P-09)',
       compositionTitle: 'Composition (principal vs interest)',
       balanceTitle: 'Balance curve',
       tableTitle: 'Amortization schedule',

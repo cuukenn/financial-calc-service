@@ -20,6 +20,7 @@ import io.github.cuukenn.fincalc.domain.model.CashFlowType;
 import io.github.cuukenn.fincalc.domain.model.DepositSettlement;
 import io.github.cuukenn.fincalc.domain.model.DepositTiming;
 import io.github.cuukenn.fincalc.domain.model.FeeChargeMode;
+import io.github.cuukenn.fincalc.domain.model.FeeOwner;
 import io.github.cuukenn.fincalc.domain.model.FeeItem;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
 import io.github.cuukenn.fincalc.domain.model.Installment;
@@ -444,6 +445,84 @@ class StandardCashFlowBuilderTest {
             assertThat(offsetFlows.get(i).amount())
                     .isEqualByComparingTo(refundFlows.get(i).amount());
         }
+    }
+
+    @Test
+    void lessee_borne_upfront_fee_stays_an_inflow_the_v1_posture() {
+        LeaseElement element = element().toBuilder()
+                .fees(Collections.singletonList(
+                        fee("HANDLING", "20000", FeeChargeMode.UPFRONT, true)))
+                .build();
+
+        List<CashFlow> flows = builder.build(schedule(), element, CalculationOptions.defaults());
+
+        assertThat(flows).filteredOn(f -> f.type() == CashFlowType.FEE).hasSize(1);
+        assertThat(flows).anySatisfy(f -> {
+            assertThat(f.type()).isEqualTo(CashFlowType.FEE);
+            assertThat(f.direction()).isEqualTo(INFLOW);
+            assertThat(f.amount()).isEqualByComparingTo("20000.00");
+        });
+    }
+
+    @Test
+    void lessor_borne_upfront_fee_flips_to_an_outflow_and_mixed_fees_split_by_owner() {
+        LeaseElement mixed = element().toBuilder()
+                .fees(Arrays.asList(
+                        fee("HANDLING", "20000", FeeChargeMode.UPFRONT, true),
+                        lessorOwnedFee("INSURANCE", "3000", FeeChargeMode.UPFRONT, true),
+                        fee("EXCLUDED", "5000", FeeChargeMode.UPFRONT, false)))
+                .build();
+
+        List<CashFlow> flows = builder.build(schedule(), mixed, CalculationOptions.defaults());
+
+        List<CashFlow> feeRows = flows.stream()
+                .filter(f -> f.type() == CashFlowType.FEE).collect(toList());
+        // 两行（金额为 0 的行丢弃）：先收（承租人承担）后付（出租人承担），不入 IRR 的费用不出现。
+        assertThat(feeRows).extracting(CashFlow::direction)
+                .containsExactly(INFLOW, OUTFLOW);
+        assertThat(feeRows).extracting(CashFlow::amount)
+                .usingElementComparator(java.util.Comparator
+                        .comparing(java.math.BigDecimal::intValueExact))
+                .containsExactly(new BigDecimal("20000.00"), new BigDecimal("3000.00"));
+        assertThat(feeRows).allSatisfy(f -> assertThat(f.date()).isEqualTo(T0));
+    }
+
+    @Test
+    void lessee_perspective_mirrors_both_fee_directions() {
+        LeaseElement mixed = element().toBuilder()
+                .fees(Arrays.asList(
+                        fee("HANDLING", "20000", FeeChargeMode.UPFRONT, true),
+                        lessorOwnedFee("INSURANCE", "3000", FeeChargeMode.UPFRONT, true)))
+                .build();
+
+        List<CashFlow> lessor = builder.build(schedule(), mixed, CalculationOptions.defaults());
+        List<CashFlow> lessee = builder.build(schedule(), mixed, CalculationOptions.defaults(),
+                CashFlowPerspective.LESSEE);
+
+        List<CashFlow> lessorFees = lessor.stream()
+                .filter(f -> f.type() == CashFlowType.FEE).collect(toList());
+        List<CashFlow> lesseeFees = lessee.stream()
+                .filter(f -> f.type() == CashFlowType.FEE).collect(toList());
+        // 金额守恒（R103 镜像）：方向全翻转、金额逐位一致。
+        assertThat(lesseeFees).hasSameSizeAs(lessorFees);
+        for (int i = 0; i < lessorFees.size(); i++) {
+            assertThat(lesseeFees.get(i).amount())
+                    .isEqualByComparingTo(lessorFees.get(i).amount());
+            assertThat(lesseeFees.get(i).direction())
+                    .isNotEqualTo(lessorFees.get(i).direction());
+        }
+    }
+
+    /** 出租人承担的费用行（ticket 04 第一步）：同一形状，仅承担方不同。 */
+    private static FeeItem lessorOwnedFee(String type, String amount, FeeChargeMode mode,
+            boolean includeInIrr) {
+        return FeeItem.builder()
+                .type(type)
+                .amount(new BigDecimal(amount))
+                .chargeMode(mode)
+                .owner(FeeOwner.LESSOR)
+                .includeInIrr(includeInIrr)
+                .build();
     }
 
     private static Schedule schedule() {

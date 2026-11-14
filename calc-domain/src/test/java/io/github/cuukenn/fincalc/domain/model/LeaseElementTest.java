@@ -305,6 +305,33 @@ class LeaseElementTest {
         assertThat(offset.toBuilder().build().measuredPrincipal()).isEqualByComparingTo("900000");
     }
 
+    @Test
+    void builder_defaults_first_period_stub_to_off() {
+        assertThat(baseBuilder().build().firstPeriodStub()).isFalse();
+    }
+
+    @Test
+    void builder_rejects_first_period_stub_for_irregular_and_rule_driven() {
+        // IRREGULAR：显式期间没有整月锚点（显式期间本身合法，拒绝来自 stub 校验）。
+        assertThatThrownBy(() -> baseBuilder()
+                .frequency(PaymentFrequency.IRREGULAR)
+                .explicitPeriods(Collections.singletonList(PeriodDate.builder()
+                        .startDate(LocalDate.of(2024, 1, 1))
+                        .endDate(LocalDate.of(2024, 2, 1))
+                        .paymentDate(LocalDate.of(2024, 2, 1))
+                        .build()))
+                .firstPeriodStub(true)
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1021");
+        assertThatThrownBy(() -> baseBuilder()
+                .method(RepaymentMethodId.RULE_DRIVEN)
+                .firstPeriodStub(true)
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1021");
+    }
+
     private LeaseElement.Builder baseBuilder() {
         return LeaseElement.builder()
                 .principal(new BigDecimal("1000000"))

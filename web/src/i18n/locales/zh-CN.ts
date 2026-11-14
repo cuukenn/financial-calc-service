@@ -56,6 +56,9 @@ const zhCN = {
     },
     rentStructure: {
       title: '租金结构',
+      firstPeriodStub: '首期按整月+零头计息（129号①）',
+      firstPeriodStubHint: '默认关闭：首期按年利率 × 期间占比一段计（129号②）',
+      firstPeriodStubNote: '首期窗口拆为「整月（月利率）+ 零头天数（日利率 = 年利率 ÷ 360）」两段计息，算法在单笔内不与②混用；结果区首期行会标注口径。',
       ruleRows: {
         title: '规则行（可选：分段利率）',
         hint: '对全部方式开放：携带规则行即启用分段利率（RULE_DRIVEN 则为必填规则集）',
@@ -323,6 +326,10 @@ const zhCN = {
       DEDUCT_FROM_PRINCIPAL: '抵减本金',
       AMORTIZED: '摊入租金',
     },
+    feeOwner: {
+      LESSEE: '承租人承担',
+      LESSOR: '出租人承担',
+    },
     method: {
       EQUAL_INSTALLMENT: '等额本息',
       EQUAL_PRINCIPAL: '等额本金',
@@ -379,6 +386,7 @@ const zhCN = {
       },
     },
     scheduleTab: {
+    tailAbsorption: '尾差吸收：末期（默认，P-09 单点带符号披露，见「尾差调整」列/表头差额）',
       compositionTitle: '构成（本金 vs 利息）',
       balanceTitle: '余额曲线',
       tableTitle: '摊销计划',

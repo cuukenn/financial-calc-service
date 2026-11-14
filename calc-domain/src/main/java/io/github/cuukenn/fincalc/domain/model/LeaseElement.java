@@ -47,6 +47,7 @@ public final class LeaseElement {
     private final DepositTiming depositTiming;
     private final DepositSettlement depositSettlement;
     private final BigDecimal depositInterestRate;
+    private final boolean firstPeriodStub;
     private final List<FeeItem> fees;
     private final List<BigDecimal> explicitRents;
     private final BigDecimal vatRate;
@@ -83,6 +84,7 @@ public final class LeaseElement {
         this.depositSettlement = builder.depositSettlement == null
                 ? DepositSettlement.REFUND : builder.depositSettlement;
         this.depositInterestRate = builder.depositInterestRate;
+        this.firstPeriodStub = builder.firstPeriodStub;
         this.fees = Collections.unmodifiableList(new ArrayList<>(builder.fees));
         this.explicitRents = Collections.unmodifiableList(new ArrayList<>(builder.explicitRents));
         this.vatRate = builder.vatRate;
@@ -130,6 +132,7 @@ public final class LeaseElement {
         validateExplicitRents();
         validateFees();
         validateDeposit();
+        validateFirstPeriodStub();
         requireField(frequency, "frequency");
         requireField(timing, "timing");
         requireField(dayCountCode, "dayCountCode");
@@ -277,6 +280,24 @@ public final class LeaseElement {
         }
     }
 
+    /**
+     * 129号① 的「整月」是一个日历概念：IRREGULAR 的显式期间没有月锚点；RULE_DRIVEN 的租金
+     * 解算不消费 stub。两者都拒绝，不做静默忽略（§3.1 缺失/矛盾即报错）。
+     */
+    private void validateFirstPeriodStub() {
+        if (!firstPeriodStub) {
+            return;
+        }
+        if (frequency == PaymentFrequency.IRREGULAR) {
+            throw new BusinessException(DomainErrorCode.FIRST_PERIOD_STUB_NOT_APPLICABLE,
+                    "IRREGULAR（显式期间没有整月锚点）");
+        }
+        if (method == RepaymentMethodId.RULE_DRIVEN) {
+            throw new BusinessException(DomainErrorCode.FIRST_PERIOD_STUB_NOT_APPLICABLE,
+                    "RULE_DRIVEN（规则驱动租金解算不消费 stub）");
+        }
+    }
+
     private static void requireField(Object value, String name) {
         if (value == null) {
             throw new BusinessException(CommonErrorCode.INVALID_ARGUMENT, name, "必填");
@@ -411,6 +432,17 @@ public final class LeaseElement {
     }
 
     /**
+     * Whether the first period splits into 整月 + 零头 (129号①: full months at the monthly rate,
+     * remainder days at the daily rate) instead of one yearFraction segment (129号②, the default).
+     * The two 129号 algorithms must not mix within one deal: with the stub on, the whole first
+     * window prices ① and every later window stays on its own whole-period yearFraction.
+     * Defaults to {@code false} — the v1 posture, bit-identical numbers.
+     */
+    public boolean firstPeriodStub() {
+        return firstPeriodStub;
+    }
+
+    /**
      * The principal the schedule amortizes: the contract principal less a deposit whose settlement
      * is {@link DepositSettlement#OFFSET_PRINCIPAL} — the deposit is consumed at collection against
      * the financed amount, so rent and balances are measured on the net — and the contract principal
@@ -489,6 +521,7 @@ public final class LeaseElement {
         private DepositTiming depositTiming;
         private DepositSettlement depositSettlement;
         private BigDecimal depositInterestRate;
+        private boolean firstPeriodStub;
         private List<FeeItem> fees = Collections.emptyList();
         private List<BigDecimal> explicitRents = Collections.emptyList();
         private BigDecimal vatRate;
@@ -523,6 +556,7 @@ public final class LeaseElement {
             this.depositTiming = source.depositTiming;
             this.depositSettlement = source.depositSettlement;
             this.depositInterestRate = source.depositInterestRate;
+            this.firstPeriodStub = source.firstPeriodStub;
             this.fees = source.fees;
             this.explicitRents = source.explicitRents;
             this.vatRate = source.vatRate;
@@ -647,6 +681,16 @@ public final class LeaseElement {
          */
         public Builder depositInterestRate(BigDecimal depositInterestRate) {
             this.depositInterestRate = depositInterestRate;
+            return this;
+        }
+
+        /**
+         * Whether the first window prices 129号① (整月 + 零头) instead of one yearFraction
+         * segment; defaults to {@code false}. Rejected for {@code IRREGULAR} and
+         * {@code RULE_DRIVEN} at build time.
+         */
+        public Builder firstPeriodStub(boolean firstPeriodStub) {
+            this.firstPeriodStub = firstPeriodStub;
             return this;
         }
 

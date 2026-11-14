@@ -15,6 +15,7 @@ import {
   Select,
   Space,
   Typography,
+  Switch,
 } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import type { Rule } from 'ant-design-vue/es/form'
@@ -180,6 +181,7 @@ interface FormState {
   depositSettlement: DepositSettlement
   /** 保证金年利率的展示值（R92-5 百分数口径：3 / 3%），提交前换算为小数字符串；空 = 不计息。 */
   depositInterestRate: string
+  firstPeriodStub: boolean
   /** 增值税率的展示值（R92-5 百分数口径：6 / 6%），提交前换算为小数字符串。 */
   vatRate: string
   interestOnlyPeriods: number
@@ -217,6 +219,7 @@ function defaults(): FormState {
     depositTiming: 'UPFRONT',
     depositSettlement: 'REFUND',
     depositInterestRate: '',
+    firstPeriodStub: false,
     vatRate: '6',
     interestOnlyPeriods: 0,
     fullGracePeriods: 0,
@@ -382,6 +385,9 @@ function buildRequest(): CalculationRequest {
       ? {}
       : { depositInterestRate: parseRateInput(form.depositInterestRate)
               ?? form.depositInterestRate.trim() }),
+    // 首期 stub（ticket 05）：仅打开时携带，缺省 false 不发键（契约显式优于缺席的反例——
+    // 这个键的缺省就是「不做拆分」，与引擎默认逐位一致）。
+    ...(form.firstPeriodStub ? { firstPeriodStub: true } : {}),
     // R92-5：增值税率为百分数口径展示值（6 / 6%），提交前换算为小数字符串。
     vatRate: parseRateInput(form.vatRate) ?? form.vatRate.trim(),
   }
@@ -398,6 +404,8 @@ function buildRequest(): CalculationRequest {
         type: fee.type.trim(),
         amount: fee.amount.trim(),
         chargeMode: fee.chargeMode,
+        // 承担方（ticket 04）：缺省承租人承担；字段总带上，契约显式优于缺席（§3.1）。
+        owner: fee.owner,
       }
       return feeInput
     })
@@ -686,6 +694,22 @@ function onReset(): void {
             data-test="card-rent-structure"
             class="block-card"
           >
+            <!-- 首期 stub（ticket 05，129号①）：默认关（129号② 一段计，逐位一致）。 -->
+            <FormItem :label="t('form.rentStructure.firstPeriodStub')">
+              <Switch
+                v-model:checked="form.firstPeriodStub"
+                data-test="first-period-stub"
+              />
+              <Typography.Text type="secondary" style="margin-left: 8px">
+                {{ t('form.rentStructure.firstPeriodStubHint') }}
+              </Typography.Text>
+            </FormItem>
+            <FormItem v-if="form.firstPeriodStub" :label="' '">
+              <Typography.Text type="warning">
+                {{ t('form.rentStructure.firstPeriodStubNote') }}
+              </Typography.Text>
+            </FormItem>
+
             <!-- 规则行编辑器（子组件）：预设按钮依赖期数。 -->
             <RuleRowsEditor v-model="ruleRows" :periods="form.periods ?? 0" />
 
