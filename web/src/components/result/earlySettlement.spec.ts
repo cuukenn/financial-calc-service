@@ -188,6 +188,26 @@ describe('quoteEarlySettlement', () => {
     expect(quote!.accruedInterest).toBe('1500')
   })
 
+  it('clamps day 31 exactly like the engine Thirty360 (Bond Basis)', () => {
+    // 引擎规则：起始日 31 → 30；结束日 31 仅在起始日已 30 时 → 30。
+    // 第 6 期期初 6-01（d1=1），结清 6-30：d2=30 不触发钳位，d = 29；
+    // 结清 6-31：d2=31 但 d1≠30 → 不钳位，d = 30（整期利息）。
+    const mid = quoteEarlySettlement(schedule(), {
+      settlementDate: '2024-06-30',
+      penaltyMode: 'AMOUNT',
+      penaltyAmount: '0',
+    }, 'THIRTY_360')
+    expect(mid!.accruedDays).toBe(29)
+
+    const monthEnd = quoteEarlySettlement(schedule(), {
+      settlementDate: '2024-06-30',
+      penaltyMode: 'AMOUNT',
+      penaltyAmount: '0',
+    }, 'ACT_360')
+    // ACT_360 用实际天数：6-01 → 6-30 = 29 天，与 30/360 在此处重合（无钳位触发）。
+    expect(monthEnd!.accruedDays).toBe(29)
+  })
+
   it('uses 30/360 day math on a 31-day calendar month (the basis, not the calendar)', () => {
     // 7 月有 31 天，但 THIRTY_360 期内天数 = 30：结清 7-16 → 30/360 天数 15，
     // 分母仍是摊销表的 30 —— 分子分母同基，整期利息不受日历长度影响。

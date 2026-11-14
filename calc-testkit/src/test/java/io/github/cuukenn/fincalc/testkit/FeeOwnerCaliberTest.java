@@ -45,7 +45,7 @@ class FeeOwnerCaliberTest {
     }
 
     @Test
-    void flipping_the_fee_owner_moves_the_irrs_in_opposite_directions_and_conserves_money() {
+    void flipping_the_fee_owner_moves_both_irrs_and_conserves_money() {
         CalculationResult lesseeBorne = FACADE.calculate(
                 new CalculationRequest(elementWithFee(FeeOwner.LESSEE), null,
                         CalculationOptions.defaults()));

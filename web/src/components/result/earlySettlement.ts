@@ -86,15 +86,24 @@ function actualDays(fromIso: string, toIso: string): number {
   return Math.round((to - from) / 86_400_000)
 }
 
-/** 30/360 差值天数（含起始日、不含结束日的同款算头不算尾口径）。 */
+/** 30/360 差值天数（含起始日、不含结束日的同款算头不算尾口径）。
+ *
+ * 钳位规则与引擎 {@code Thirty360}（30/360 Bond Basis）逐条一致：起始日 31 → 30；
+ * 结束日 31 仅在起始日已是 30 时 → 30。不钳位的话，月末边缘（如结清日 31 日）上
+ * 分子分母不再同基——「可手工复算」的验收会差出 1–2 天利息（代码自审发现 1）。
+ */
 function thirty360Days(fromIso: string, toIso: string): number {
   const [, y1, m1, d1] = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fromIso) ?? []
   const [, y2, m2, d2] = /^(\d{4})-(\d{2})-(\d{2})$/.exec(toIso) ?? []
   if (y1 === undefined || y2 === undefined) return 0
+  let startDay = Number(d1)
+  let endDay = Number(d2)
+  if (startDay === 31) startDay = 30
+  if (endDay === 31 && startDay === 30) endDay = 30
   return (
     (Number(y2) - Number(y1)) * 360
     + (Number(m2) - Number(m1)) * 30
-    + (Number(d2) - Number(d1))
+    + (endDay - startDay)
   )
 }
 
