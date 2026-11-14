@@ -14,6 +14,7 @@ import io.github.cuukenn.fincalc.domain.model.RepaymentMethodId;
 import io.github.cuukenn.fincalc.domain.model.RuleOutcome;
 import io.github.cuukenn.fincalc.domain.port.DayCountConvention;
 import io.github.cuukenn.fincalc.domain.support.AbstractAmortizationGenerator;
+import io.github.cuukenn.fincalc.domain.support.NumericConfig;
 import io.github.cuukenn.fincalc.domain.support.FirstPeriodStubSplit;
 import io.github.cuukenn.fincalc.domain.support.PmtSolver;
 
@@ -71,6 +72,8 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
     @Override
     protected void prepare(CalculationContext context, List<PeriodDate> periods,
             AmortizationState state) {
+
+        state.numericConfig(context.numericConfig());
         LeaseElement element = context.element();
         DayCountConvention dayCount = context.dayCount();
         BigDecimal principal = money(element.measuredPrincipal(), element);
@@ -93,7 +96,7 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
                 state.solver("CLOSED_FORM");
             } else {
                 state.pmt(PmtSolver.iterative(principal, periods, dayCount, element.nominalRate(),
-                        residual, stubOverride));
+                        residual, stubOverride, context.numericConfig()));
                 state.solver("ITERATIVE");
             }
             return;
@@ -110,7 +113,7 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
                 state.pmt(solveSegment(principal, initialAnnual,
                         periodRate(element, periods.get(0), initialAnnual, dayCount),
                         periods.size(), periods, dayCount, residual,
-                        firstStubOverride(element, periods)));
+                        firstStubOverride(element, periods), context.numericConfig()));
                 state.solver("FIXED_RENT");
                 break;
             case DRIFT:
@@ -133,7 +136,8 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
      */
     private static BigDecimal solveSegment(BigDecimal opening, BigDecimal annual,
             BigDecimal periodicRate, int remaining, List<PeriodDate> remainingWindows,
-            DayCountConvention dayCount, BigDecimal residual, BigDecimal stubOverride) {
+            DayCountConvention dayCount, BigDecimal residual, BigDecimal stubOverride,
+            NumericConfig config) {
         // Each window's rate is derived once per segment solve and then consumed twice — by the
         // uniformity test and by the bisection's ~50 evaluations . The products are
         // the same unrounded {@code annual × yearFraction(window)} in window order, so the rent the
@@ -143,7 +147,7 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
         if (uniform(periodRates)) {
             return PmtSolver.closedForm(opening, periodicRate, remaining, residual);
         }
-        return PmtSolver.iterative(opening, periodRates, annual, residual);
+        return PmtSolver.iterative(opening, periodRates, annual, residual, config);
     }
 
     /** Whether every window of a segment accrues the same periodic rate. */
@@ -232,14 +236,15 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
         if (input.element().rateChangePolicy() == RateChangePolicy.DRIFT) {
             return solveSegment(input.openingBalance(), annual, input.periodRate(), remaining,
                     remainingWindows, dayCount, residual, firstStubOverride(input.element(),
-                            remainingWindows, input.periodNo()));
+                            remainingWindows, input.periodNo()), state.numericConfig());
         }
         BigDecimal segmentRate = state.segmentRate();
         if (segmentRate == null || annual.compareTo(segmentRate) != 0) {
             state.segmentRate(annual);
             state.segmentRent(solveSegment(input.openingBalance(), annual, input.periodRate(),
                     remaining, remainingWindows, dayCount, residual, firstStubOverride(
-                            input.element(), remainingWindows, input.periodNo())));
+                            input.element(), remainingWindows, input.periodNo()),
+                    state.numericConfig()));
         }
         return state.segmentRent();
     }

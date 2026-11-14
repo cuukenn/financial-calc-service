@@ -73,6 +73,6 @@ public final class BorrowerIrrPeriodMetric implements FinancialMetric {
         if (flows.isEmpty()) {
             return null;
         }
-        return MoneyUtils.mid(IrrCalculator.periodIrr(flows));
+        return MoneyUtils.mid(IrrCalculator.periodIrr(flows, context.numericConfig()));
     }
 }

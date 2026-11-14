@@ -129,6 +129,12 @@ public final class EffectiveInterestCalculator {
      */
     public static EffectiveInterestTable calculate(Schedule schedule, BigDecimal periodIrr,
             BigDecimal closingTargetExtra) {
+        return calculate(schedule, periodIrr, closingTargetExtra, NumericConfig.defaults());
+    }
+
+    /** 经 {@code NumericConfig} 提供每期闭合容差的重载（默认路径行为不变）。 */
+    public static EffectiveInterestTable calculate(Schedule schedule, BigDecimal periodIrr,
+            BigDecimal closingTargetExtra, NumericConfig config) {
         Objects.requireNonNull(schedule, "schedule");
         if (periodIrr == null) {
             throw new BusinessException(CalcErrorCode.IRR_NOT_CONVERGED);
@@ -168,7 +174,7 @@ public final class EffectiveInterestCalculator {
                 installments.get(installments.size() - 1).closingBalance()
                         .add(MoneyUtils.zeroIfNull(closingTargetExtra)), MoneyScale.OUTPUT);
         BigDecimal adjustment = target.subtract(lastRow.closingNetInvestment());
-        BigDecimal tolerance = CLOSING_TOLERANCE_PER_PERIOD.multiply(
+        BigDecimal tolerance = config.closingTolerancePerPeriod().multiply(
                 BigDecimal.valueOf(installments.size()));
         if (adjustment.abs().compareTo(tolerance) > 0) {
             throw new BusinessException(CalcErrorCode.EFFECTIVE_INTEREST_TABLE_NOT_CLOSING,
@@ -242,9 +248,25 @@ public final class EffectiveInterestCalculator {
      */
     public static BigDecimal netInvestmentPeriodIrr(Schedule schedule, BigDecimal residualExtra,
             PeriodicRootHandoff rootHandoff) {
+        if (schedule.installments().isEmpty()) {
+            return null;
+        }
+        return chooseRoot(netInvestmentStream(schedule, residualExtra), rootHandoff,
+                NumericConfig.defaults());
+    }
+
+    /** 经 {@code NumericConfig} 提供求根参数的重载（区间、容差与迭代预算全部来自配置）。 */
+    public static BigDecimal netInvestmentPeriodIrr(Schedule schedule, BigDecimal residualExtra,
+            PeriodicRootHandoff rootHandoff, NumericConfig config) {
+        return chooseRoot(netInvestmentStream(schedule, residualExtra), rootHandoff, config);
+    }
+
+    /** 净投资流构建：t0 期初流出、正租金流入、末期闭合目标流入（与调用方口径一致）。 */
+    private static List<CashFlow> netInvestmentStream(Schedule schedule,
+            BigDecimal residualExtra) {
         List<Installment> installments = schedule.installments();
         if (installments.isEmpty()) {
-            return null;
+            throw new IllegalArgumentException("installments must not be empty");
         }
         List<CashFlow> stream = new ArrayList<>(installments.size() + 1);
         Installment first = installments.get(0);
@@ -266,7 +288,12 @@ public final class EffectiveInterestCalculator {
             stream.add(new CashFlow(last.periodNo(), last.endDate(), terminal,
                     CashFlowType.RESIDUAL, CashFlowDirection.INFLOW));
         }
+        return stream;
+    }
 
+    /** 复用台账已解根，未命中才按配置求解——两个重载共用同一判定。 */
+    private static BigDecimal chooseRoot(List<CashFlow> stream, PeriodicRootHandoff rootHandoff,
+            NumericConfig config) {
         BigDecimal solvedOverRun = rootHandoff.rootFor(stream);
         if (solvedOverRun != null) {
             // The stream this chain prices is the very stream some solve of this run — the §9.5
@@ -284,6 +311,7 @@ public final class EffectiveInterestCalculator {
         // part of the lessor's net investment the chain must unwind but never becomes cash (§9.4 keeps
         // the event table cash-only). Different stream, therefore a different root, therefore its own
         // solve: that is the caliber difference, and it is the only reason this run pays for two.
-        return IrrCalculator.periodIrr(stream);
+        return IrrCalculator.periodIrr(stream, config);
     }
+
 }

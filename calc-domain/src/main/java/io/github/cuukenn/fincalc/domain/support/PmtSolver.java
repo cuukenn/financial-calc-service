@@ -55,7 +55,7 @@ public final class PmtSolver {
     private static final Set<String> CONSTANT_RATE_CODES = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList("THIRTY_360", "THIRTY_E_360")));
 
-    private static final int MAX_BRACKET_DOUBLINGS = 64;
+    public static final int MAX_BRACKET_DOUBLINGS = 64;
 
     /**
      * Diagnostic counters for gate-test attribution — how many iterative rent solves a run
@@ -133,7 +133,15 @@ public final class PmtSolver {
      */
     public static BigDecimal iterative(BigDecimal principal, List<PeriodDate> windows,
             DayCountConvention dayCount, BigDecimal annualRate, BigDecimal residualValue) {
-        return iterative(principal, windows, dayCount, annualRate, residualValue, null);
+        return iterative(principal, windows, dayCount, annualRate, residualValue, null,
+                NumericConfig.defaults());
+    }
+
+    /** 经 {@code NumericConfig} 提供 PMT 逼近次数与容差的重载（默认路径行为不变）。 */
+    public static BigDecimal iterative(BigDecimal principal, List<PeriodDate> windows,
+            DayCountConvention dayCount, BigDecimal annualRate, BigDecimal residualValue,
+            NumericConfig config) {
+        return iterative(principal, windows, dayCount, annualRate, residualValue, null, config);
     }
 
     /**
@@ -144,12 +152,20 @@ public final class PmtSolver {
     public static BigDecimal iterative(BigDecimal principal, List<PeriodDate> windows,
             DayCountConvention dayCount, BigDecimal annualRate, BigDecimal residualValue,
             BigDecimal firstWindowYearFraction) {
+        return iterative(principal, windows, dayCount, annualRate, residualValue,
+                firstWindowYearFraction, NumericConfig.defaults());
+    }
+
+    /** 经 {@code NumericConfig} 提供 PMT 逼近次数与容差的重载（默认路径行为不变）。 */
+    public static BigDecimal iterative(BigDecimal principal, List<PeriodDate> windows,
+            DayCountConvention dayCount, BigDecimal annualRate, BigDecimal residualValue,
+            BigDecimal firstWindowYearFraction, NumericConfig config) {
         Objects.requireNonNull(dayCount, "dayCount");
         if (windows.isEmpty()) {
             throw new IllegalArgumentException("windows must not be empty");
         }
         return iterative(principal, periodRates(annualRate, windows, dayCount,
-                firstWindowYearFraction), annualRate, residualValue);
+                firstWindowYearFraction), annualRate, residualValue, config);
     }
 
     /**
@@ -172,6 +188,13 @@ public final class PmtSolver {
      */
     public static BigDecimal iterative(BigDecimal principal, List<BigDecimal> periodRates,
             BigDecimal annualRate, BigDecimal residualValue) {
+        return iterative(principal, periodRates, annualRate, residualValue,
+                NumericConfig.defaults());
+    }
+
+    /** 经 {@code NumericConfig} 提供 PMT 逼近次数与容差的重载（默认路径行为不变）。 */
+    public static BigDecimal iterative(BigDecimal principal, List<BigDecimal> periodRates,
+            BigDecimal annualRate, BigDecimal residualValue, NumericConfig config) {
         Objects.requireNonNull(principal, "principal");
         Objects.requireNonNull(periodRates, "periodRates");
         Objects.requireNonNull(annualRate, "annualRate");
@@ -191,13 +214,14 @@ public final class PmtSolver {
             return MoneyUtils.out(BigDecimal.ZERO);
         }
         BigDecimal high = principal.divide(BigDecimal.valueOf(periodRates.size()), MC);
-        for (int attempt = 0; attempt < MAX_BRACKET_DOUBLINGS; attempt++) {
+        for (int attempt = 0; attempt < config.pmtBracketDoublings(); attempt++) {
             if (error(principal, periodRates, residual, high).signum() < 0) {
-                return bisect(principal, periodRates, residual, low, high);
+                return bisect(principal, periodRates, residual, low, high, config);
             }
             high = high.multiply(TWO, MC);
         }
-        throw new IllegalStateException("no rent bracket found within " + MAX_BRACKET_DOUBLINGS
+        throw new IllegalStateException("no rent bracket found within "
+                + config.pmtBracketDoublings()
                 + " doublings for " + periodRates.size() + " periods");
     }
 
@@ -271,11 +295,11 @@ public final class PmtSolver {
     }
 
     private static BigDecimal bisect(BigDecimal principal, List<BigDecimal> periodRates,
-            BigDecimal residual, BigDecimal low, BigDecimal high) {
-        for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+            BigDecimal residual, BigDecimal low, BigDecimal high, NumericConfig config) {
+        for (int iteration = 0; iteration < config.pmtMaxIterations(); iteration++) {
             BigDecimal middle = low.add(high).divide(TWO, MC);
             BigDecimal error = error(principal, periodRates, residual, middle);
-            if (error.abs().compareTo(TOLERANCE) <= 0) {
+            if (error.abs().compareTo(config.pmtTolerance()) <= 0) {
                 return MoneyUtils.out(middle);
             }
             if (error.signum() > 0) {

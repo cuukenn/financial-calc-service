@@ -67,7 +67,7 @@ public final class LeaseImplicitRateMetric implements FinancialMetric {
         // instead of solving the identical net-investment stream a second time.
         BigDecimal period = context.rootHandoff().rootFor(priced);
         if (period == null) {
-            period = IrrCalculator.periodIrr(priced);
+            period = IrrCalculator.periodIrr(priced, context.numericConfig());
             context.rootHandoff().record(period, priced);
         }
         if (period == null || !MetricSupport.annualizable(context)) {

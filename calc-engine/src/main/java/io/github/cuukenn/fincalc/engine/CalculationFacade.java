@@ -25,6 +25,7 @@ import io.github.cuukenn.fincalc.domain.support.DateRollConventions;
 import io.github.cuukenn.fincalc.domain.support.DayCountConventions;
 import io.github.cuukenn.fincalc.domain.support.EffectiveInterestCalculator;
 import io.github.cuukenn.fincalc.domain.support.IrrCalculator;
+import io.github.cuukenn.fincalc.domain.support.NumericConfig;
 import io.github.cuukenn.fincalc.domain.support.ValidatorChain;
 import io.github.cuukenn.fincalc.domain.support.cashflow.StandardCashFlowBuilder;
 import io.github.cuukenn.fincalc.rule.function.FunctionRegistry;
@@ -198,7 +199,13 @@ public final class CalculationFacade {
      * @return the enriched, validated result; {@code effectiveInterest()} is nullable
      */
     public CalculationResult calculate(CalculationRequest request) {
+        return calculate(request, NumericConfig.defaults());
+    }
+
+    /** 经 {@code NumericConfig} 提供求解逼近次数/容差/求根区间的重载；null 取默认。 */
+    public CalculationResult calculate(CalculationRequest request, NumericConfig config) {
         Objects.requireNonNull(request, "request");
+        NumericConfig numericConfig = config == null ? NumericConfig.defaults() : config;
         long startNanos = System.nanoTime();
         LeaseElement element = request.element();
         log.info("calculation start: method={}, periods={}, frequency={}, product={}",
@@ -222,7 +229,7 @@ public final class CalculationFacade {
             generators = generators.withRuleDriven(request.ruleSet());
         }
         CalculationContext context = new CalculationContext(element, request.ruleSet(), dayCount,
-                dateRoll, SystemClockProvider.INSTANCE, request.options());
+                dateRoll, SystemClockProvider.INSTANCE, request.options(), numericConfig);
         Schedule schedule = generators.require(element.method().name()).generate(context);
         log.debug("step 2 schedule generated: generator={}, installments={}, issues={}",
                 element.method().name(), schedule.installments().size(), schedule.issues().size());
@@ -236,7 +243,7 @@ public final class CalculationFacade {
         // lessor event table whatever the metric view is (R109).
         List<String> failedMetrics = new ArrayList<>();
         MetricContext metricContext = new MetricContext(flows, schedule, element,
-                periodsPerYear(element), null, null, null, request.perspective());
+                periodsPerYear(element), null, null, null, request.perspective(), numericConfig);
         FinancialMetrics metrics = this.metrics.computeAll(metricContext, failedMetrics);
         log.debug("step 4 metrics computed: {} failed", failedMetrics.size());
 
@@ -275,7 +282,7 @@ public final class CalculationFacade {
 
         // Step 7: the §9.7 effective-interest table (nullable, never thrown).
         EffectiveInterestTable effectiveInterest = effectiveInterest(schedule, element, metrics,
-                metricContext.rootHandoff(), engineIssues);
+                metricContext.rootHandoff(), engineIssues, numericConfig);
 
         // The engine's findings join the schedule's own issues in one rebuild.
         if (!engineIssues.isEmpty()) {
@@ -303,7 +310,8 @@ public final class CalculationFacade {
      * plus a WARN issue carrying the stable code of the refusal — the run itself never fails here.
      */
     private EffectiveInterestTable effectiveInterest(Schedule schedule, LeaseElement element,
-            FinancialMetrics metrics, PeriodicRootHandoff rootHandoff, List<ValidationIssue> issues) {
+            FinancialMetrics metrics, PeriodicRootHandoff rootHandoff, List<ValidationIssue> issues,
+            NumericConfig numericConfig) {
         if (metrics.find(MetricCodes.IRR_PERIOD) == null) {
             log.warn("effective-interest table skipped: IRR_PERIOD did not converge ({})",
                     CalcErrorCode.IRR_NOT_CONVERGED.code());
@@ -314,7 +322,7 @@ public final class CalculationFacade {
         }
         BigDecimal residualExtra = EffectiveInterestCalculator.unrecoveredResiduals(element);
         BigDecimal periodIrr = EffectiveInterestCalculator.netInvestmentPeriodIrr(schedule,
-                residualExtra, rootHandoff);
+                residualExtra, rootHandoff, numericConfig);
         if (periodIrr == null) {
             log.warn("effective-interest table skipped: rent-consistent stream has no root ({})",
                     CalcErrorCode.IRR_NOT_CONVERGED.code());
@@ -324,7 +332,8 @@ public final class CalculationFacade {
             return null;
         }
         try {
-            return EffectiveInterestCalculator.calculate(schedule, periodIrr, residualExtra);
+            return EffectiveInterestCalculator.calculate(schedule, periodIrr, residualExtra,
+                    numericConfig);
         } catch (BusinessException ex) {
             log.warn("effective-interest table refused ({}): {}", ex.errorCode().code(),
                     ex.getMessage());

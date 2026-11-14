@@ -418,6 +418,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         private List<PeriodDate> periods;
         private DayCountConvention dayCount;
         private String solver;
+        private NumericConfig numericConfig;
 
         public BigDecimal deferredInterest() {
             return deferredInterest;
@@ -463,6 +464,18 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
         public void segmentRate(BigDecimal segmentRate) {
             this.segmentRate = segmentRate;
+        }
+
+        /**
+         * 数值求解配置（逼近次数/容差/求根区间）：prepare 从计算上下文存入，allocate 读取。
+         * 非测算要素，不改任何口径；null 时求解器自行取默认。
+         */
+        public NumericConfig numericConfig() {
+            return numericConfig;
+        }
+
+        public void numericConfig(NumericConfig numericConfig) {
+            this.numericConfig = numericConfig;
         }
 
         /**

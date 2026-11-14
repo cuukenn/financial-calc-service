@@ -87,7 +87,7 @@ public final class IrrMetrics implements FinancialMetric {
             return null;
         }
         if (variant == Variant.PERIOD) {
-            BigDecimal raw = IrrCalculator.periodIrr(flows);
+            BigDecimal raw = IrrCalculator.periodIrr(flows, context.numericConfig());
             // Hand the unrounded root — and the flow set it is a root of — to the run before this
             // metric publishes its §9.5 rounding. The engine's §9.7 chain prices a rent-caliber
             // stream; reading this root is what keeps the run to one solve of that stream instead of

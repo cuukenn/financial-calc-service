@@ -1,6 +1,7 @@
 package io.github.cuukenn.fincalc.domain.metric;
 
 import io.github.cuukenn.fincalc.domain.model.CashFlow;
+import io.github.cuukenn.fincalc.domain.support.NumericConfig;
 import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.model.LeaseElement;
 import io.github.cuukenn.fincalc.domain.model.Schedule;
@@ -59,6 +60,7 @@ public final class MetricContext {
     private final CashFlowPerspective perspective;
     private final Map<String, BigDecimal> computedValues;
     private final PeriodicRootHandoff rootHandoff;
+    private final NumericConfig numericConfig;
 
     /**
      * A lessor-view context — the v1 shape; delegates with {@link CashFlowPerspective#LESSOR}.
@@ -100,7 +102,17 @@ public final class MetricContext {
             int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
             BigDecimal financeRate, CashFlowPerspective perspective) {
         this(cashFlows, schedule, element, periodsPerYear, discountRate, reinvestRate, financeRate,
-                perspective, Collections.<String, BigDecimal>emptyMap());
+                perspective, Collections.<String, BigDecimal>emptyMap(),
+                new PeriodicRootHandoff(), NumericConfig.defaults());
+    }
+
+    /** 经 {@code NumericConfig} 提供求根参数的重载（逼近次数/容差/区间）；null 取默认。 */
+    public MetricContext(List<CashFlow> cashFlows, Schedule schedule, LeaseElement element,
+            int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
+            BigDecimal financeRate, CashFlowPerspective perspective, NumericConfig numericConfig) {
+        this(cashFlows, schedule, element, periodsPerYear, discountRate, reinvestRate, financeRate,
+                perspective, Collections.<String, BigDecimal>emptyMap(),
+                new PeriodicRootHandoff(), numericConfig);
     }
 
     private MetricContext(List<CashFlow> cashFlows, Schedule schedule, LeaseElement element,
@@ -115,6 +127,15 @@ public final class MetricContext {
             int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
             BigDecimal financeRate, CashFlowPerspective perspective,
             Map<String, BigDecimal> computedValues, PeriodicRootHandoff rootHandoff) {
+        this(cashFlows, schedule, element, periodsPerYear, discountRate, reinvestRate, financeRate,
+                perspective, computedValues, rootHandoff, null);
+    }
+
+    private MetricContext(List<CashFlow> cashFlows, Schedule schedule, LeaseElement element,
+            int periodsPerYear, BigDecimal discountRate, BigDecimal reinvestRate,
+            BigDecimal financeRate, CashFlowPerspective perspective,
+            Map<String, BigDecimal> computedValues, PeriodicRootHandoff rootHandoff,
+            NumericConfig numericConfig) {
         Objects.requireNonNull(cashFlows, "cashFlows");
         if (periodsPerYear < 0) {
             throw new IllegalArgumentException("periodsPerYear must be at least 0: "
@@ -130,6 +151,7 @@ public final class MetricContext {
         this.perspective = perspective == null ? CashFlowPerspective.LESSOR : perspective;
         this.computedValues = computedValues;
         this.rootHandoff = Objects.requireNonNull(rootHandoff, "rootHandoff");
+        this.numericConfig = numericConfig == null ? NumericConfig.defaults() : numericConfig;
     }
 
     /**
@@ -148,7 +170,7 @@ public final class MetricContext {
     MetricContext withRunValues(Map<String, BigDecimal> runValues) {
         return new MetricContext(cashFlows, schedule, element, periodsPerYear, discountRate,
                 reinvestRate, financeRate, perspective,
-                Objects.requireNonNull(runValues, "runValues"), rootHandoff);
+                Objects.requireNonNull(runValues, "runValues"), rootHandoff, numericConfig);
     }
 
     /** Cash flows to measure, in sequence order; unmodifiable. */
@@ -159,6 +181,11 @@ public final class MetricContext {
     /** Schedule whose installments the totals, totals-derived ratios and balances read. */
     public Schedule schedule() {
         return schedule;
+    }
+
+    /** 数值求解配置（逼近次数/容差/求根区间）；非测算要素，不改任何口径。 */
+    public NumericConfig numericConfig() {
+        return numericConfig;
     }
 
     /** Lease element providing principal, nominal rate and residual. */

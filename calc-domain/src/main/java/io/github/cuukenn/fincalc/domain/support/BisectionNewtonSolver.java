@@ -43,6 +43,9 @@ public final class BisectionNewtonSolver implements RootSolver {
     /** Iteration budget shared with the design document's solver convention. */
     public static final int MAX_ITERATIONS = 100;
 
+    /** 实例级迭代预算：默认 = {@link #MAX_ITERATIONS}；经 {@code NumericConfig} 覆写。 */
+    private final int maxIterations;
+
     /**
      * Monotonic count of {@link #solve} entries since JVM start. Cost accounting only: a run must pay for each root exactly once, and a count a test can read
      * is how it proves that — never「看起来快了」as evidence.
@@ -69,6 +72,18 @@ public final class BisectionNewtonSolver implements RootSolver {
      * accepted bracket then shrinks to at most {@code 1 - 2 × 0.25 = 3/4} of its width.
      */
     private static final BigDecimal MIN_CONTRACTION = new BigDecimal("0.25");
+
+    public BisectionNewtonSolver() {
+        this.maxIterations = MAX_ITERATIONS;
+    }
+
+    /** 经 {@code NumericConfig} 覆写迭代预算的构造器（默认路径行为不变）。 */
+    public BisectionNewtonSolver(int maxIterations) {
+        if (maxIterations < 1) {
+            throw new IllegalArgumentException("maxIterations must be at least 1");
+        }
+        this.maxIterations = maxIterations;
+    }
 
     @Override
     public String code() {
@@ -113,7 +128,7 @@ public final class BisectionNewtonSolver implements RootSolver {
             return null;
         }
 
-        for (int iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        for (int iteration = 0; iteration < maxIterations; iteration++) {
             BigDecimal mid = lo.add(hi).divide(TWO, MC);
             BigDecimal fMid = counted.apply(mid);
             if (fMid.signum() == 0) {

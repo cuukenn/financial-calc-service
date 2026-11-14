@@ -134,13 +134,25 @@ public final class IrrCalculator {
     }
 
     public static BigDecimal periodIrr(List<CashFlow> flows, RootSolver solver) {
+        return periodIrr(flows, solver, RATE_LOWER, RATE_UPPER,
+                BisectionNewtonSolver.DEFAULT_TOLERANCE);
+    }
+
+    /** 经 {@code NumericConfig} 提供求根区间、容差与迭代预算的重载（默认路径行为不变）。 */
+    public static BigDecimal periodIrr(List<CashFlow> flows, RootSolver solver,
+            BigDecimal lower, BigDecimal upper, BigDecimal tolerance) {
         requireFlows(flows);
         Objects.requireNonNull(solver, "solver");
         if (!hasSignChange(flows)) {
             return null;
         }
-        return solver.solve(rate -> npv(flows, rate), RATE_LOWER, RATE_UPPER,
-                BisectionNewtonSolver.DEFAULT_TOLERANCE);
+        return solver.solve(rate -> npv(flows, rate), lower, upper, tolerance);
+    }
+
+    /** 经 {@code NumericConfig} 提供求根参数的重载：区间、容差与迭代预算全部来自配置。 */
+    public static BigDecimal periodIrr(List<CashFlow> flows, NumericConfig config) {
+        return periodIrr(flows, new BisectionNewtonSolver(config.rootMaxIterations()),
+                config.rootLowerBound(), config.rootUpperBound(), config.rootTolerance());
     }
 
     /** Annualized XIRR: the annual rate at which the day-discounted flows sum to zero. */
@@ -149,6 +161,13 @@ public final class IrrCalculator {
     }
 
     public static BigDecimal xirr(List<CashFlow> flows, RootSolver solver) {
+        return xirr(flows, solver, RATE_LOWER, RATE_UPPER,
+                BisectionNewtonSolver.DEFAULT_TOLERANCE);
+    }
+
+    /** 经 {@code NumericConfig} 提供求根区间、容差与迭代预算的重载（默认路径行为不变）。 */
+    public static BigDecimal xirr(List<CashFlow> flows, RootSolver solver,
+            BigDecimal lower, BigDecimal upper, BigDecimal tolerance) {
         requireFlows(flows);
         Objects.requireNonNull(solver, "solver");
         if (!hasSignChange(flows)) {
@@ -158,8 +177,13 @@ public final class IrrCalculator {
         // solve instead of ~120 times inside it. Same quotients, same order —
         // the root the solver lands on is the one the per-evaluation walk would have produced.
         List<BigDecimal> weights = yearWeights(flows);
-        return solver.solve(rate -> xnpv(flows, rate, weights), RATE_LOWER, RATE_UPPER,
-                BisectionNewtonSolver.DEFAULT_TOLERANCE);
+        return solver.solve(rate -> xnpv(flows, rate, weights), lower, upper, tolerance);
+    }
+
+    /** 经 {@code NumericConfig} 提供求根参数的重载：区间、容差与迭代预算全部来自配置。 */
+    public static BigDecimal xirr(List<CashFlow> flows, NumericConfig config) {
+        return xirr(flows, new BisectionNewtonSolver(config.rootMaxIterations()),
+                config.rootLowerBound(), config.rootUpperBound(), config.rootTolerance());
     }
 
     /** Compound annualization: {@code (1 + periodIrr) ^ periodsPerYear - 1}, at {@code 12} scales. */
