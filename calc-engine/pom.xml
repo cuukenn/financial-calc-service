@@ -24,6 +24,12 @@
             <groupId>io.github.cuukenn</groupId>
             <artifactId>calc-domain</artifactId>
         </dependency>
+        <!-- 核心编排日志（INFO run 生命周期 / DEBUG 步骤 / WARN 诊断）：仅 API，无实现绑定 ——
+             绑定由宿主（calc-server 的 spring-boot-starter-web→logback）提供。 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>

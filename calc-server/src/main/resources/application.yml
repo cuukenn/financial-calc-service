@@ -21,3 +21,8 @@ spring:
       # for them (A6 note: the old spring.mvc.throw-exception-if-no-handler-found property was
       # removed with Boot 3 — its true behavior is now the default), landing in ApiExceptionHandler.
       add-mappings: false
+
+logging:
+  level:
+    # 默认 INFO（run 生命周期 / WARN 诊断 / 启动装配）；排查引擎逐步耗时与装配细节时开 DEBUG
+    io.github.cuukenn.fincalc: INFO

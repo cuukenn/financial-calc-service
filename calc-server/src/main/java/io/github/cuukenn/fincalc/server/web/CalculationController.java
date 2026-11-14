@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -22,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "calculations", description = "租金测算：一次请求运行一套完整的"
         + "「校验 → 生成 → 现金流 → 指标 → 实际利率表」编排")
 public class CalculationController {
+
+    private static final Logger log = LoggerFactory.getLogger(CalculationController.class);
 
     private final CalculationFacade facade;
     // A3（2026-11-11 scan）：编译注册表 = facade 的脚本注册表，规则行里的 .fcs 函数
@@ -46,8 +50,12 @@ public class CalculationController {
             description = "正路返回 200 + CalculationResponseDto；业务失败返回 HTTP 400、"
                     + "系统失败返回 HTTP 500，错误体统一为 {code, message}（R77，见 ApiError）。")
     public CalculationResponseDto calculate(@RequestBody CalculationRequestDto request) {
+        long startNanos = System.nanoTime();
         CalculationRequest engineRequest = requestAssembler.assemble(request);
         CalculationResult result = facade.calculate(engineRequest);
+        log.info("POST /api/v1/calculations completed: runId={}, durationMs={}, issues={}",
+                result.runId(), (System.nanoTime() - startNanos) / 1_000_000,
+                result.schedule().issues().size());
         return responseAssembler.assemble(result);
     }
 }

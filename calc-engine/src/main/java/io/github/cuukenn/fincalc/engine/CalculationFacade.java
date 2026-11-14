@@ -40,6 +40,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The engine orchestration: turns a {@link CalculationRequest} into an enriched, validated
@@ -112,6 +114,8 @@ import java.util.stream.Stream;
  */
 public final class CalculationFacade {
 
+    private static final Logger log = LoggerFactory.getLogger(CalculationFacade.class);
+
     /** Classpath prefix the startup wiring scans for {@code .fcs} function scripts. */
     private static final String CLASSPATH_SCRIPT_PREFIX = "functions";
 
@@ -173,9 +177,12 @@ public final class CalculationFacade {
      */
     public static CalculationFacade defaultsWithScripts(Path externalDir) {
         Objects.requireNonNull(externalDir, "externalDir");
+        List<Path> scripts = listScripts(externalDir);
         FunctionRegistry functions = FunctionScriptLoader.loadClasspath(CLASSPATH_SCRIPT_PREFIX,
                 FunctionRegistry.defaults());
-        functions = FunctionScriptLoader.load(listScripts(externalDir), functions);
+        functions = FunctionScriptLoader.load(scripts, functions);
+        log.info("function registry assembled: built-in library + {} classpath prefixes + {} external scripts",
+                CLASSPATH_SCRIPT_PREFIX, scripts.size());
         return defaults(functions);
     }
 
@@ -192,13 +199,19 @@ public final class CalculationFacade {
      */
     public CalculationResult calculate(CalculationRequest request) {
         Objects.requireNonNull(request, "request");
+        long startNanos = System.nanoTime();
         LeaseElement element = request.element();
+        log.info("calculation start: method={}, periods={}, frequency={}, product={}",
+                element.method(), element.periods(), element.frequency(),
+                request.options().product());
 
         // Step 1: the calculation context (口径/滚动缺失 → FCS-ENG-1001).
         DayCountConvention dayCount = requireConvention(DayCountConventions.all(),
                 element.dayCountCode(), "dayCount");
         DateRollConvention dateRoll = requireConvention(DateRollConventions.all(),
                 element.dateRollCode(), "dateRoll");
+        log.debug("step 1 context resolved: dayCount={}, dateRoll={}",
+                element.dayCountCode(), element.dateRollCode());
 
         // Step 2: route to the generator and produce the raw schedule.
         GeneratorRegistry generators = this.generators;
@@ -211,9 +224,12 @@ public final class CalculationFacade {
         CalculationContext context = new CalculationContext(element, request.ruleSet(), dayCount,
                 dateRoll, SystemClockProvider.INSTANCE, request.options());
         Schedule schedule = generators.require(element.method().name()).generate(context);
+        log.debug("step 2 schedule generated: generator={}, installments={}, issues={}",
+                element.method().name(), schedule.installments().size(), schedule.issues().size());
 
         // Step 3: the §9.4 event table.
         List<CashFlow> flows = cashFlowBuilder.build(schedule, element, request.options());
+        log.debug("step 3 cash flows built: {} events", flows.size());
 
         // Step 4: the §9.5 metric run (rates unconfigured — derived inside the metric layer). The
         // perspective is the caller's (R103); it changes nothing above, and the schedule keeps the
@@ -222,6 +238,7 @@ public final class CalculationFacade {
         MetricContext metricContext = new MetricContext(flows, schedule, element,
                 periodsPerYear(element), null, null, null, request.perspective());
         FinancialMetrics metrics = this.metrics.computeAll(metricContext, failedMetrics);
+        log.debug("step 4 metrics computed: {} failed", failedMetrics.size());
 
         // Step 5: the enriched schedule.
         schedule = schedule.with(metrics, flows);
@@ -233,6 +250,7 @@ public final class CalculationFacade {
         schedule = (request.options().product() == ProductProfile.MORTGAGE
                 ? mortgageValidators : validators).validate(schedule, element);
         for (String code : failedMetrics) {
+            log.warn("metric {} not computable (FCS-ENG-1007): recorded as WARN on the run", code);
             engineIssues.add(new ValidationIssue(IssueLevel.WARN,
                     EngineErrorCode.METRIC_COMPUTATION_FAILED.code(),
                     String.format(EngineErrorCode.METRIC_COMPUTATION_FAILED.message(), code),
@@ -249,6 +267,7 @@ public final class CalculationFacade {
                     null));
         }
         if (!IrrCalculator.hasSingleSignChange(flows)) {
+            log.warn("flow set has no unambiguous IRR root (FCS-ENG-1005)");
             engineIssues.add(new ValidationIssue(IssueLevel.WARN,
                     EngineErrorCode.IRR_ROOT_AMBIGUOUS.code(),
                     EngineErrorCode.IRR_ROOT_AMBIGUOUS.message(), null));
@@ -267,8 +286,12 @@ public final class CalculationFacade {
         }
 
         // Step 8: the result.
-        return new CalculationResult(UUID.randomUUID().toString().replace("-", ""), schedule,
-                effectiveInterest);
+        String runId = UUID.randomUUID().toString().replace("-", "");
+        log.info("calculation done: runId={}, durationMs={}, installments={}, issues={}, "
+                        + "effectiveInterest={}",
+                runId, (System.nanoTime() - startNanos) / 1_000_000, schedule.installments().size(),
+                schedule.issues().size(), effectiveInterest != null);
+        return new CalculationResult(runId, schedule, effectiveInterest);
     }
 
     /**
@@ -282,6 +305,8 @@ public final class CalculationFacade {
     private EffectiveInterestTable effectiveInterest(Schedule schedule, LeaseElement element,
             FinancialMetrics metrics, PeriodicRootHandoff rootHandoff, List<ValidationIssue> issues) {
         if (metrics.find(MetricCodes.IRR_PERIOD) == null) {
+            log.warn("effective-interest table skipped: IRR_PERIOD did not converge ({})",
+                    CalcErrorCode.IRR_NOT_CONVERGED.code());
             issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
                     CalcErrorCode.IRR_NOT_CONVERGED.code()
                             + ": IRR_PERIOD 不收敛, 实际利率法摊销表未生成", null));
@@ -291,6 +316,8 @@ public final class CalculationFacade {
         BigDecimal periodIrr = EffectiveInterestCalculator.netInvestmentPeriodIrr(schedule,
                 residualExtra, rootHandoff);
         if (periodIrr == null) {
+            log.warn("effective-interest table skipped: rent-consistent stream has no root ({})",
+                    CalcErrorCode.IRR_NOT_CONVERGED.code());
             issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
                     CalcErrorCode.IRR_NOT_CONVERGED.code()
                             + ": 租金口径现金流无内部收益率, 实际利率法摊销表未生成", null));
@@ -299,6 +326,8 @@ public final class CalculationFacade {
         try {
             return EffectiveInterestCalculator.calculate(schedule, periodIrr, residualExtra);
         } catch (BusinessException ex) {
+            log.warn("effective-interest table refused ({}): {}", ex.errorCode().code(),
+                    ex.getMessage());
             issues.add(new ValidationIssue(IssueLevel.WARN, ex.errorCode().code(),
                     "实际利率法摊销表未生成: " + ex.getMessage(), null));
             return null;

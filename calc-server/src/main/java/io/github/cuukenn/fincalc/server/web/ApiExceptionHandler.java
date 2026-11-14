@@ -43,6 +43,8 @@ public class ApiExceptionHandler {
     /** Expected, caller-actionable failures (R77): stable FCS code, HTTP 400. */
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiError> onBusinessException(BusinessException e) {
+        log.warn("calculation rejected as a business failure: {} ({})", e.getMessage(),
+                e.errorCode().code());
         return ResponseEntity.badRequest()
                 .body(new ApiError(e.errorCode().code(), e.getMessage()));
     }

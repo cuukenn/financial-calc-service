@@ -1,6 +1,8 @@
 package io.github.cuukenn.fincalc.server;
 
 import io.github.cuukenn.fincalc.engine.CalculationFacade;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -20,6 +22,8 @@ import org.springframework.context.annotation.Bean;
 @SpringBootApplication
 public class CalcServerApplication {
 
+    private static final Logger log = LoggerFactory.getLogger(CalcServerApplication.class);
+
     public static void main(String[] args) {
         SpringApplication.run(CalcServerApplication.class, args);
     }
@@ -27,6 +31,7 @@ public class CalcServerApplication {
     /** The R78 minimal assembly: built-in functions only, no external scripts. */
     @Bean
     public CalculationFacade calculationFacade() {
+        log.info("assembling the calculation engine: built-in functions only, no external scripts");
         return CalculationFacade.defaults();
     }
 }
