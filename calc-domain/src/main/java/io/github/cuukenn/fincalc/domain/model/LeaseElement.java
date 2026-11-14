@@ -44,6 +44,9 @@ public final class LeaseElement {
     private final BigDecimal residualValue;
     private final ResidualHandling residualHandling;
     private final BigDecimal deposit;
+    private final DepositTiming depositTiming;
+    private final DepositSettlement depositSettlement;
+    private final BigDecimal depositInterestRate;
     private final List<FeeItem> fees;
     private final List<BigDecimal> explicitRents;
     private final BigDecimal vatRate;
@@ -72,6 +75,14 @@ public final class LeaseElement {
         this.residualValue = builder.residualValue;
         this.residualHandling = builder.residualHandling;
         this.deposit = builder.deposit;
+        // The deposit calibers normalize in the constructor, not at the call sites: every engine
+        // reader gets one non-null answer, and an element built without the fields keeps the v1
+        // posture (upfront collection, refund at maturity, no interest) — AGENTS.md §3.1 第 11 条.
+        this.depositTiming = builder.depositTiming == null
+                ? DepositTiming.UPFRONT : builder.depositTiming;
+        this.depositSettlement = builder.depositSettlement == null
+                ? DepositSettlement.REFUND : builder.depositSettlement;
+        this.depositInterestRate = builder.depositInterestRate;
         this.fees = Collections.unmodifiableList(new ArrayList<>(builder.fees));
         this.explicitRents = Collections.unmodifiableList(new ArrayList<>(builder.explicitRents));
         this.vatRate = builder.vatRate;
@@ -246,6 +257,24 @@ public final class LeaseElement {
         if (deposit != null && deposit.compareTo(MoneyUtils.ZERO) < 0) {
             throw new BusinessException(DomainErrorCode.DEPOSIT_MUST_BE_NON_NEGATIVE, deposit);
         }
+        if (depositInterestRate == null) {
+            return;
+        }
+        if (depositInterestRate.compareTo(MoneyUtils.ZERO) < 0
+                || depositInterestRate.compareTo(BigDecimal.ONE) > 0) {
+            throw new BusinessException(DomainErrorCode.NOMINAL_RATE_OUT_OF_RANGE, depositInterestRate);
+        }
+        if (deposit == null || deposit.signum() <= 0) {
+            throw new BusinessException(DomainErrorCode.DEPOSIT_INTEREST_RATE_REQUIRES_DEPOSIT,
+                    depositInterestRate);
+        }
+        if (depositSettlement == DepositSettlement.OFFSET_PRINCIPAL) {
+            // 抵减本金 consumes the deposit at collection: it never occupies a period, so there is
+            // no time over which interest could accrue — carrying a rate is a caliber contradiction,
+            // not a no-op (AGENTS.md 补充口径规则: 显式声明与口径矛盾的输入即报错).
+            throw new BusinessException(DomainErrorCode.DEPOSIT_INTEREST_RATE_CONFLICTS_WITH_OFFSET,
+                    depositInterestRate);
+        }
     }
 
     private static void requireField(Object value, String name) {
@@ -359,6 +388,44 @@ public final class LeaseElement {
         return deposit;
     }
 
+    /** When the deposit is collected; never {@code null} (defaults to {@link DepositTiming#UPFRONT}). */
+    public DepositTiming depositTiming() {
+        return depositTiming;
+    }
+
+    /**
+     * How the deposit leaves the deal; never {@code null} (defaults to
+     * {@link DepositSettlement#REFUND}, the v1 posture).
+     */
+    public DepositSettlement depositSettlement() {
+        return depositSettlement;
+    }
+
+    /**
+     * Annual interest rate the deposit earns while held; {@code null} means it does not earn
+     * interest. Rejected at build time without a positive deposit and under
+     * {@link DepositSettlement#OFFSET_PRINCIPAL}.
+     */
+    public BigDecimal depositInterestRate() {
+        return depositInterestRate;
+    }
+
+    /**
+     * The principal the schedule amortizes: the contract principal less a deposit whose settlement
+     * is {@link DepositSettlement#OFFSET_PRINCIPAL} — the deposit is consumed at collection against
+     * the financed amount, so rent and balances are measured on the net — and the contract principal
+     * under every other settlement. Generators, the principal-conservation validator and the rule
+     * pool all read this, so no amortization site can disagree with another about what the schedule
+     * must repay; the event table keeps the deposit legs explicit and nets to the same number.
+     */
+    public BigDecimal measuredPrincipal() {
+        if (depositSettlement == DepositSettlement.OFFSET_PRINCIPAL
+                && deposit != null && deposit.signum() > 0) {
+            return principal.subtract(deposit);
+        }
+        return principal;
+    }
+
     /** Fees charged alongside the rent; unmodifiable. */
     public List<FeeItem> fees() {
         return fees;
@@ -419,6 +486,9 @@ public final class LeaseElement {
         private BigDecimal residualValue;
         private ResidualHandling residualHandling;
         private BigDecimal deposit;
+        private DepositTiming depositTiming;
+        private DepositSettlement depositSettlement;
+        private BigDecimal depositInterestRate;
         private List<FeeItem> fees = Collections.emptyList();
         private List<BigDecimal> explicitRents = Collections.emptyList();
         private BigDecimal vatRate;
@@ -450,6 +520,9 @@ public final class LeaseElement {
             this.residualValue = source.residualValue;
             this.residualHandling = source.residualHandling;
             this.deposit = source.deposit;
+            this.depositTiming = source.depositTiming;
+            this.depositSettlement = source.depositSettlement;
+            this.depositInterestRate = source.depositInterestRate;
             this.fees = source.fees;
             this.explicitRents = source.explicitRents;
             this.vatRate = source.vatRate;
@@ -552,6 +625,28 @@ public final class LeaseElement {
 
         public Builder deposit(BigDecimal deposit) {
             this.deposit = deposit;
+            return this;
+        }
+
+        /** When the deposit is collected; {@code null} means the v1 posture (upfront). */
+        public Builder depositTiming(DepositTiming depositTiming) {
+            this.depositTiming = depositTiming;
+            return this;
+        }
+
+        /** How the deposit leaves the deal; {@code null} means the v1 posture (refund). */
+        public Builder depositSettlement(DepositSettlement depositSettlement) {
+            this.depositSettlement = depositSettlement;
+            return this;
+        }
+
+        /**
+         * Annual interest rate the deposit earns while held, as a fraction within [0, 1];
+         * {@code null} means no interest. Requires a positive deposit and a settlement other than
+         * {@link DepositSettlement#OFFSET_PRINCIPAL}.
+         */
+        public Builder depositInterestRate(BigDecimal depositInterestRate) {
+            this.depositInterestRate = depositInterestRate;
             return this;
         }
 

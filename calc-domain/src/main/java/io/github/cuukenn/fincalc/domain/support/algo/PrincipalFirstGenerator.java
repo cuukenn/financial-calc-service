@@ -52,7 +52,7 @@ public final class PrincipalFirstGenerator extends AbstractAmortizationGenerator
     protected void prepare(CalculationContext context, List<PeriodDate> periods,
             AmortizationState state) {
         LeaseElement element = context.element();
-        BigDecimal repayable = element.principal()
+        BigDecimal repayable = element.measuredPrincipal()
                 .setScale(element.rounding().scale(), element.rounding().mode())
                 .subtract(element.outstandingResidual());
         state.pmt(repayable.divide(BigDecimal.valueOf(periods.size()),

@@ -72,7 +72,7 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
             AmortizationState state) {
         LeaseElement element = context.element();
         DayCountConvention dayCount = context.dayCount();
-        BigDecimal principal = money(element.principal(), element);
+        BigDecimal principal = money(element.measuredPrincipal(), element);
         BigDecimal residual = element.outstandingResidual();
 
         if (context.ruleSet() == null) {
@@ -151,7 +151,7 @@ public final class EqualInstallmentGenerator extends AbstractAmortizationGenerat
     /** Annual rate of the opening period: the rule-resolved rate, else the nominal rate. */
     private BigDecimal initialAnnualRate(CalculationContext context, List<PeriodDate> periods) {
         PeriodDate first = periods.get(0);
-        RuleOutcome outcome = resolveRule(context.ruleSet(), 1, money(context.element().principal(),
+        RuleOutcome outcome = resolveRule(context.ruleSet(), 1, money(context.element().measuredPrincipal(),
                 context.element()), context.dayCount().days(first.startDate(), first.endDate()),
                 context.element().nominalRate());
         return annualRate(context.element(), outcome);

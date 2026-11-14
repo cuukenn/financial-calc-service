@@ -1,6 +1,6 @@
 # 14. 房贷 payload 被迫携带两个「租赁专属」必填要素
 
-Status: needs-triage
+Status: resolved（2026-11-14 裁定方案 B 并落地：schema 描述 + 既有前端注释；契约与数值零改动）
 Type: task
 Priority: P2
 数据角色: 契约形状问题 —— 现携带的这两个值对房贷不改变任何现金流
@@ -41,3 +41,17 @@ Blocked by: —
 ## 涉及文件
 
 `calc-domain/.../model/LeaseElement.java`（校验）、`calc-server/.../dto/CalculationRequestDto.java` 与 `CalculationRequestAssembler.java`（契约与必填形状）、`web/src/components/MortgageForm.vue`、`web/src/i18n/locales/*.ts`。
+
+## 裁定与落地记录（2026-11-14）
+
+**裁定：方案 B（保留现状，把契约形状说清楚）。**
+
+理由：
+- 方案 A（条件必填）守「缺失即报错」要引入显式 `noResidual` 声明或业务类型字段——那是一次契约扩展，和「房贷 payload 键数冻结」（R101 + R137）正面冲突，且 `PrincipalConservationValidator` / `addClosingResidual` / `RuleSetValidator` 的无残值路径要逐个重新钉；收益只是删掉 payload 里一个不参与测算的键，M-01 的「答不出改变哪一期现金流」审查的是**引入新字段**，这个键是既存契约形状，不是新引入。
+- 方案 C（拆领域模型）与「Plan 5 已冻结」正面冲突，留待真正的多业务类型重构轮次。
+- 方案 B 消除的是「读者误以为有残值语义」的风险，用一行 schema 描述 + 前端既有注释（`MortgageForm.vue` 头部的 14 键说明）达成，零数值改动。
+
+**落地**：
+- `CalculationRequestDto.residualHandling` 的 `@Schema` 描述追加房贷语义说明（SEPARATE + null 残值 = 契约形状，不改变任何现金流，房贷结果区不产出残值读数）。
+- 前端已满足「不得显示残值读数」：`MetricsPane` 的房贷指标集不含 `RESIDUAL_VALUE`（R103 借款方族 + §9.5 租赁码按场景门控）。
+- `rateChangePolicy` 在 R150 后已是有意义口径，按本票背景节结论移出对象。

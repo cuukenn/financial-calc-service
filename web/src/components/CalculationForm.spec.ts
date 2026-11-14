@@ -79,6 +79,28 @@ function resultWithIssues(hasErrors: boolean): CalculationResult {
   return base
 }
 
+async function pickOption(
+  wrapper: ReturnType<typeof mountWithI18n>,
+  selector: string,
+  label: string,
+): Promise<void> {
+  await wrapper.find(selector).find('.ant-select-selector').trigger('mousedown')
+  await flushPromises()
+  await flushPromises()
+  const dropdown = [...document.querySelectorAll('.ant-select-dropdown')].find((d) =>
+    d.textContent?.includes(label),
+  )
+  expect(dropdown).toBeTruthy()
+  const option = [...dropdown!.querySelectorAll('.ant-select-item-option')].find((o) =>
+    o.textContent?.includes(label),
+  )
+  expect(option).toBeTruthy()
+  option!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  option!.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+  option!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  await flushPromises()
+}
+
 async function submit(wrapper: ReturnType<typeof mountWithI18n>): Promise<void> {
   await wrapper.find('form').trigger('submit')
   await flushPromises()
@@ -185,6 +207,34 @@ describe('CalculationForm', () => {
     expect(req.guaranteedResidual).toBe('30000')
     expect(req.assetValue).toBeUndefined()
     expect(req.principal).toBe('1000000')
+  })
+
+  it('sends the deposit calibers and the percent-denominated interest rate (ticket 03)', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="deposit"]').setValue('50000')
+    // AntD Select 与 R92-2 币种用例同款交互：mousedown 展开弹层，点击选项提交枚举值。
+    await pickOption(wrapper, '[data-test="deposit-timing"]', '随首期租金')
+    await pickOption(wrapper, '[data-test="deposit-settlement"]', '冲抵末期租金')
+    await wrapper.find('[data-test="deposit-interest-rate"]').setValue('3')
+    await submit(wrapper)
+
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.deposit).toBe('50000')
+    expect(req.depositTiming).toBe('WITH_FIRST_RENT')
+    expect(req.depositSettlement).toBe('OFFSET_FINAL_RENT')
+    // 百分数口径展示值 3 → 提交小数 0.03（R92-5 同款换算）。
+    expect(req.depositInterestRate).toBe('0.03')
+  })
+
+  it('omits depositInterestRate when left empty', async () => {
+    const wrapper = mountWithI18n(CalculationForm)
+    await wrapper.find('[data-test="deposit"]').setValue('50000')
+    await wrapper.find('[data-test="deposit-interest-rate"]').setValue('')
+    await submit(wrapper)
+
+    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
+    expect(req.deposit).toBe('50000')
+    expect(req).not.toHaveProperty('depositInterestRate')
   })
 
   it('blocks the unguaranteed residual without an asset value (FCS-DOM-1017)', async () => {
@@ -368,6 +418,10 @@ describe('CalculationForm', () => {
     expect(req.residualValue).toBe('0')
     expect(req.residualHandling).toBe('SEPARATE')
     expect(req.deposit).toBe('0')
+    // 保证金口径三字段（ticket 03）：默认 v1 姿态（期初收取 / 到期退还 / 不计息）。
+    expect(req.depositTiming).toBe('UPFRONT')
+    expect(req.depositSettlement).toBe('REFUND')
+    expect(req).not.toHaveProperty('depositInterestRate')
     expect(req.vatRate).toBe('0.06')
     expect(req).not.toHaveProperty('ruleRows')
     expect(req).not.toHaveProperty('explicitRents')

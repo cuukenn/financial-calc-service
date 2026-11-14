@@ -201,12 +201,12 @@ public final class RuleSetValidator {
                     "PERCENT 行 principalValue 合计应为 100，实际 " + percentSum.toPlainString()));
         }
         if (!rows.isEmpty() && !hasAlgorithmDrivenRow && !anySequenceInvalid) {
-            deterministicTotal = deterministicTotal.add(element.principal()
+            deterministicTotal = deterministicTotal.add(element.measuredPrincipal()
                     .multiply(percentSum).divide(HUNDRED));
-            if (deterministicTotal.compareTo(element.principal()) != 0) {
+            if (deterministicTotal.compareTo(element.measuredPrincipal()) != 0) {
                 issues.add(issue(RuleErrorCode.PRINCIPAL_PLAN_TOTAL, String.format(
                         "本金计划合计 %s 与本金 %s 不一致（FIXED 值×期数 + CUSTOM 序列合计 + PERCENT 份额）",
-                        deterministicTotal.toPlainString(), element.principal().toPlainString())));
+                        deterministicTotal.toPlainString(), element.measuredPrincipal().toPlainString())));
             }
         }
     }

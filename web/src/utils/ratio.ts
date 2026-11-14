@@ -122,6 +122,20 @@ export function decimalSubtract(a: string, b: string): string | null {
   })
 }
 
+/** 精确乘法（decimals 字符串），非法输入 → null。 */
+export function decimalMultiply(a: string, b: string): string | null {
+  const left = parseDecimal(a)
+  const right = parseDecimal(b)
+  if (left === null || right === null) return null
+  const negative = left.negative !== right.negative
+  const digits = left.digits * right.digits
+  return canonical({
+    negative: negative && digits !== 0n,
+    digits,
+    scale: left.scale + right.scale,
+  })
+}
+
 /**
  * 十进制字符串长除法：numerator ÷ denominator，结果保留 scale 位小数（HALF_UP，保号）。
  * 分母为 0 或任一输入不可解析 → null（调用方决定展示「无法计算」而不是 0）。

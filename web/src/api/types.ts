@@ -12,6 +12,8 @@ export type PaymentFrequency = 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL
 export type PaymentTiming = 'IN_ADVANCE' | 'IN_ARREARS'
 
 export type ResidualHandling = 'SEPARATE' | 'BALLOON_IN_RENT'
+export type DepositTiming = 'UPFRONT' | 'WITH_FIRST_RENT'
+export type DepositSettlement = 'REFUND' | 'OFFSET_PRINCIPAL' | 'OFFSET_FINAL_RENT'
 
 /** IRREGULAR 频率的一个显式期间（PeriodDateDto）。 */
 export interface ExplicitPeriod {
@@ -115,8 +117,14 @@ export interface CalculationRequest {
   /** 残值金额；缺省 = 无残值。 */
   residualValue?: string
   residualHandling?: ResidualHandling
-  /** 保证金金额；缺省 = 无保证金。 */
+  /** 保证金金额；缺省 = 无保证金。保证金 > 0 时后端现金流基准自动为 INCLUDE_DEPOSIT（进入 IRR）。 */
   deposit?: string
+  /** 保证金收取时点：UPFRONT（起租日，缺省）/ WITH_FIRST_RENT（随首期租金）。 */
+  depositTiming?: DepositTiming
+  /** 保证金退还/抵扣方式：REFUND（缺省）/ OFFSET_PRINCIPAL（租金按净本金）/ OFFSET_FINAL_RENT。 */
+  depositSettlement?: DepositSettlement
+  /** 保证金计息年利率，小数形式；缺省 = 不计息。 */
+  depositInterestRate?: string
   /** 增值税率，小数形式。 */
   vatRate?: string
   /** 币种，ISO-4217 代码。 */

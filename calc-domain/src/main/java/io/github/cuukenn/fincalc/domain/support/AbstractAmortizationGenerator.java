@@ -140,7 +140,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
         List<Installment> installments = new ArrayList<>(periods.size());
         List<ValidationIssue> issues = new ArrayList<>();
-        BigDecimal balance = money(element.principal(), rounding);
+        BigDecimal balance = money(element.measuredPrincipal(), rounding);
         BigDecimal cumulativePrincipal = money(MoneyUtils.ZERO, rounding);
         BigDecimal cumulativeInterest = money(MoneyUtils.ZERO, rounding);
         int totalPeriods = periods.size();
@@ -159,7 +159,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
 
             AllocationInput input = new AllocationInput(periodNo, totalPeriods, openingBalance,
                     periodicRate, accruedInterest,
-                    element.principal().subtract(cumulativePrincipal), lastPeriod, element.timing(),
+                    element.measuredPrincipal().subtract(cumulativePrincipal), lastPeriod, element.timing(),
                     days, element, outcome);
             Allocation allocation = allocate(input, state);
             if (allocation == null) {
@@ -212,7 +212,7 @@ public abstract class AbstractAmortizationGenerator implements ScheduleGenerator
         for (Installment installment : installments) {
             principalSum = principalSum.add(installment.principalDue());
         }
-        BigDecimal contractPrincipal = money(element.principal(), rounding);
+        BigDecimal contractPrincipal = money(element.measuredPrincipal(), rounding);
         BigDecimal residual = element.outstandingResidual();
         BigDecimal expectedPrincipal = money(contractPrincipal.subtract(residual), rounding);
         if (principalSum.subtract(expectedPrincipal).abs().compareTo(TOLERANCE) >= 0) {

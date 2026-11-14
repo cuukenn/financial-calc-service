@@ -44,6 +44,8 @@ import { formatMoney } from '@/utils/format'
 import { composeLprRate } from '@/utils/rate'
 import {
   collateralValue,
+  compareDecimal,
+  decimalSubtract,
   downPaymentRatio,
   formatDecimalPercent,
   loanToValue,
@@ -405,6 +407,62 @@ async function onFinish(): Promise<void> {
 }
 
 /**
+ * 部分提前还款重算剩余期供（ticket 08）：剩余本金 = 结清日承载期期初余额 − 部分还款金额，
+ * 剩余期数与下一次还款日由结清试算 pane 给出，年利率沿用本次测算的 LPR + 加点组合值。
+ * 重算按**当前年利率固定计息**（不带原重定价分段行 —— 分段相对原起放款日，缩短后的租期
+ * 需要重新映射；需要重定价分段时请回表单重跑完整测算）。
+ * 金额非法、≥ 剩余本金（那是一次性结清，走结清金额读数）或年利率不可用时阻断并给出文案。
+ */
+async function onPrepay(payload: {
+  settlementDate: string
+  prepayAmount: string
+  recalcPrincipal: string
+  nextRentDate: string
+  remainingPeriods: number
+}): Promise<void> {
+  const annual = annualRate.value
+  if (annual === null) return
+  // 重算本金 = 下一期期初余额 − 部分还款金额（pane 只在还款日当日放行，见 SettlementPane）。
+  const remaining = decimalSubtract(payload.recalcPrincipal, payload.prepayAmount)
+  if (remaining === null || compareDecimal(remaining, '0') <= 0) {
+    blockRun(t('mortgage.gates.prepayNotPartial'))
+    return
+  }
+  if (payload.remainingPeriods < 1) {
+    blockRun(t('mortgage.gates.prepayNoPeriods'))
+    return
+  }
+  const request: CalculationRequest = {
+    principal: remaining,
+    nominalRate: annual,
+    commenceDate: payload.settlementDate,
+    firstRentDate: payload.nextRentDate,
+    periods: payload.remainingPeriods,
+    frequency: 'MONTHLY',
+    timing: 'IN_ARREARS',
+    dayCountCode: 'THIRTY_360',
+    dateRollCode: 'NONE',
+    currency: 'CNY',
+    method: form.method,
+    residualValue: '0',
+    residualHandling: 'SEPARATE',
+    rateChangePolicy: 'RESOLVE',
+  }
+  localError.value = null
+  submitError.value = null
+  loading.value = true
+  try {
+    result.value = await calculate(request)
+  } catch (err: unknown) {
+    result.value = null
+    submitError.value =
+      err instanceof ApiError ? err : new ApiError('UNKNOWN_ERROR', String(err), 0)
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
  * 显式重置（Task 6 §2）：模型回到 defaults()、清掉校验态、清掉结果与两条错误提示，
  * 依赖这次结果的读数（月供 / DTI / 全部负债 DTI）随之回到未计算的「—」。
  * 抵押物价值 / 贷款成数 / 首付比例是活输入的实时派生，不是这次跑的结果：
@@ -727,7 +785,9 @@ function onReset(): void {
     <Col :xs="24" :lg="14">
       <!-- 结果区：ResultPanel 只是外壳（Card + runId + ERROR 提示 + 四个 Tab），
            各 Tab 的主体已拆成 `components/result/*Pane.vue`（D-6）。 -->
-      <ResultPanel v-if="result" :result="result" scenario="mortgage" />
+      <ResultPanel v-if="result" :result="result" scenario="mortgage"
+        day-count-code="THIRTY_360" :annual-rate="annualRate ?? undefined"
+        @prepay="onPrepay" />
     </Col>
   </Row>
 </template>

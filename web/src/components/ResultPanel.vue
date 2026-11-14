@@ -9,6 +9,7 @@ import CashflowPane from './result/CashflowPane.vue'
 import EirPane from './result/EirPane.vue'
 import MetricsPane from './result/MetricsPane.vue'
 import SchedulePane from './result/SchedulePane.vue'
+import SettlementPane from './result/SettlementPane.vue'
 
 /**
  * 结果区（D-6）：外壳只留 Card + runId + ERROR 提示 + 四个 TabPane。
@@ -24,11 +25,26 @@ const props = withDefaults(
   defineProps<{
     result: CalculationResult
     scenario?: ScenarioKey
+    /** 计息基准 code（提前结清试算的天数口径）；缺省 THIRTY_360（房贷硬编码基准）。 */
+    dayCountCode?: string
+    /** 合同年利率（小数字符串），提前结清试算的罚息默认占位用。 */
+    annualRate?: string
   }>(),
   { scenario: 'lease' },
 )
 
 const { t } = useI18n()
+
+/** 提前结清试算（ticket 07/08）往表单侧抛的事件：部分提前还款重算剩余期供。 */
+const emit = defineEmits<{
+  prepay: [payload: {
+    settlementDate: string
+    prepayAmount: string
+    recalcPrincipal: string
+    nextRentDate: string
+    remainingPeriods: number
+  }]
+}>()
 </script>
 
 <template>
@@ -57,6 +73,15 @@ const { t } = useI18n()
       </TabPane>
       <TabPane key="cashflow" :tab="t('result.tabs.cashflow')">
         <CashflowPane :cash-flows="props.result.schedule.cashFlows" />
+      </TabPane>
+      <TabPane key="settlement" :tab="t('result.tabs.settlement')">
+        <SettlementPane
+          :installments="props.result.schedule.installments"
+          :day-count-code="props.dayCountCode ?? 'THIRTY_360'"
+          :annual-rate="props.annualRate"
+          :scenario="props.scenario"
+          @prepay="(payload) => emit('prepay', payload)"
+        />
       </TabPane>
       <TabPane key="eir" :tab="t('result.tabs.eir')">
         <EirPane :effective-interest="props.result.effectiveInterest" />

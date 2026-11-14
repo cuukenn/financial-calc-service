@@ -9,6 +9,8 @@ import io.github.cuukenn.fincalc.domain.model.CashFlowBasis;
 import io.github.cuukenn.fincalc.domain.model.CashFlowDirection;
 import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.model.CashFlowType;
+import io.github.cuukenn.fincalc.domain.model.DepositSettlement;
+import io.github.cuukenn.fincalc.domain.model.DepositTiming;
 import io.github.cuukenn.fincalc.domain.model.FeeChargeMode;
 import io.github.cuukenn.fincalc.domain.model.FeeItem;
 import io.github.cuukenn.fincalc.domain.model.Installment;
@@ -19,6 +21,7 @@ import io.github.cuukenn.fincalc.domain.model.Schedule;
 import io.github.cuukenn.fincalc.domain.port.CashFlowBuilder;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -41,11 +44,13 @@ import java.util.Objects;
  * both modes because it is a separate receipt line. Dropping either would erase money the lessor
  * receives and silently misprice every yield metric.
  *
- * <p>Known v1 gaps: a {@link FeeChargeMode#DEDUCT_FROM_PRINCIPAL} fee or a deposit netted against
- * the t0 principal would have no leg because v1 does not net anything — the {@code FeeAllocator}
- * extension point arrives with the fee work (Plan 2); until then such contracts price the gross
- * principal. Rent legs land on {@code installment.endDate()} because v1 schedules are
- * {@code IN_ARREARS} only.
+ * <p>Known v1 gaps: a {@link FeeChargeMode#DEDUCT_FROM_PRINCIPAL} fee has no leg because v1 does
+ * not net fees — the {@code FeeAllocator} extension point arrives with the fee work (Plan 2);
+ * until then such contracts price the gross principal. A deposit that offsets the principal is
+ * netted the other way round (form-field-gaps ticket 03): the schedule amortizes
+ * {@link LeaseElement#measuredPrincipal()} and the event table keeps both t0 legs explicit.
+ * Rent legs land on {@code installment.endDate()} because v1 schedules are {@code IN_ARREARS}
+ * only.
  */
 public final class StandardCashFlowBuilder implements CashFlowBuilder {
 
@@ -57,8 +62,9 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
         order.put(CashFlowType.PRINCIPAL, 0);
         order.put(CashFlowType.FEE, 1);
         order.put(CashFlowType.DEPOSIT, 2);
-        order.put(CashFlowType.RENT, 3);
-        order.put(CashFlowType.RESIDUAL, 4);
+        order.put(CashFlowType.DEPOSIT_INTEREST, 3);
+        order.put(CashFlowType.RENT, 4);
+        order.put(CashFlowType.RESIDUAL, 5);
         SAME_DAY_ORDER = Collections.unmodifiableMap(order);
     }
 
@@ -102,9 +108,7 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
         }
         addUpfrontFees(flows, element, rounding, t0);
         if (settled && depositIncluded(options, element)) {
-            BigDecimal deposit = money(element.deposit(), rounding);
-            addFlow(flows, t0, deposit, CashFlowType.DEPOSIT, CashFlowDirection.INFLOW);
-            addFlow(flows, maturity, deposit, CashFlowType.DEPOSIT, CashFlowDirection.OUTFLOW);
+            addDepositLegs(flows, element, rounding, t0, installments, maturity);
         }
         for (Installment installment : installments) {
             // tax is already part of rentDue. v1 consumes only UPFRONT fees (see
@@ -120,13 +124,70 @@ public final class StandardCashFlowBuilder implements CashFlowBuilder {
     }
 
     /**
-     * A deposit participates only under the basis that asks for it; v1 deposits are refundable
-     * only, so they never net against the t0 principal.
+     * A deposit participates only under the basis that asks for it. The legs themselves are shaped
+     * by the element's 收取时点 / 退还抵扣规则 (AGENTS.md §3.1 第 11 条; calibers documented on
+     * {@link DepositSettlement}); the event table keeps the deposit money explicit — under
+     * {@link DepositSettlement#OFFSET_PRINCIPAL} the two t0 legs (gross principal out, deposit in)
+     * net to the {@link LeaseElement#measuredPrincipal()} the schedule amortizes, and under the
+     * refund/offset-final-rent settlements the deposit (plus its interest when carried) is its own
+     * maturity rows that never fold into 租金 (M-03/M-04).
      */
     private boolean depositIncluded(CalculationOptions options, LeaseElement element) {
         return options.cashFlowBasis() == CashFlowBasis.INCLUDE_DEPOSIT
                 && element.deposit() != null
                 && element.deposit().signum() > 0;
+    }
+
+    /**
+     * The deposit legs, per the element's 收取时点 / 退还抵扣规则. Collection lands on t0 under
+     * {@link DepositTiming#UPFRONT} and on the first rent's payment date under
+     * {@link DepositTiming#WITH_FIRST_RENT} — the same date the rent rows use, so same-day
+     * compression keeps the deposit and the first rent on one discount index.
+     *
+     * <p>Settlement: {@link DepositSettlement#REFUND} and {@link DepositSettlement#OFFSET_FINAL_RENT}
+     * return the deposit at maturity as its own rows — offsetting the final rent is the same cash
+     * pair as a refund dated at maturity, so the schedule's rent column stays the amortization rent
+     * and the offset lives in the deposit rows, never netted into 租金;
+     * {@link DepositSettlement#OFFSET_PRINCIPAL} has no settlement leg because the deposit is
+     * consumed at collection.
+     *
+     * <p>Interest (P-03/P-06): the deposit earns its element rate over the days it actually
+     * occupies — ACT/360, 算头不算尾, simple — and the interest is its own maturity outflow, never
+     * folded into rent or the deposit principal leg.
+     */
+    private void addDepositLegs(List<CashFlow> flows, LeaseElement element,
+            RoundingPolicy rounding, LocalDate t0, List<Installment> installments,
+            LocalDate maturity) {
+        BigDecimal deposit = money(element.deposit(), rounding);
+        LocalDate collected = element.depositTiming() == DepositTiming.WITH_FIRST_RENT
+                ? installments.get(0).endDate() : t0;
+        addFlow(flows, collected, deposit, CashFlowType.DEPOSIT, CashFlowDirection.INFLOW);
+        if (element.depositSettlement() == DepositSettlement.OFFSET_PRINCIPAL) {
+            return;
+        }
+        addFlow(flows, maturity, depositInterest(element, rounding, collected, maturity),
+                CashFlowType.DEPOSIT_INTEREST, CashFlowDirection.OUTFLOW);
+        addFlow(flows, maturity, deposit, CashFlowType.DEPOSIT, CashFlowDirection.OUTFLOW);
+    }
+
+    /**
+     * Deposit interest at the element's rate over the days the deposit actually occupies:
+     * 保证金 × 年利率 × 实际占用天数 ÷ 360 (P-03 日利率、算头不算尾、单利), rounded to the
+     * element's output scale (P-05/P-06). A same-day settlement accrues zero days and no row; a
+     * settlement cannot precede collection because maturity is the schedule's last end date and
+     * the collection date is t0 or the first rent's date.
+     */
+    private BigDecimal depositInterest(LeaseElement element, RoundingPolicy rounding,
+            LocalDate collected, LocalDate settled) {
+        BigDecimal rate = element.depositInterestRate();
+        if (rate == null || !settled.isAfter(collected)) {
+            return null;
+        }
+        long days = ChronoUnit.DAYS.between(collected, settled);
+        return element.deposit()
+                .multiply(rate)
+                .multiply(BigDecimal.valueOf(days))
+                .divide(BigDecimal.valueOf(360), rounding.scale(), rounding.mode());
     }
 
     private void addUpfrontFees(List<CashFlow> flows, LeaseElement element,

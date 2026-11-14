@@ -59,6 +59,12 @@ public enum DomainErrorCode implements ErrorCode {
     CHAIN_AMOUNT_REQUIRES_ASSET_VALUE("FCS-DOM-1017",
             "FCS-DOM-1017: %s 必须与资产价值同时提供（CAS 21 计量链）: %s"),
 
+    DEPOSIT_INTEREST_RATE_REQUIRES_DEPOSIT("FCS-DOM-1018",
+            "FCS-DOM-1018: 保证金计息利率必须与正保证金同时提供: %s"),
+
+    DEPOSIT_INTEREST_RATE_CONFLICTS_WITH_OFFSET("FCS-DOM-1019",
+            "FCS-DOM-1019: 抵减本金方式下保证金不占用期间、不得计息: %s"),
+
     PERIOD_SEQUENCE_INVALID("FCS-DOM-2001",
             "FCS-DOM-2001: 期次日期必须严格递增且 start < end: 第 %s 期 [%s, %s]"),
 

@@ -1,6 +1,6 @@
 # 05. 首末期规则与尾差去向
 
-Status: needs-triage
+Status: ready-for-agent（2026-11-14 设计裁定已记，见文末「裁定」）
 Type: task
 Priority: P2
 数据角色: A 参与测算 —— 首期切分与尾差归属改变每期金额
@@ -28,3 +28,11 @@ Blocked by: —
 
 `web/src/components/CalculationForm.vue`、`web/src/components/result/SchedulePane.vue`、
 `web/src/i18n/locales/*.ts`、`calc-engine`（生成器末期处理）。
+
+## 裁定（2026-11-14，triage：设计已定，待实现）
+
+1. **现状盘点**：引擎的尾差吸收已是「单点、末期」姿态（P-09：末期吸收 + 带符号 `roundingDifference` 在 `ScheduleHeader` 披露）——本票不是「造功能」，是把引擎已经隐式做的口径**显式化**成 §3.1 第 9 条的输入要素。
+2. **首期 stub**：`firstRentDate ≠ 起租日 + 整期` 时期间构建器已经产生不等长首期（现有行为）；新增开关控制的是「首期是否按实际天数单独计息」（P-14 零头天数规则：整期部分 × 期利率、零头部分 × 日利率，两种 129 号算法不得混用于单笔）。默认 = 现状（按年利率 × yearFraction 一段计），开关打开才走「整期 + 零头」两段——**默认必须与现状逐位一致**。
+3. **尾差吸收位置（末期 / 首期）**：改的是 `AbstractAmortizationGenerator` 末期的 tail 调整落点（现为末期 rentDue 吸收）。首期吸收 = 把带符号尾差加在首期 rentDue。约束：只能选一个位置（校验），被吸收行在 memo 标注（已有 `memo` 通道），`ScheduleHeader.roundingDifference` 语义不变。
+4. **默认显式标注**：未选择时按「末期」并在表单/结果标注「尾差吸收：末期（默认）」，不静默（验收第 3 条）。
+5. 实施顺序：开关 + 默认逐位一致（金序列测试钉）→ 首期吸收路径（± 符号两向）→ stub 两段计息 → 摊销表 memo 标注。全程 N-04 逐位纪律适用。

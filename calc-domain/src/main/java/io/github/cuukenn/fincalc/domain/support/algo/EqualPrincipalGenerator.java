@@ -60,7 +60,7 @@ public final class EqualPrincipalGenerator extends AbstractAmortizationGenerator
     protected void prepare(CalculationContext context, List<PeriodDate> periods,
             AmortizationState state) {
         LeaseElement element = context.element();
-        BigDecimal principal = element.principal()
+        BigDecimal principal = element.measuredPrincipal()
                 .setScale(element.rounding().scale(), element.rounding().mode())
                 .subtract(element.outstandingResidual());
         state.pmt(principal.divide(BigDecimal.valueOf(periods.size()),

@@ -275,11 +275,12 @@ describe('ResultPanel', () => {
     expect(tooltips.join('\n')).toContain('原值：1032797.15')
   })
 
-  it('renders the four tabs with a cash-flow placeholder when no flows exist', async () => {
+  it('renders the five tabs with a cash-flow placeholder when no flows exist', async () => {
     const wrapper = mountWithI18n(ResultPanel, { props: { result: result() } })
 
     const tabs = wrapper.findAll('.ant-tabs-tab')
-    expect(tabs.map((t) => t.text())).toEqual(['指标', '摊销计划', '现金流', '实际利率法'])
+    expect(tabs.map((t) => t.text()))
+      .toEqual(['指标', '摊销计划', '现金流', '提前结清试算', '实际利率法'])
 
     // 现金流 Tab：无现金流数据时 Empty 占位（R87）。
     await activateTab(wrapper, '现金流')

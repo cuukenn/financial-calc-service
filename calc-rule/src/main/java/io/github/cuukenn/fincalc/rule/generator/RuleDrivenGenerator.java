@@ -228,7 +228,7 @@ public final class RuleDrivenGenerator extends AbstractAmortizationGenerator {
             this.totalPeriods = totalPeriods;
             this.partialAllowed = context.options().allowPartialRuleSet();
             this.spans = indexSpans(delegate);
-            this.pool = money(element.principal(), element)
+            this.pool = money(element.measuredPrincipal(), element)
                     .subtract(money(element.outstandingResidual(), element));
         }
 

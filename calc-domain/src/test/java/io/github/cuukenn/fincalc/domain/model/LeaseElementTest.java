@@ -250,6 +250,61 @@ class LeaseElementTest {
                 .guaranteedResidual()).isEqualByComparingTo("30000");
     }
 
+    @Test
+    void builder_defaults_deposit_calibers_to_the_v1_posture() {
+        LeaseElement element = baseBuilder().deposit(new BigDecimal("50000")).build();
+        assertThat(element.depositTiming()).isEqualTo(DepositTiming.UPFRONT);
+        assertThat(element.depositSettlement()).isEqualTo(DepositSettlement.REFUND);
+        assertThat(element.depositInterestRate()).isNull();
+        assertThat(element.measuredPrincipal()).isEqualByComparingTo(element.principal());
+    }
+
+    @Test
+    void builder_rejects_deposit_interest_rate_without_a_positive_deposit() {
+        assertThatThrownBy(() -> baseBuilder().depositInterestRate(new BigDecimal("0.03")).build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1018");
+        assertThatThrownBy(() -> baseBuilder()
+                .deposit(BigDecimal.ZERO)
+                .depositInterestRate(new BigDecimal("0.03"))
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1018");
+    }
+
+    @Test
+    void builder_rejects_deposit_interest_rate_under_offset_principal() {
+        assertThatThrownBy(() -> baseBuilder()
+                .deposit(new BigDecimal("50000"))
+                .depositSettlement(DepositSettlement.OFFSET_PRINCIPAL)
+                .depositInterestRate(new BigDecimal("0.03"))
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1019");
+    }
+
+    @Test
+    void builder_rejects_out_of_range_deposit_interest_rate() {
+        assertThatThrownBy(() -> baseBuilder()
+                .deposit(new BigDecimal("50000"))
+                .depositInterestRate(new BigDecimal("1.5"))
+                .build())
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("FCS-DOM-1002");
+    }
+
+    @Test
+    void measured_principal_nets_only_under_offset_principal() {
+        LeaseElement refund = baseBuilder().deposit(new BigDecimal("100000")).build();
+        assertThat(refund.measuredPrincipal()).isEqualByComparingTo(refund.principal());
+        LeaseElement offset = baseBuilder()
+                .deposit(new BigDecimal("100000"))
+                .depositSettlement(DepositSettlement.OFFSET_PRINCIPAL)
+                .build();
+        assertThat(offset.measuredPrincipal()).isEqualByComparingTo("900000");
+        assertThat(offset.toBuilder().build().measuredPrincipal()).isEqualByComparingTo("900000");
+    }
+
     private LeaseElement.Builder baseBuilder() {
         return LeaseElement.builder()
                 .principal(new BigDecimal("1000000"))

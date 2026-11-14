@@ -17,6 +17,8 @@ import io.github.cuukenn.fincalc.domain.model.CashFlowBasis;
 import io.github.cuukenn.fincalc.domain.model.CashFlowDirection;
 import io.github.cuukenn.fincalc.domain.model.CashFlowPerspective;
 import io.github.cuukenn.fincalc.domain.model.CashFlowType;
+import io.github.cuukenn.fincalc.domain.model.DepositSettlement;
+import io.github.cuukenn.fincalc.domain.model.DepositTiming;
 import io.github.cuukenn.fincalc.domain.model.FeeChargeMode;
 import io.github.cuukenn.fincalc.domain.model.FeeItem;
 import io.github.cuukenn.fincalc.domain.model.GracePeriod;
@@ -345,6 +347,102 @@ class StandardCashFlowBuilderTest {
             assertThat(lessee.get(i).direction())
                     .isEqualTo(lessor.get(i).direction() == CashFlowDirection.INFLOW
                             ? CashFlowDirection.OUTFLOW : CashFlowDirection.INFLOW);
+        }
+    }
+
+    @Test
+    void deposit_with_first_rent_collects_on_the_first_rent_date() {
+        LeaseElement element = element().toBuilder()
+                .deposit(new BigDecimal("50000"))
+                .depositTiming(DepositTiming.WITH_FIRST_RENT)
+                .build();
+
+        List<CashFlow> flows = builder.build(schedule(), element,
+                new CalculationOptions(false, CashFlowBasis.INCLUDE_DEPOSIT));
+
+        List<CashFlow> depositIn = flows.stream()
+                .filter(f -> f.type() == CashFlowType.DEPOSIT && f.direction() == INFLOW)
+                .collect(toList());
+        assertThat(depositIn).hasSize(1);
+        // The same date the first rent row lands on, so same-day compression keeps the two on one
+        // discount index.
+        assertThat(depositIn.get(0).date()).isEqualTo(LocalDate.of(2024, 2, 1));
+    }
+
+    @Test
+    void deposit_interest_is_its_own_maturity_outflow_at_act360_days() {
+        LeaseElement element = element().toBuilder()
+                .deposit(new BigDecimal("50000"))
+                .depositInterestRate(new BigDecimal("0.03"))
+                .build();
+
+        List<CashFlow> flows = builder.build(schedule(), element,
+                new CalculationOptions(false, CashFlowBasis.INCLUDE_DEPOSIT));
+
+        List<CashFlow> interest = flows.stream()
+                .filter(f -> f.type() == CashFlowType.DEPOSIT_INTEREST).collect(toList());
+        assertThat(interest).hasSize(1);
+        // 2024-01-01 → 2025-01-01 = 366 actual days, leap year: 50000 × 3% × 366/360 = 1525.00
+        // (P-03 日利率 ACT/360、算头不算尾、单利；P-05/P-06 算至分）.
+        assertThat(interest.get(0).amount()).isEqualByComparingTo("1525.00");
+        assertThat(interest.get(0).date()).isEqualTo(LAST);
+        assertThat(interest.get(0).direction()).isEqualTo(OUTFLOW);
+        // The deposit principal leg stays its own row — the interest never folds into it.
+        assertThat(flows).filteredOn(f -> f.type() == CashFlowType.DEPOSIT)
+                .allSatisfy(f -> assertThat(f.amount()).isEqualByComparingTo("50000.00"));
+    }
+
+    @Test
+    void offset_principal_amortizes_the_net_principal_and_keeps_both_t0_legs() {
+        LeaseElement element = element().toBuilder()
+                .deposit(new BigDecimal("100000"))
+                .depositSettlement(DepositSettlement.OFFSET_PRINCIPAL)
+                .build();
+        Schedule schedule = generate(element);
+
+        assertThat(schedule.installments().get(0).openingBalance())
+                .as("the schedule amortizes 合同本金 − 保证金")
+                .isEqualByComparingTo("900000.00");
+
+        List<CashFlow> flows = builder.build(schedule, element,
+                new CalculationOptions(false, CashFlowBasis.INCLUDE_DEPOSIT));
+
+        assertThat(flows.get(0).type()).isEqualTo(CashFlowType.PRINCIPAL);
+        assertThat(flows.get(0).amount()).as("the gross principal leg stays explicit")
+                .isEqualByComparingTo("1000000.00");
+        assertThat(flows).anySatisfy(f -> {
+            assertThat(f.type()).isEqualTo(CashFlowType.DEPOSIT);
+            assertThat(f.date()).isEqualTo(T0);
+            assertThat(f.direction()).isEqualTo(INFLOW);
+            assertThat(f.amount()).isEqualByComparingTo("100000.00");
+        });
+        // Consumed at collection: no settlement leg at maturity.
+        assertThat(flows).noneMatch(f -> f.type() == CashFlowType.DEPOSIT
+                && f.direction() == OUTFLOW);
+    }
+
+    @Test
+    void offset_final_rent_sets_like_a_refund_and_never_nets_into_rent() {
+        LeaseElement refund = element().toBuilder().deposit(new BigDecimal("50000")).build();
+        LeaseElement offset = element().toBuilder()
+                .deposit(new BigDecimal("50000"))
+                .depositSettlement(DepositSettlement.OFFSET_FINAL_RENT)
+                .build();
+
+        List<CashFlow> refundFlows = builder.build(schedule(), refund,
+                new CalculationOptions(false, CashFlowBasis.INCLUDE_DEPOSIT));
+        List<CashFlow> offsetFlows = builder.build(generate(offset), offset,
+                new CalculationOptions(false, CashFlowBasis.INCLUDE_DEPOSIT));
+
+        // Same cash pair, same dates, same directions: offsetting the final rent is a refund
+        // dated at maturity, so the schedule's rent column stays the amortization rent.
+        assertThat(offsetFlows).hasSameSizeAs(refundFlows);
+        for (int i = 0; i < offsetFlows.size(); i++) {
+            assertThat(offsetFlows.get(i).date()).isEqualTo(refundFlows.get(i).date());
+            assertThat(offsetFlows.get(i).type()).isEqualTo(refundFlows.get(i).type());
+            assertThat(offsetFlows.get(i).direction()).isEqualTo(refundFlows.get(i).direction());
+            assertThat(offsetFlows.get(i).amount())
+                    .isEqualByComparingTo(refundFlows.get(i).amount());
         }
     }
 

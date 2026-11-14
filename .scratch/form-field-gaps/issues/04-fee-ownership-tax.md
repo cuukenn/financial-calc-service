@@ -1,6 +1,6 @@
 # 04. 费用：承担方与含税/不含税口径
 
-Status: needs-triage
+Status: ready-for-agent（2026-11-14 裁定拆两步：承担方先行可落地；含税口径 blocked on VAT_SPLIT 解冻，见文末「裁定」）
 Type: task
 Priority: P2
 数据角色: A 参与测算 —— 费用承担方决定现金流方向，含税口径决定税额
@@ -27,3 +27,13 @@ Blocked by: —
 
 `web/src/components/FeesEditor.vue`、`web/src/i18n/locales/*.ts`、
 `calc-domain`（`FeeInput`）、`calc-engine`（现金流与税额）、`calc-server`（DTO）。
+
+## 裁定（2026-11-14，triage）
+
+**拆两步，第一步先做、第二步 blocked：**
+
+1. **承担方（可立即落地）**：`FeeItem` 增加承担方（出租人 / 承租人，缺省出租人 = 现状）。现金流方向规则：出租人向承租人收取 = 事件表 INFLOW（现状）；**出租人承担** = 出租人支付给第三方 = 事件表 OUTFLOW（IRR 下降），承租人视角（R103 镜像）自动反向，金额守恒由镜像保证。摊销表费用列不变（费用不进租金）。这是纯方向语义，不动契约键数冻结之外的任何东西，也不触碰 VAT。
+2. **含税/不含税与差额征税（blocked on 标准裁定）**：含税费用的价税分离要求引擎解冻 `CashFlowBasis.VAT_SPLIT`（现为 `FCS-CALC-3005` 显式拒绝，v1 明确「不做价税分离」）。这是口径相邻区的结构性改动：需要先裁定「税额如何进摊销表的税列、差额征税的扣除额（借款利息/债券利息/车辆购置税）如何显式列示」（§1 P-12、§4 增值税口径），再动 `StandardCashFlowBuilder`。在裁定前不得为了验收标准 2 而解冻。
+3. 实现顺序建议：先落承担方（含 FeesEditor UI + DTO + 方向测试），验收标准 1 单独达成；验收标准 2 等第二步。
+
+**实施前须补的钉子**：`CashFlowType.FEE` 的 SAME_DAY_ORDER 在 t0 已有固定序（PRINCIPAL → FEE → DEPOSIT）；出租人承担的费用是 t0 OUTFLOW，方向翻转不影响排序语义，测试钉住即可。

@@ -2,6 +2,8 @@ package io.github.cuukenn.fincalc.server.dto;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.github.cuukenn.fincalc.domain.model.DepositSettlement;
+import io.github.cuukenn.fincalc.domain.model.DepositTiming;
 import io.github.cuukenn.fincalc.domain.model.FeeChargeMode;
 import io.github.cuukenn.fincalc.domain.model.PaymentFrequency;
 import io.github.cuukenn.fincalc.domain.model.PaymentTiming;
@@ -105,12 +107,28 @@ public final class CalculationRequestDto {
 
     private final BigDecimal residualValue;
 
-    @Schema(description = "残值处理：SEPARATE（残值期末单独回收）/ BALLOON_IN_RENT（摊入租金）",
+    @Schema(description = "残值处理：SEPARATE（残值期末单独回收）/ BALLOON_IN_RENT（摊入租金）。"
+            + "房贷场景没有残值语义：本字段是满足 LeaseElement 必填校验的契约形状"
+            + "（form-field-gaps 14-B 裁定），取 SEPARATE 且 residualValue=null，"
+            + "不改变任何一期现金流，房贷结果区不产出任何残值读数",
             example = "SEPARATE")
     private final ResidualHandling residualHandling;
 
-    @Schema(description = "保证金金额；缺省 = 无保证金")
+    @Schema(description = "保证金金额；缺省 = 无保证金。保证金 > 0 时本次测算的现金流基准自动为 "
+            + "INCLUDE_DEPOSIT（保证金进入 IRR 现金流）")
     private final BigDecimal deposit;
+
+    @Schema(description = "保证金收取时点：UPFRONT（起租日，缺省）/ WITH_FIRST_RENT（随首期租金）")
+    private final DepositTiming depositTiming;
+
+    @Schema(description = "保证金退还/抵扣方式：REFUND（到期退还，缺省）/ OFFSET_PRINCIPAL"
+            + "（抵减租赁本金，租金按净本金测算）/ OFFSET_FINAL_RENT（冲抵末期租金）；"
+            + "OFFSET_PRINCIPAL 下不得携带 depositInterestRate（FCS-DOM-1019）")
+    private final DepositSettlement depositSettlement;
+
+    @Schema(description = "保证金计息年利率，小数形式（0.03 = 3%）；缺省 = 不计息。"
+            + "利息按 ACT/360 实际占用天数、算头不算尾、单利，单独成行返还")
+    private final BigDecimal depositInterestRate;
 
     @Schema(description = "增值税率，小数形式（0.06 = 6%）", example = "0.06")
     private final BigDecimal vatRate;
@@ -166,6 +184,9 @@ public final class CalculationRequestDto {
             @JsonProperty("residualValue") BigDecimal residualValue,
             @JsonProperty("residualHandling") ResidualHandling residualHandling,
             @JsonProperty("deposit") BigDecimal deposit,
+            @JsonProperty("depositTiming") DepositTiming depositTiming,
+            @JsonProperty("depositSettlement") DepositSettlement depositSettlement,
+            @JsonProperty("depositInterestRate") BigDecimal depositInterestRate,
             @JsonProperty("vatRate") BigDecimal vatRate,
             @JsonProperty("currency") String currency,
             @JsonProperty("method") String method,
@@ -194,6 +215,9 @@ public final class CalculationRequestDto {
         this.residualValue = residualValue;
         this.residualHandling = residualHandling;
         this.deposit = deposit;
+        this.depositTiming = depositTiming;
+        this.depositSettlement = depositSettlement;
+        this.depositInterestRate = depositInterestRate;
         this.vatRate = vatRate;
         this.currency = currency;
         this.method = method;
@@ -284,6 +308,18 @@ public final class CalculationRequestDto {
 
     public BigDecimal deposit() {
         return deposit;
+    }
+
+    public DepositTiming depositTiming() {
+        return depositTiming;
+    }
+
+    public DepositSettlement depositSettlement() {
+        return depositSettlement;
+    }
+
+    public BigDecimal depositInterestRate() {
+        return depositInterestRate;
     }
 
     public BigDecimal vatRate() {

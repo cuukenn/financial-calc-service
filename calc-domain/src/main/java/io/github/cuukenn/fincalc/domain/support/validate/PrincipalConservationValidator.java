@@ -60,7 +60,7 @@ public final class PrincipalConservationValidator implements Validator {
      * than the input.
      */
     private static BigDecimal expectedRepayablePrincipal(LeaseElement element) {
-        BigDecimal repayable = element.principal().subtract(element.outstandingResidual());
+        BigDecimal repayable = element.measuredPrincipal().subtract(element.outstandingResidual());
         return repayable.setScale(element.rounding().scale(), element.rounding().mode());
     }
 }

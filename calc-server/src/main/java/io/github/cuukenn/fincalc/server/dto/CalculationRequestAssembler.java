@@ -71,8 +71,21 @@ public final class CalculationRequestAssembler {
             }
             ruleSet = ruleCompiler.compile(rows, element, allowPartial);
         }
-        CalculationOptions options = new CalculationOptions(allowPartial, CashFlowBasis.INCLUDE_FEES);
+        CalculationOptions options = new CalculationOptions(allowPartial, cashFlowBasis(dto));
         return new CalculationRequest(element, ruleSet, options);
+    }
+
+    /**
+     * The cash-flow basis of one run: a request carrying a positive deposit runs under
+     * {@link CashFlowBasis#INCLUDE_DEPOSIT} so the deposit genuinely enters the investment and the
+     * IRR — the whole point of the 收取时点/计息/退还抵扣 fields (form-field-gaps ticket 03) — and
+     * every other request keeps the v1 {@link CashFlowBasis#INCLUDE_FEES} basis, so a deposit-free
+     * run is byte-for-byte what it was. A caller that wants the deposit excluded prices a
+     * deposit-free element instead; there is no per-request basis override in v1.
+     */
+    private static CashFlowBasis cashFlowBasis(CalculationRequestDto dto) {
+        boolean hasDeposit = dto.deposit() != null && dto.deposit().signum() > 0;
+        return hasDeposit ? CashFlowBasis.INCLUDE_DEPOSIT : CashFlowBasis.INCLUDE_FEES;
     }
 
     private LeaseElement buildElement(CalculationRequestDto dto) {
@@ -105,6 +118,9 @@ public final class CalculationRequestAssembler {
                 .residualValue(dto.residualValue())
                 .residualHandling(dto.residualHandling())
                 .deposit(dto.deposit())
+                .depositTiming(dto.depositTiming())
+                .depositSettlement(dto.depositSettlement())
+                .depositInterestRate(dto.depositInterestRate())
                 .fees(toFees(dto.fees()))
                 .explicitRents(dto.explicitRents())
                 .vatRate(dto.vatRate())

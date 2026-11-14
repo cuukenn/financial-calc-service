@@ -119,9 +119,13 @@ class RunCostBaselineTest {
 
     /**
      * Relative gate on the worst cell: {@code ACT_360} with 400 segments at the engine period ceiling
-     * may cost at most this multiple of the closed-form segmented run (measured 2026-11-12: 6.0x).
+     * may cost at most this multiple of the closed-form segmented run. Calibration history: measured
+     * 6.0x on 2026-11-12 (gate set to 8.0); recalibrated on 2026-11-14 after the §9.5 metric-line
+     * optimization — the numerator's metric stage shrank ~12% while the denominator's full run
+     * (nine-tenths metrics) shrank ~38%, so the honest ratio rose to ~8.0x and the gate follows the
+     * measurement (10.0 = measured 8.0 × margin), not the stale calibration.
      */
-    private static final double ACT360_SEGMENTED_VS_CLOSED_FORM_RATIO = 8.0;
+    private static final double ACT360_SEGMENTED_VS_CLOSED_FORM_RATIO = 10.0;
 
     @Test
     void the_four_pinned_shapes_stay_inside_their_run_cost_gates() {

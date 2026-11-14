@@ -26,6 +26,8 @@ import type {
   CalculationRequest,
   CalculationResult,
   FeeInput,
+  DepositSettlement,
+  DepositTiming,
   PaymentFrequency,
   PaymentTiming,
   ResidualHandling,
@@ -84,6 +86,12 @@ const METHOD_VALUES = [
 ] as const
 
 const RESIDUAL_HANDLING_VALUES: ResidualHandling[] = ['SEPARATE', 'BALLOON_IN_RENT']
+const DEPOSIT_TIMING_VALUES: DepositTiming[] = ['UPFRONT', 'WITH_FIRST_RENT']
+const DEPOSIT_SETTLEMENT_VALUES: DepositSettlement[] = [
+  'REFUND',
+  'OFFSET_PRINCIPAL',
+  'OFFSET_FINAL_RENT',
+]
 
 /** RateChangePolicy 枚举（分段利率生效策略）。 */
 const RATE_CHANGE_POLICY_VALUES = ['RESOLVE', 'FIXED_RENT', 'DRIFT'] as const
@@ -113,6 +121,17 @@ const residualHandlingOptions = computed(() =>
 )
 const rateChangePolicyOptions = computed(() =>
   RATE_CHANGE_POLICY_VALUES.map((value) => ({ value, label: t(`enums.rateChangePolicy.${value}`) })),
+)
+const depositTimingOptions = computed(() =>
+  DEPOSIT_TIMING_VALUES.map((value) => ({ value, label: t(`enums.depositTiming.${value}`) })),
+)
+const depositSettlementOptions = computed(() =>
+  DEPOSIT_SETTLEMENT_VALUES.map((value) => ({ value, label: t(`enums.depositSettlement.${value}`) })),
+)
+
+/** 名义年利率的小数字符串（提前结清试算的罚息默认占位用）；与 payload 同一套换算。 */
+const nominalRateDecimal = computed(() =>
+  parseRateInput(form.nominalRate) ?? form.nominalRate.trim(),
 )
 
 /**
@@ -157,6 +176,10 @@ interface FormState {
   residualValue: string
   residualHandling: ResidualHandling
   deposit: string
+  depositTiming: DepositTiming
+  depositSettlement: DepositSettlement
+  /** 保证金年利率的展示值（R92-5 百分数口径：3 / 3%），提交前换算为小数字符串；空 = 不计息。 */
+  depositInterestRate: string
   /** 增值税率的展示值（R92-5 百分数口径：6 / 6%），提交前换算为小数字符串。 */
   vatRate: string
   interestOnlyPeriods: number
@@ -191,6 +214,9 @@ function defaults(): FormState {
     residualValue: '0',
     residualHandling: 'SEPARATE',
     deposit: '0',
+    depositTiming: 'UPFRONT',
+    depositSettlement: 'REFUND',
+    depositInterestRate: '',
     vatRate: '6',
     interestOnlyPeriods: 0,
     fullGracePeriods: 0,
@@ -349,6 +375,13 @@ function buildRequest(): CalculationRequest {
     residualValue: form.residualValue.trim(),
     residualHandling: form.residualHandling,
     deposit: form.deposit.trim(),
+    depositTiming: form.depositTiming,
+    depositSettlement: form.depositSettlement,
+    // 保证金年利率为百分数口径展示值（3 / 3% → 0.03）；空 = 不计息，不携带该键。
+    ...(form.depositInterestRate.trim() === ''
+      ? {}
+      : { depositInterestRate: parseRateInput(form.depositInterestRate)
+              ?? form.depositInterestRate.trim() }),
     // R92-5：增值税率为百分数口径展示值（6 / 6%），提交前换算为小数字符串。
     vatRate: parseRateInput(form.vatRate) ?? form.vatRate.trim(),
   }
@@ -730,6 +763,37 @@ function onReset(): void {
                 <FormItem :label="t('form.feesOther.deposit')" name="deposit">
                   <Input v-model:value="form.deposit" data-test="deposit" />
                 </FormItem>
+                <FormItem :label="t('form.feesOther.depositTiming')" name="depositTiming">
+                  <Select
+                    v-model:value="form.depositTiming"
+                    :options="depositTimingOptions"
+                    :popup-match-select-width="false"
+                    style="width: 100%"
+                    data-test="deposit-timing"
+                  />
+                </FormItem>
+                <FormItem :label="t('form.feesOther.depositSettlement')" name="depositSettlement">
+                  <Select
+                    v-model:value="form.depositSettlement"
+                    :options="depositSettlementOptions"
+                    :popup-match-select-width="false"
+                    style="width: 100%"
+                    data-test="deposit-settlement"
+                  />
+                  <Typography.Text type="secondary" style="display: block; margin-top: 4px">
+                    {{ t('form.feesOther.depositSettlementHint') }}
+                  </Typography.Text>
+                </FormItem>
+                <FormItem :label="t('form.feesOther.depositInterestRate')" name="depositInterestRate">
+                  <Input
+                    v-model:value="form.depositInterestRate"
+                    :placeholder="t('form.feesOther.depositInterestRatePh')"
+                    data-test="deposit-interest-rate"
+                  />
+                  <Typography.Text type="secondary" style="display: block; margin-top: 4px">
+                    {{ t('form.feesOther.depositInterestRateHint') }}
+                  </Typography.Text>
+                </FormItem>
                 <FormItem :label="t('form.feesOther.initialDirectCosts')" name="initialDirectCosts">
                   <Input v-model:value="form.initialDirectCosts" :placeholder="t('form.feesOther.amountPh')" data-test="initial-direct-costs" />
                 </FormItem>
@@ -816,7 +880,8 @@ function onReset(): void {
     </Col>
 
     <Col :xs="24" :lg="14">
-      <ResultPanel v-if="result" :result="result" scenario="lease" />
+      <ResultPanel v-if="result" :result="result" scenario="lease"
+        :day-count-code="form.dayCountCode" :annual-rate="nominalRateDecimal" />
     </Col>
   </Row>
 </template>
