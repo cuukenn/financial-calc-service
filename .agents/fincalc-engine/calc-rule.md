@@ -1,8 +1,3 @@
----
-name: fincalc-rule
-description: 规则引擎模块的不可变架构——表达式流水线、规则编译校验、函数注册表单源与脚本加载的 fail-fast 契约。改动 calc-rule 前必读。
----
-
 # calc-rule：规则引擎
 
 ## 职责边界

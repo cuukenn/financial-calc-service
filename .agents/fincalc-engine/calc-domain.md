@@ -1,8 +1,3 @@
----
-name: fincalc-domain
-description: 领域模块的不可变架构——模型不可变、端口/支持实现分层、算法模板骨架、校验链与指标契约。改动 calc-domain 前必读。
----
-
 # calc-domain：领域模型、端口与算法
 
 ## 职责边界

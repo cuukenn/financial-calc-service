@@ -1,8 +1,3 @@
----
-name: fincalc-common
-description: 共享原语模块的不可变架构——金额/日期、错误码体系与扩展点注册表的职责边界与纪律。改动 calc-common 前必读。
----
-
 # calc-common：共享原语
 
 ## 职责边界
