@@ -32,17 +32,6 @@ const enUS: typeof zhCN = {
       commenceDate: 'Commencement date',
       firstRentDate: 'First rent payment date',
       periods: 'Periods',
-      currency: 'Currency',
-      // R92-2: common-currency select (label "English name (code)", value = ISO-4217 code).
-      currencies: {
-        CNY: 'Chinese Yuan (CNY)',
-        USD: 'US Dollar (USD)',
-        EUR: 'Euro (EUR)',
-        HKD: 'Hong Kong Dollar (HKD)',
-        JPY: 'Japanese Yen (JPY)',
-        GBP: 'British Pound (GBP)',
-        SGD: 'Singapore Dollar (SGD)',
-      },
       frequency: 'Payment frequency',
       timing: 'Payment timing',
       dayCountCode: 'Day count convention',
@@ -87,7 +76,6 @@ const enUS: typeof zhCN = {
     feesOther: {
       title: 'Fees & Others',
       fees: {
-        vatRatePh: 'VAT rate, e.g. 6 or 6%',
         includeIrr: 'Include in IRR',
         title: 'Fees (optional)',
         typePh: 'Fee type',
@@ -114,10 +102,6 @@ const enUS: typeof zhCN = {
       guaranteedResidualHint: 'Cash actually collected at maturity (CAS 21 lease receipts)',
       unguaranteedResidual: 'Unguaranteed residual',
       unguaranteedResidualHint: 'Feeds the lease implicit rate only; it never becomes cash',
-      vatRate: 'VAT rate',
-      // R92-5: percent-style input (6 or 6% → 0.06), with China VAT bracket quick picks.
-      vatRatePh: 'e.g. 6 or 6%',
-      vatRateFormat: 'Invalid format: enter a VAT rate like 6 or 6%',
     },
     submit: 'Calculate',
     submitting: 'Calculating…',

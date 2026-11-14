@@ -141,11 +141,7 @@ public final class CalculationRequestDto {
             + "FCS-CALC-3010/3011）；测算内核产品盲（R100）。缺省路径与历史请求逐字节一致")
     private final ProductProfile product;
 
-    @Schema(description = "增值税率，小数形式（0.06 = 6%）", example = "0.06")
-    private final BigDecimal vatRate;
 
-    @Schema(description = "币种，ISO-4217 代码", example = "CNY")
-    private final String currency;
 
     @Schema(description = "还款方式 code（RepaymentMethodId 枚举名，可选值见 GET /api/v1/algorithms）："
             + "EQUAL_INSTALLMENT / EQUAL_PRINCIPAL / INTEREST_FIRST / PRINCIPAL_FIRST / "
@@ -198,8 +194,6 @@ public final class CalculationRequestDto {
             @JsonProperty("depositTiming") DepositTiming depositTiming,
             @JsonProperty("depositSettlement") DepositSettlement depositSettlement,
             @JsonProperty("depositInterestRate") BigDecimal depositInterestRate,
-            @JsonProperty("vatRate") BigDecimal vatRate,
-            @JsonProperty("currency") String currency,
             @JsonProperty("method") String method,
             @JsonProperty("gracePeriod") GracePeriodDto gracePeriod,
             @JsonProperty("rateChangePolicy") RateChangePolicy rateChangePolicy,
@@ -233,8 +227,6 @@ public final class CalculationRequestDto {
         this.depositInterestRate = depositInterestRate;
         this.firstPeriodStub = firstPeriodStub;
         this.product = product;
-        this.vatRate = vatRate;
-        this.currency = currency;
         this.method = method;
         this.gracePeriod = gracePeriod;
         this.rateChangePolicy = rateChangePolicy;
@@ -343,14 +335,6 @@ public final class CalculationRequestDto {
 
     public ProductProfile product() {
         return product;
-    }
-
-    public BigDecimal vatRate() {
-        return vatRate;
-    }
-
-    public String currency() {
-        return currency;
     }
 
     public String method() {
@@ -504,9 +488,7 @@ public final class CalculationRequestDto {
                 + "（出租人承担、出租人支付第三方 —— 事件表记流出，IRR 反向变化）")
         private final FeeOwner owner;
 
-        @Schema(description = "该笔费用的增值税率，小数形式", example = "0.06")
-        private final BigDecimal vatRate;
-
+    
         @Schema(description = "是否计入 IRR 现金流；缺省 false", example = "false")
         private final Boolean includeInIrr;
 
@@ -516,14 +498,12 @@ public final class CalculationRequestDto {
                 @JsonProperty("amount") BigDecimal amount,
                 @JsonProperty("chargeMode") FeeChargeMode chargeMode,
                 @JsonProperty("owner") FeeOwner owner,
-                @JsonProperty("vatRate") BigDecimal vatRate,
-                @JsonProperty("includeInIrr") Boolean includeInIrr) {
+                    @JsonProperty("includeInIrr") Boolean includeInIrr) {
             this.type = type;
             this.amount = amount;
             this.chargeMode = chargeMode;
             this.owner = owner;
-            this.vatRate = vatRate;
-            this.includeInIrr = includeInIrr;
+                this.includeInIrr = includeInIrr;
         }
 
         public String type() {
@@ -540,10 +520,6 @@ public final class CalculationRequestDto {
 
         public FeeOwner owner() {
             return owner;
-        }
-
-        public BigDecimal vatRate() {
-            return vatRate;
         }
 
         public Boolean includeInIrr() {

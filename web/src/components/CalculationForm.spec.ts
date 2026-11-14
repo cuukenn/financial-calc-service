@@ -210,12 +210,11 @@ describe('CalculationForm', () => {
     expect(req.principal).toBe('1000000')
   })
 
-  it('sends per-fee vatRate and includeInIrr from the editor (U5)', async () => {
+  it('sends per-fee includeInIrr from the editor (U5)', async () => {
     const wrapper = mountWithI18n(CalculationForm)
     await wrapper.find('[data-test="fee-add"]').trigger('click')
     await wrapper.find('[data-test="fee-row"] input[placeholder="费用类型"]').setValue('HANDLING')
     await wrapper.find('[data-test="fee-row"] input[placeholder="金额"]').setValue('20000')
-    await wrapper.find('[data-test="fee-vat-rate"]').setValue('6')
     // AntD Checkbox 的 attrs 落点不可靠：按行内 checkbox 类型选择。
     await wrapper.find('[data-test="fee-row"] input[type="checkbox"]').setValue(true)
     await submit(wrapper)
@@ -224,8 +223,6 @@ describe('CalculationForm', () => {
     expect(req.fees).toHaveLength(1)
     expect(req.fees![0]!.type).toBe('HANDLING')
     expect(req.fees![0]!.amount).toBe('20000')
-    // 税率百分数口径展示值 6 → 0.06（R92-5 同款换算）；IRR 开关显式 true。
-    expect(req.fees![0]!.vatRate).toBe('0.06')
     expect(req.fees![0]!.includeInIrr).toBe(true)
   })
 
@@ -283,60 +280,6 @@ describe('CalculationForm', () => {
     expect(wrapper.text()).toContain('Purchase option price (nominal)')
   })
 
-  it('renders the currency select with common currencies and submits the ISO code (R92-2)', async () => {
-    const wrapper = mountWithI18n(CalculationForm)
-
-    // 触发器显示「中文名（码）」，默认人民币。
-    const trigger = wrapper.find('[data-test="currency"]')
-    expect(trigger.text()).toContain('人民币（CNY）')
-
-    await trigger.find('.ant-select-selector').trigger('mousedown')
-    await flushPromises()
-    await flushPromises()
-
-    // AntD 下拉挂在 body 上且先前用例的弹层可能残留：锁定包含币种清单的那个弹层。
-    const currencyDropdown = [...document.querySelectorAll('.ant-select-dropdown')].find((d) =>
-      d.textContent?.includes('人民币（CNY）'),
-    )
-    expect(currencyDropdown).toBeTruthy()
-
-    const options = [...currencyDropdown!.querySelectorAll('.ant-select-item-option')]
-    const labels = options.map((o) => o.textContent?.trim())
-    expect(labels).toEqual([
-      '人民币（CNY）',
-      '美元（USD）',
-      '欧元（EUR）',
-      '港币（HKD）',
-      '日元（JPY）',
-      '英镑（GBP）',
-      '新加坡元（SGD）',
-    ])
-
-    // show-search：按本地化标签过滤（中文名或 ISO 码均可命中）。
-    await trigger.find('input').setValue('美元')
-    await flushPromises()
-    const filtered = [...currencyDropdown!.querySelectorAll('.ant-select-item-option')].filter(
-      (o) => !o.getAttribute('style')?.includes('display: none') && !o.classList.contains('ant-select-item-option-hidden'),
-    )
-    expect(filtered.map((o) => o.textContent?.trim())).toEqual(['美元（USD）'])
-
-    // 选择美元 → 提交值为 ISO-4217 码 USD（后端契约不变）。
-    await trigger.find('input').setValue('')
-    await flushPromises()
-    const usd = [...currencyDropdown!.querySelectorAll('.ant-select-item-option')].find((o) =>
-      o.textContent?.includes('USD'),
-    )
-    expect(usd).toBeTruthy()
-    usd!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
-    usd!.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
-    usd!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    await flushPromises()
-    await submit(wrapper)
-
-    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
-    expect(req.currency).toBe('USD')
-  })
-
   it('converts percent-style rate inputs to decimal strings on submit (R92-6)', async () => {
     const wrapper = mountWithI18n(CalculationForm)
     // 默认展示值 6 → 提交 0.06（黄金请求不变）。
@@ -386,37 +329,6 @@ describe('CalculationForm', () => {
     expect(colClasses('[data-test="rate-change-policy"]')).toContain('ant-col-12')
   })
 
-  it('fills the VAT rate from the China bracket presets and submits decimals (R92-5 / R93-4)', async () => {
-    const wrapper = mountWithI18n(CalculationForm)
-
-    // R93-4：档次快选位于增值税率 Form.Item 的 extra 插槽（输入框正下方内联一行），
-    // 不再有独立「增值税档次」标签（竖排一字一行的旧实现彻底移除）。
-    const presets = wrapper.find('[data-test="vat-rate-presets"]')
-    expect(presets.exists()).toBe(true)
-    expect(presets.element.closest('.ant-form-item-extra')).not.toBeNull()
-    expect(wrapper.text()).not.toContain('增值税档次')
-    for (const preset of ['13%', '9%', '6%', '0%']) {
-      expect(presets.text()).toContain(preset)
-    }
-
-    // 快选按钮以百分数口径回填展示值。
-    await wrapper.find('[data-test="vat-rate-preset-13"]').trigger('click')
-    await flushPromises()
-    expect((wrapper.find('[data-test="vat-rate"]').element as HTMLInputElement).value).toBe('13')
-
-    await submit(wrapper)
-    const req = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
-    expect(req.vatRate).toBe('0.13')
-
-    // 0 档：提交 "0"。
-    vi.mocked(calculate).mockClear()
-    await wrapper.find('[data-test="vat-rate-preset-0"]').trigger('click')
-    await flushPromises()
-    await submit(wrapper)
-    const req0 = vi.mocked(calculate).mock.calls[0][0] as CalculationRequest
-    expect(req0.vatRate).toBe('0')
-  })
-
   it('submits a correctly-shaped CalculationRequest on golden defaults', async () => {
     const wrapper = mountWithI18n(CalculationForm)
     await submit(wrapper)
@@ -430,7 +342,6 @@ describe('CalculationForm', () => {
     expect(req.periods).toBe(12)
     expect(req.frequency).toBe('MONTHLY')
     expect(req.timing).toBe('IN_ARREARS')
-    expect(req.currency).toBe('CNY')
     expect(req.dayCountCode).toBe('THIRTY_360')
     expect(req.dateRollCode).toBe('NONE')
     expect(req.rateChangePolicy).toBe('RESOLVE')
@@ -442,7 +353,6 @@ describe('CalculationForm', () => {
     expect(req.depositTiming).toBe('UPFRONT')
     expect(req.depositSettlement).toBe('REFUND')
     expect(req).not.toHaveProperty('depositInterestRate')
-    expect(req.vatRate).toBe('0.06')
     expect(req).not.toHaveProperty('ruleRows')
     expect(req).not.toHaveProperty('explicitRents')
     expect(req).not.toHaveProperty('gracePeriod')
@@ -502,11 +412,10 @@ describe('CalculationForm', () => {
     expect(rentStructure.find('[data-test="interest-only-periods"]').exists()).toBe(true)
     expect(rentStructure.find('[data-test="rents-editor"]').exists()).toBe(false)
 
-    // 费用与其他：费用编辑器 + 残值/保证金/税率。
+    // 费用与其他：费用编辑器 + 残值/保证金。
     const feesOther = wrapper.find('[data-test="card-fees-other"]')
     expect(feesOther.find('[data-test="fee-add"]').exists()).toBe(true)
     expect(feesOther.find('[data-test="residual-value"]').exists()).toBe(true)
-    expect(feesOther.find('[data-test="vat-rate"]').exists()).toBe(true)
   })
 
   it('shows the cash-flow tab as a placeholder after a successful calculation', async () => {
@@ -724,7 +633,6 @@ describe('CalculationForm 显式重置 (Task 6 §2)', () => {
     expect(wrapper.find('[data-test="day-count-code"]').text()).toContain('30/360')
     expect(value('residual-value')).toBe('0')
     expect(value('deposit')).toBe('0')
-    expect(value('vat-rate')).toBe('6')
     expect((wrapper.find('input[value="EQUAL_INSTALLMENT"]').element as HTMLInputElement).checked).toBe(true)
 
     await submit(wrapper)

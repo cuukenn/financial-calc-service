@@ -99,10 +99,8 @@ class PeriodBuilderTest {
                 .residualValue(BigDecimal.ZERO)
                 .residualHandling(ResidualHandling.SEPARATE)
                 .deposit(BigDecimal.ZERO)
-                .vatRate(BigDecimal.ZERO)
                 .method(RepaymentMethodId.EQUAL_INSTALLMENT)
                 .gracePeriod(GracePeriod.none())
-                .currency("CNY")
                 .rateChangePolicy(RateChangePolicy.RESOLVE);
     }
 }

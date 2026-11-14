@@ -369,10 +369,8 @@ class LeaseElementTest {
                 .residualHandling(ResidualHandling.SEPARATE)
                 .deposit(BigDecimal.ZERO)
                 .fees(Collections.emptyList())
-                .vatRate(null)
                 .method(RepaymentMethodId.EQUAL_INSTALLMENT)
                 .gracePeriod(GracePeriod.none())
-                .currency("CNY")
                 .rateChangePolicy(RateChangePolicy.RESOLVE);
     }
 }

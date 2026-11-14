@@ -216,7 +216,6 @@ class FunctionScriptLoaderTest {
                 .residualHandling(ResidualHandling.SEPARATE)
                 .method(RepaymentMethodId.RULE_DRIVEN)
                 .gracePeriod(GracePeriod.none())
-                .currency("CNY")
                 .rateChangePolicy(RateChangePolicy.RESOLVE)
                 .build();
     }

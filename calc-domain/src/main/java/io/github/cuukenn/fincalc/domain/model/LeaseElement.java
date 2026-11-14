@@ -50,10 +50,8 @@ public final class LeaseElement {
     private final boolean firstPeriodStub;
     private final List<FeeItem> fees;
     private final List<BigDecimal> explicitRents;
-    private final BigDecimal vatRate;
     private final RepaymentMethodId method;
     private final GracePeriod gracePeriod;
-    private final String currency;
     private final RateChangePolicy rateChangePolicy;
 
     private LeaseElement(Builder builder) {
@@ -87,10 +85,8 @@ public final class LeaseElement {
         this.firstPeriodStub = builder.firstPeriodStub;
         this.fees = Collections.unmodifiableList(new ArrayList<>(builder.fees));
         this.explicitRents = Collections.unmodifiableList(new ArrayList<>(builder.explicitRents));
-        this.vatRate = builder.vatRate;
         this.method = builder.method;
         this.gracePeriod = builder.gracePeriod;
-        this.currency = builder.currency;
         this.rateChangePolicy = builder.rateChangePolicy;
     }
 
@@ -141,7 +137,6 @@ public final class LeaseElement {
         requireField(residualHandling, "residualHandling");
         requireField(method, "method");
         requireField(gracePeriod, "gracePeriod");
-        requireField(currency, "currency");
         requireField(rateChangePolicy, "rateChangePolicy");
     }
 
@@ -483,11 +478,6 @@ public final class LeaseElement {
         return explicitRents;
     }
 
-    /** VAT rate; {@code null} means prices include tax. */
-    public BigDecimal vatRate() {
-        return vatRate;
-    }
-
     /** Identifier of the amortization algorithm. */
     public RepaymentMethodId method() {
         return method;
@@ -496,11 +486,6 @@ public final class LeaseElement {
     /** Grace period at the start of the lease. */
     public GracePeriod gracePeriod() {
         return gracePeriod;
-    }
-
-    /** Currency code, e.g. {@code CNY}. */
-    public String currency() {
-        return currency;
     }
 
     /** How the schedule reacts to a mid-term rate change. */
@@ -536,10 +521,8 @@ public final class LeaseElement {
         private boolean firstPeriodStub;
         private List<FeeItem> fees = Collections.emptyList();
         private List<BigDecimal> explicitRents = Collections.emptyList();
-        private BigDecimal vatRate;
         private RepaymentMethodId method;
         private GracePeriod gracePeriod;
-        private String currency;
         private RateChangePolicy rateChangePolicy;
 
         private Builder() {
@@ -571,10 +554,8 @@ public final class LeaseElement {
             this.firstPeriodStub = source.firstPeriodStub;
             this.fees = source.fees;
             this.explicitRents = source.explicitRents;
-            this.vatRate = source.vatRate;
             this.method = source.method;
             this.gracePeriod = source.gracePeriod;
-            this.currency = source.currency;
             this.rateChangePolicy = source.rateChangePolicy;
         }
 
@@ -722,11 +703,6 @@ public final class LeaseElement {
             return this;
         }
 
-        public Builder vatRate(BigDecimal vatRate) {
-            this.vatRate = vatRate;
-            return this;
-        }
-
         public Builder method(RepaymentMethodId method) {
             this.method = method;
             return this;
@@ -734,11 +710,6 @@ public final class LeaseElement {
 
         public Builder gracePeriod(GracePeriod gracePeriod) {
             this.gracePeriod = gracePeriod;
-            return this;
-        }
-
-        public Builder currency(String currency) {
-            this.currency = currency;
             return this;
         }
 

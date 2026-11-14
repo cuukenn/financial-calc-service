@@ -147,10 +147,8 @@ public final class CalculationRequestAssembler {
                 .firstPeriodStub(Boolean.TRUE.equals(dto.firstPeriodStub()))
                 .fees(toFees(dto.fees()))
                 .explicitRents(dto.explicitRents())
-                .vatRate(dto.vatRate())
                 .method(parseMethod(dto.method()))
                 .gracePeriod(gracePeriod)
-                .currency(dto.currency())
                 .rateChangePolicy(dto.rateChangePolicy());
         return builder.build();
     }
@@ -195,7 +193,6 @@ public final class CalculationRequestAssembler {
                     .amount(dto.amount())
                     .chargeMode(dto.chargeMode())
                     .owner(dto.owner())
-                    .vatRate(dto.vatRate())
                     .includeInIrr(Boolean.TRUE.equals(dto.includeInIrr()))
                     .build());
         }

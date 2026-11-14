@@ -36,17 +36,6 @@ const zhCN = {
       commenceDate: '起租日',
       firstRentDate: '首期租金支付日',
       periods: '期数',
-      currency: '币种',
-      // R92-2：常见币种下拉（标签「中文名（码）」，提交值为 ISO-4217 码）。
-      currencies: {
-        CNY: '人民币（CNY）',
-        USD: '美元（USD）',
-        EUR: '欧元（EUR）',
-        HKD: '港币（HKD）',
-        JPY: '日元（JPY）',
-        GBP: '英镑（GBP）',
-        SGD: '新加坡元（SGD）',
-      },
       frequency: '支付频率',
       timing: '支付时点',
       dayCountCode: '计息基准',
@@ -89,7 +78,6 @@ const zhCN = {
     feesOther: {
       title: '费用与其他',
       fees: {
-        vatRatePh: '税率 如 6 或 6%',
         includeIrr: '计入 IRR',
         title: '费用（可选）',
         typePh: '费用类型',
@@ -116,10 +104,6 @@ const zhCN = {
       guaranteedResidualHint: '期末实际收取的担保金额（CAS 21 租赁收款额），进现金流表',
       unguaranteedResidual: '未担保余值',
       unguaranteedResidualHint: '只参与租赁内含利率的求解，不产生现金流',
-      vatRate: '增值税率',
-      // R92-5：百分数口径输入（6 或 6% → 0.06），附中国增值税档次快选。
-      vatRatePh: '如 6 或 6%',
-      vatRateFormat: '格式无效：请输入如 6 或 6% 的增值税率',
     },
     submit: '开始测算',
     submitting: '测算中…',

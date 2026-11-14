@@ -83,7 +83,7 @@ function lastRequest(): CalculationRequest {
 }
 
 /**
- * 归还给引擎的房贷请求只允许这 14 个键（R101 + R137），其余租赁专属键必须缺席。
+ * 归还给引擎的房贷请求只允许这 13 个键（R101 + R137），其余租赁专属键必须缺席。
  * `residualValue` / `residualHandling` / `rateChangePolicy` 在这里而不是缺席清单里：
  * 它们是 `LeaseElement` 的必填要素，服务端不为它们补默认（AGENTS.md §3.1 输入要素
  * 必须显式提供、缺失即报错），所以表单显式发送。与
@@ -100,7 +100,6 @@ const MORTGAGE_KEYS = [
   'timing',
   'dayCountCode',
   'dateRollCode',
-  'currency',
   'method',
   'residualValue',
   'residualHandling',
@@ -117,7 +116,6 @@ const ABSENT_LEASE_ONLY_KEYS = [
   'gracePeriod',
   'allowPartialRuleSet',
   'rounding',
-  'vatRate',
 ]
 
 describe('scenario tabs (R100: one page, one engine contract)', () => {
@@ -182,7 +180,7 @@ describe('MortgageForm payload mapping (R101)', () => {
     setLocale('zh-CN')
   })
 
-  it('submits exactly the 15 mortgage keys and omits every lease-only key (15 = 14 + product，issue 15/A1)', async () => {
+  it('submits exactly the 14 mortgage keys and omits every lease-only key (14 = 13 + product，issue 15/A1；arch-seams 死字段 currency 移除后 13+product)', async () => {
     const wrapper = mountWithI18n(MortgageForm)
     await submit(wrapper)
 
@@ -199,7 +197,6 @@ describe('MortgageForm payload mapping (R101)', () => {
       timing: 'IN_ARREARS',
       dayCountCode: 'THIRTY_360',
       dateRollCode: 'NONE',
-      currency: 'CNY',
       method: 'EQUAL_INSTALLMENT',
       // R137：这三个是 `LeaseElement` 必填要素，显式发送而非让服务端补默认。
       residualValue: '0',
@@ -207,8 +204,8 @@ describe('MortgageForm payload mapping (R101)', () => {
       rateChangePolicy: 'RESOLVE',
       product: 'MORTGAGE',
     })
-    // issue 15/A1：14 键 + product = 15 键（兼容性增量，缺省 LEASE 不影响既有调用方）。
-    expect(Object.keys(req)).toHaveLength(15)
+    // issue 15/A1：13 键 + product = 14 键（currency 死字段已按 2026-11-14 裁定移除）。
+    expect(Object.keys(req)).toHaveLength(14)
     expect(Object.keys(req).sort()).toEqual([...MORTGAGE_KEYS, 'product'].sort())
     expect(req.product).toBe('MORTGAGE')
     for (const key of ABSENT_LEASE_ONLY_KEYS) {
@@ -326,7 +323,7 @@ describe('MortgageForm 还款方式 gate (R109: ≤ 12 期 才可选到期一次
       residualHandling: 'SEPARATE',
       rateChangePolicy: 'RESOLVE',
     })
-    expect(Object.keys(lastRequest())).toHaveLength(15)
+    expect(Object.keys(lastRequest())).toHaveLength(14)
   })
 
   it('disables BULLET_LOAN at 13 months, resets a prior selection and never sends it', async () => {

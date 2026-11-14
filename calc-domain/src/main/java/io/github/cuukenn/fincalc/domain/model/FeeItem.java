@@ -11,7 +11,6 @@ public final class FeeItem {
     private final BigDecimal amount;
     private final FeeChargeMode chargeMode;
     private final FeeOwner owner;
-    private final BigDecimal vatRate;
     private final boolean includeInIrr;
 
     private FeeItem(Builder builder) {
@@ -21,7 +20,6 @@ public final class FeeItem {
         // 归一化在构造器：引擎读者永远拿到一个非空答案，未携带 owner 的既有要素保持
         // v1 姿态（承租人承担 = 出租人收取 = INFLOW）。
         this.owner = builder.owner == null ? FeeOwner.LESSEE : builder.owner;
-        this.vatRate = builder.vatRate;
         this.includeInIrr = builder.includeInIrr;
     }
 
@@ -52,11 +50,6 @@ public final class FeeItem {
         return owner;
     }
 
-    /** VAT rate applied to this fee; {@code null} means no separate VAT treatment. */
-    public BigDecimal vatRate() {
-        return vatRate;
-    }
-
     /** Whether the fee participates in the IRR cash flow. */
     public boolean includeInIrr() {
         return includeInIrr;
@@ -69,7 +62,6 @@ public final class FeeItem {
         private BigDecimal amount;
         private FeeChargeMode chargeMode;
         private FeeOwner owner;
-        private BigDecimal vatRate;
         private boolean includeInIrr;
 
         private Builder() {
@@ -93,11 +85,6 @@ public final class FeeItem {
         /** Who bears the fee; {@code null} means the v1 posture (lessee-borne inflow). */
         public Builder owner(FeeOwner owner) {
             this.owner = owner;
-            return this;
-        }
-
-        public Builder vatRate(BigDecimal vatRate) {
-            this.vatRate = vatRate;
             return this;
         }
 

@@ -140,20 +140,6 @@ const nominalRateDecimal = computed(() =>
  * 标签为「中文名（码）」（en-US 为英文名（码）），随语言切换响应式更新；
  * show-search 按本地化标签模糊过滤（码或名称均可命中）。
  */
-const CURRENCY_CODES = ['CNY', 'USD', 'EUR', 'HKD', 'JPY', 'GBP', 'SGD'] as const
-
-const currencyOptions = computed(() =>
-  CURRENCY_CODES.map((code) => ({ value: code, label: t(`form.basic.currencies.${code}`) })),
-)
-
-function filterCurrencyOption(input: string, option: { label?: unknown }): boolean {
-  const label = typeof option.label === 'string' ? option.label : ''
-  return label.toLowerCase().includes(input.trim().toLowerCase())
-}
-
-/** R92-5：中国增值税档次快选（百分数口径展示值，提交前经 parseRateInput 换算为小数）。 */
-const VAT_RATE_PRESETS = ['13', '9', '6', '0'] as const
-
 interface FormState {
   principal: string
   /** CAS 21 计量链（全部选填）：价值 + IDC − 首付 = 融资额。 */
@@ -169,7 +155,6 @@ interface FormState {
   periods: number
   frequency: PaymentFrequency
   timing: PaymentTiming
-  currency: string
   dayCountCode: string
   dateRollCode: string
   rateChangePolicy: string
@@ -182,8 +167,6 @@ interface FormState {
   /** 保证金年利率的展示值（R92-5 百分数口径：3 / 3%），提交前换算为小数字符串；空 = 不计息。 */
   depositInterestRate: string
   firstPeriodStub: boolean
-  /** 增值税率的展示值（R92-5 百分数口径：6 / 6%），提交前换算为小数字符串。 */
-  vatRate: string
   interestOnlyPeriods: number
   fullGracePeriods: number
 }
@@ -208,7 +191,6 @@ function defaults(): FormState {
     periods: 12,
     frequency: 'MONTHLY',
     timing: 'IN_ARREARS',
-    currency: 'CNY',
     dayCountCode: 'THIRTY_360',
     dateRollCode: 'NONE',
     rateChangePolicy: 'RESOLVE',
@@ -220,7 +202,6 @@ function defaults(): FormState {
     depositSettlement: 'REFUND',
     depositInterestRate: '',
     firstPeriodStub: false,
-    vatRate: '6',
     interestOnlyPeriods: 0,
     fullGracePeriods: 0,
   }
@@ -276,7 +257,6 @@ const rules = computed<Record<string, Rule[]>>(() => ({
   dayCountCode: [{ required: true, message: t('form.validation.dayCountCode') }],
   dateRollCode: [{ required: true, message: t('form.validation.dateRollCode') }],
   method: [{ required: true, message: t('form.validation.method') }],
-  vatRate: [rateFormatRule(t('form.feesOther.vatRateFormat'))],
 }))
 
 /** EXPLICIT_RENT 的逐期租金（长度始终与期数对齐）。 */
@@ -369,8 +349,6 @@ function buildRequest(): CalculationRequest {
     periods: form.periods ?? 0,
     frequency: form.frequency,
     timing: form.timing,
-    // R92-2：币种下拉的值即 ISO-4217 码字符串。
-    currency: form.currency,
     dayCountCode: form.dayCountCode,
     dateRollCode: form.dateRollCode,
     rateChangePolicy: form.rateChangePolicy,
@@ -388,8 +366,6 @@ function buildRequest(): CalculationRequest {
     // 首期 stub（ticket 05）：仅打开时携带，缺省 false 不发键（契约显式优于缺席的反例——
     // 这个键的缺省就是「不做拆分」，与引擎默认逐位一致）。
     ...(form.firstPeriodStub ? { firstPeriodStub: true } : {}),
-    // R92-5：增值税率为百分数口径展示值（6 / 6%），提交前换算为小数字符串。
-    vatRate: parseRateInput(form.vatRate) ?? form.vatRate.trim(),
   }
 
   if (form.method === 'EXPLICIT_RENT') {
@@ -406,11 +382,6 @@ function buildRequest(): CalculationRequest {
         chargeMode: fee.chargeMode,
         // 承担方（ticket 04）：缺省承租人承担；字段总带上，契约显式优于缺席（§3.1）。
         owner: fee.owner,
-        // U5：费用税率（百分数口径展示值）与 IRR 参与开关逐笔显式给出；
-        // 税率留空不携带（后端 null = 不单列税），开关恒带（false 是契约缺省，显式优于缺席）。
-        ...(fee.vatRate.trim() === ''
-          ? {}
-          : { vatRate: parseRateInput(fee.vatRate) ?? fee.vatRate.trim() }),
         includeInIrr: fee.includeInIrr,
       }
       return feeInput
@@ -592,20 +563,6 @@ function onReset(): void {
                     :min="1"
                     style="width: 100%"
                     data-test="periods"
-                  />
-                </FormItem>
-              </Col>
-              <Col :span="12">
-                <FormItem :label="t('form.basic.currency')" name="currency">
-                  <!-- R92-2：常见币种下拉（标签「中文名（码）」，提交值为 ISO-4217 码）。 -->
-                  <Select
-                    v-model:value="form.currency"
-                    :options="currencyOptions"
-                    show-search
-                    :filter-option="filterCurrencyOption"
-                    :popup-match-select-width="false"
-                    style="width: 100%"
-                    data-test="currency"
                   />
                 </FormItem>
               </Col>
@@ -840,32 +797,6 @@ function onReset(): void {
                   </Typography.Text>
                 </FormItem>
               </Col>
-              <Col :span="12">
-                <FormItem :label="t('form.feesOther.vatRate')" name="vatRate">
-                  <!-- R92-5：百分数口径输入（6 或 6% → 0.06）。 -->
-                  <Input
-                    v-model:value="form.vatRate"
-                    data-test="vat-rate"
-                    :placeholder="t('form.feesOther.vatRatePh')"
-                  />
-                  <!-- R93-4：档次快选移入 extra 插槽——输入框正下方一行内联小按钮，
-                       不再有任何独立标签（彻底消除竖排一字一行的可能）。 -->
-                  <template #extra>
-                    <div class="vat-rate-presets" data-test="vat-rate-presets">
-                      <Button
-                        v-for="preset in VAT_RATE_PRESETS"
-                        :key="preset"
-                        size="small"
-                        class="vat-rate-preset-btn"
-                        :data-test="`vat-rate-preset-${preset}`"
-                        @click="form.vatRate = preset"
-                      >
-                        {{ preset }}%
-                      </Button>
-                    </div>
-                  </template>
-                </FormItem>
-              </Col>
             </Row>
           </Card>
 
@@ -942,14 +873,4 @@ function onReset(): void {
   color: var(--fcs-text-muted);
 }
 
-/* R92-5：增值税档次快选按钮行。 */
-.vat-rate-presets {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-.vat-rate-preset-btn {
-  min-width: 40px;
-}
 </style>

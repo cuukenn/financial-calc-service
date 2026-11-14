@@ -267,13 +267,11 @@ class ValidatorChainTest {
                 .residualValue(BigDecimal.ZERO)
                 .residualHandling(ResidualHandling.SEPARATE)
                 .deposit(BigDecimal.ZERO)
-                .vatRate(new BigDecimal("0.06"))
                 .method(RepaymentMethodId.EXPLICIT_RENT)
                 .explicitRents(List.of(
                         new BigDecimal("30200.00"), new BigDecimal("30200.00"),
                         new BigDecimal("30503.01")))
                 .gracePeriod(GracePeriod.none())
-                .currency("CNY")
                 .rateChangePolicy(RateChangePolicy.RESOLVE)
                 .build();
         Schedule schedule = new ExplicitRentGenerator().generate(context(element));
@@ -465,10 +463,8 @@ class ValidatorChainTest {
                 .residualValue(BigDecimal.ZERO)
                 .residualHandling(ResidualHandling.SEPARATE)
                 .deposit(BigDecimal.ZERO)
-                .vatRate(new BigDecimal("0.06"))
                 .method(RepaymentMethodId.EQUAL_INSTALLMENT)
                 .gracePeriod(GracePeriod.none())
-                .currency("CNY")
                 .rateChangePolicy(RateChangePolicy.RESOLVE)
                 .build();
     }

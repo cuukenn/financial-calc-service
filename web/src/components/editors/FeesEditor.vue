@@ -28,7 +28,7 @@ const feeOwnerOptions = computed(() =>
 
 function addFee(): void {
   fees.value.push({ type: '', amount: '', chargeMode: 'UPFRONT', owner: 'LESSEE',
-    vatRate: '', includeInIrr: false })
+    includeInIrr: false })
 }
 
 function removeFee(index: number): void {
@@ -70,12 +70,6 @@ function removeFee(index: number): void {
           :popup-match-select-width="false"
           style="width: 140px"
           data-test="fee-owner"
-        />
-        <Input
-          v-model:value="fee.vatRate"
-          :placeholder="t('form.feesOther.fees.vatRatePh')"
-          style="width: 110px"
-          data-test="fee-vat-rate"
         />
         <Checkbox v-model:checked="fee.includeInIrr" data-test="fee-include-irr">
           {{ t('form.feesOther.fees.includeIrr') }}

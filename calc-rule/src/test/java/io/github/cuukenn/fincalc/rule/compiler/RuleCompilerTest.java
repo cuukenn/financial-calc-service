@@ -314,7 +314,6 @@ class RuleCompilerTest {
                 .residualHandling(io.github.cuukenn.fincalc.domain.model.ResidualHandling.SEPARATE)
                 .method(io.github.cuukenn.fincalc.domain.model.RepaymentMethodId.RULE_DRIVEN)
                 .gracePeriod(GracePeriod.none())
-                .currency("CNY")
                 .rateChangePolicy(RateChangePolicy.RESOLVE)
                 .build();
     }

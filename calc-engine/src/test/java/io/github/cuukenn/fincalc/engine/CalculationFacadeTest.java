@@ -568,10 +568,8 @@ class CalculationFacadeTest {
                 .residualValue(BigDecimal.ZERO)
                 .residualHandling(ResidualHandling.SEPARATE)
                 .deposit(BigDecimal.ZERO)
-                .vatRate(new BigDecimal("0.06"))
                 .method(RepaymentMethodId.EQUAL_INSTALLMENT)
                 .gracePeriod(GracePeriod.none())
-                .currency("CNY")
                 .rateChangePolicy(RateChangePolicy.RESOLVE)
                 .build();
     }

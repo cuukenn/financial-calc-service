@@ -21,8 +21,6 @@ export interface FeeDraft {
   amount: string
   chargeMode: string
   owner: FeeOwnerDraft
-  /** 该笔费用的增值税率展示值（百分数口径）；空 = 不单列税。 */
-  vatRate: string
   /** 是否计入 IRR 现金流；后端契约缺省 false。 */
   includeInIrr: boolean
 }

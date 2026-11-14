@@ -52,8 +52,6 @@ export interface FeeInput {
   chargeMode: string
   /** 费用承担方：LESSEE（承租人承担、出租人收取，缺省）/ LESSOR（出租人承担，事件表流出）。 */
   owner?: FeeOwner
-  /** 该笔费用的增值税率，小数形式。 */
-  vatRate?: string
   /** 是否计入 IRR 现金流；缺省 false。 */
   includeInIrr?: boolean
 }
@@ -133,10 +131,6 @@ export interface CalculationRequest {
   firstPeriodStub?: boolean
   /** 业务产品：LEASE（缺省）/ MORTGAGE——仅选择校验装配（引擎 WARN 阈值披露），内核产品盲。 */
   product?: ProductProfile
-  /** 增值税率，小数形式。 */
-  vatRate?: string
-  /** 币种，ISO-4217 代码。 */
-  currency?: string
   /** 还款方式 code（RepaymentMethodId 枚举名，见 GET /api/v1/algorithms）。 */
   method?: string
   gracePeriod?: GracePeriodOptions

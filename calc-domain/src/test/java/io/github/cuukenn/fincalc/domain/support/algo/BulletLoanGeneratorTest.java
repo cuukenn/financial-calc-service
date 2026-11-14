@@ -167,10 +167,8 @@ class BulletLoanGeneratorTest {
                 .residualValue(BigDecimal.ZERO)
                 .residualHandling(ResidualHandling.SEPARATE)
                 .deposit(BigDecimal.ZERO)
-                .vatRate(new BigDecimal("0.06"))
                 .method(RepaymentMethodId.BULLET_LOAN)
                 .gracePeriod(GracePeriod.none())
-                .currency("CNY")
                 .rateChangePolicy(RateChangePolicy.RESOLVE)
                 .build();
     }
