@@ -6,7 +6,7 @@
 
 ## 环境要求
 
-- JDK 11+（构建目标 `release=11`，无 text blocks 等 11+ 语法）
+- JDK 17+（A6，2026-11-14：构建目标 `release=17`，运行 Maven 的 JDK 也须 ≥ 17）
 - Maven 3.8+
 
 ## 模块说明
@@ -139,7 +139,7 @@ THIRTY_360、12 期月付期末付，`TOTAL_RENT = 1 032 797.15`）。改动算�
 
 ## REST API（calc-server）
 
-`calc-server` 是 Spring Boot 2.7.18 薄壳（Plan 2），把 `CalculationFacade` 暴露为 JSON API；
+`calc-server` 是 Spring Boot 3.5.16 薄壳（A6，2026-11-14，自 2.7.18 迁移）（Plan 2），把 `CalculationFacade` 暴露为 JSON API；
 依赖版本集中于 `calc-bom`（R78）。机器可读契约见 OpenAPI 文档 `GET /v3/api-docs`
 （springdoc-openapi 1.7.x，DTO 层 `@Schema` 注解；核心模块零注解，R76）。
 

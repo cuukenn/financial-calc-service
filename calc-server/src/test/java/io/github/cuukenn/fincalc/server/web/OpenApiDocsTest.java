@@ -30,7 +30,9 @@ class OpenApiDocsTest {
         mockMvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.openapi", containsString("3.0")));
+                // A6（Boot 3.5.16 + springdoc 2.8.13）：OpenAPI 3.1 的 JSON——springdoc 1.x
+                // 出 3.0.x，2.x 出 3.1.x，钉桩随迁移同步。
+                .andExpect(jsonPath("$.openapi", containsString("3.1")));
     }
 
     @Test

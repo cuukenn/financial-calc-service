@@ -326,14 +326,16 @@ public final class CalculationFacade {
             FinancialMetrics metrics, PeriodicRootHandoff rootHandoff, List<ValidationIssue> issues) {
         if (metrics.find(MetricCodes.IRR_PERIOD) == null) {
             issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
-                    "FCS-CALC-3003: IRR_PERIOD 不收敛, 实际利率法摊销表未生成", null));
+                    CalcErrorCode.IRR_NOT_CONVERGED.code()
+                            + ": IRR_PERIOD 不收敛, 实际利率法摊销表未生成", null));
             return null;
         }
         BigDecimal residualExtra = unrecoveredResiduals(element, schedule);
         BigDecimal periodIrr = netInvestmentPeriodIrr(schedule, residualExtra, rootHandoff);
         if (periodIrr == null) {
             issues.add(new ValidationIssue(IssueLevel.WARN, CalcErrorCode.IRR_NOT_CONVERGED.code(),
-                    "FCS-CALC-3003: 租金口径现金流无内部收益率, 实际利率法摊销表未生成", null));
+                    CalcErrorCode.IRR_NOT_CONVERGED.code()
+                            + ": 租金口径现金流无内部收益率, 实际利率法摊销表未生成", null));
             return null;
         }
         try {

@@ -31,11 +31,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- OpenAPI documentation (R78): version managed in calc-bom (springdoc 1.7.x, the
-             Boot 2.7-compatible line). Brings swagger-annotations for the DTO @Schema docs. -->
+        <!-- OpenAPI documentation (R78): version managed in calc-bom (springdoc 2.8.x, the
+             Boot 3.5-compatible line, A6). Brings swagger-annotations for the DTO @Schema docs;
+             serves OpenAPI 3.1 JSON (was 3.0.x on springdoc 1.x). -->
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-ui</artifactId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
         <dependency>
