@@ -60,6 +60,15 @@
                         </goals>
                     </execution>
                 </executions>
+                <!-- Docker 分层构建：jar 自带 layers.idx，layertools extract 拆出
+                     dependencies / spring-boot-loader / snapshot-dependencies / application 四层，
+                     依赖不变的重建只动 application 层（见 docker/backend.Dockerfile）。
+                     2.4+ 默认开启，这里显式钉住。 -->
+                <configuration>
+                    <layers>
+                        <enabled>true</enabled>
+                    </layers>
+                </configuration>
             </plugin>
         </plugins>
     </build>
