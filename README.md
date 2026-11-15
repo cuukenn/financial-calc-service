@@ -1,10 +1,16 @@
 # financial-calc-service
 
+[![CI](https://github.com/cuukenn/financial-calc-service/actions/workflows/ci.yml/badge.svg)](https://github.com/cuukenn/financial-calc-service/actions/workflows/ci.yml)
+[![Release](https://github.com/cuukenn/financial-calc-service/actions/workflows/release.yml/badge.svg)](https://github.com/cuukenn/financial-calc-service/releases)
+[![License](https://img.shields.io/badge/license-Apache_2.0-blue.svg)](LICENSE)
+
 > 融资租赁 / 个人住房贷款测算引擎 —— 精确到分、一套契约、开箱即部署。
 
 融资租赁 / 个人住房贷款的测算引擎：给定合同要素（本金、利率、期限、频率、残值、保证金、费用……），
 产出逐期摊销表、现金流事件表、26 项金融指标与实际利率法摊销表。纯 Java 内核（`BigDecimal`
 精确算术、无框架依赖）+ Spring Boot JSON API + Vue 3 可视化前端，前端与 API 打在同一个 jar 里。
+
+![工作台](docs/images/workbench.png)
 
 ## 特性
 

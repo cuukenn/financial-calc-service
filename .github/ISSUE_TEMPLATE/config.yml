@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题
+    url: https://github.com/cuukenn/financial-calc-service/discussions
+    about: 先到 Discussions 提问，确认是缺陷或功能需求再开 issue
